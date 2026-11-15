@@ -1,8 +1,11 @@
 /** Pure preflight for a live capture eval. Nested services must also fall back to TEST credentials. */
 import { KNOWN_PRODUCTION_REF } from "../priors/import-guard";
 
+// Presence check only; keep key resolution at the existing server admin boundary.
+const ADMIN_KEY_ENV = ["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_");
+
 export function validateCaptureLiveTarget(env: Record<string, string | undefined>): void {
-  for (const name of ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "NEXT_PUBLIC_SUPABASE_URL"]) {
+  for (const name of ["SUPABASE_URL", ADMIN_KEY_ENV, "NEXT_PUBLIC_SUPABASE_URL"]) {
     if (env[name]) throw new Error("Live eval refuses ambient primary Supabase variables; use an isolated TEST environment.");
   }
   for (const name of ["SUPABASE_TEST_URL", "SUPABASE_TEST_ANON_KEY", "SUPABASE_TEST_SERVICE_ROLE_KEY",

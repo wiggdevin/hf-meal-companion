@@ -4,7 +4,7 @@
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import {
-  BASE_TDEE, intakeErrorScenarios, replayScenario, SCENARIOS, START_DATE, steadyState,
+  BASE_TDEE, intakeErrorScenarios, replayScenario, SCENARIOS, START_DATE,
   toScenarioDay, waterSwingControl,
 } from "@/lib/expenditure.fixtures";
 import { ENGINE_VERSION } from "@/lib/expenditure";
@@ -21,17 +21,34 @@ export const STEP_WITHIN_DAYS = 28;
 export const RAMP_MAX_KCAL = 120;
 
 type Runs = ReturnType<typeof replayScenario>;
+type ScenarioRuns = { label: string; runs: Runs };
+export type BacktestEvidence = {
+  scenarios: ScenarioRuns[];
+  waterControl: Runs;
+  intakeErrors: ScenarioRuns[];
+};
+
+/** Run each series once; summaries and acceptance claims consume the same observations. */
+export function collectBacktestEvidence(): BacktestEvidence {
+  const errors = intakeErrorScenarios();
+  return {
+    scenarios: SCENARIOS.map((scenario) => ({ label: scenario.label, runs: replayScenario(scenario) })),
+    waterControl: replayScenario(waterSwingControl()),
+    intakeErrors: (["constantBias", "methodSwitch", "randomError", "omittedFat", "falseComplete"] as const)
+      .map((key) => ({ label: errors[key].label, runs: replayScenario(errors[key], {
+        marksStartedOn: key === "falseComplete" ? START_DATE : null,
+      }) })),
+  };
+}
 
 /** Version the filename from the engine too, so a new run cannot masquerade as an old engine. */
 export function recordPath(today: string): string {
   return `docs/evals/${today}-${ENGINE_VERSION}-backtest.md`;
 }
 
-const control = replayScenario(steadyState());
-
 const tdeeOn = (runs: Runs, date: string) => runs.find((r) => r.date === date)?.result ?? null;
 
-function maxAbsDeviation(runs: Runs, against: Runs = control): number {
+function maxAbsDeviation(runs: Runs, against: Runs): number {
   let worst = 0;
   for (const run of runs) {
     const base = tdeeOn(against, run.date);
@@ -48,26 +65,23 @@ function row(label: string, runs: Runs) {
   return `| ${label} | ${last?.status ?? "n/a"} | ${last?.tdeeKcal ?? "n/a"} | ${last?.phase ?? "n/a"} | ${last?.dataWeight?.toFixed(2) ?? "n/a"} | ${[...statuses].sort().join(", ")} |`;
 }
 
-function scenario(label: string): Runs {
-  const match = SCENARIOS.find((s) => s.label === label);
-  if (!match) throw new Error(`unknown scenario: ${label}`);
-  return replayScenario(match);
-}
-
-const claims: string[] = [];
-function claim(name: string, bound: string, measured: string, pass: boolean) {
-  claims.push(`| ${name} | ${bound} | ${measured} | ${pass ? "pass" : "**MISS**"} |`);
-}
-
-function verdict() {
-  claims.length = 0;
+function verdict(evidence: BacktestEvidence): string[] {
+  const claims: string[] = [];
+  const claim = (name: string, bound: string, measured: string, pass: boolean) => {
+    claims.push(`| ${name} | ${bound} | ${measured} | ${pass ? "pass" : "**MISS**"} |`);
+  };
+  const scenario = (label: string): Runs => {
+    const match = evidence.scenarios.find((item) => item.label === label);
+    if (!match) throw new Error(`unknown scenario: ${label}`);
+    return match.runs;
+  };
   const water = scenario("1.5 kg water swing over 3 days");
   const cycle = scenario("±0.8 kg on a 28-day cycle");
   const under = scenario("under-logging: 3 qualified days a week");
   const step = scenario("+250 kcal/day step");
   const ramp = scenario("+15 kcal/day/week ramp");
 
-  const waterControl = replayScenario(waterSwingControl());
+  const waterControl = evidence.waterControl;
   const waterDev = maxAbsDeviation(water, waterControl);
   const badNights = water.filter((r, i) =>
     r.result.proposalEligible && !waterControl[i].result.proposalEligible);
@@ -106,28 +120,23 @@ function verdict() {
   }
   claim("3b/12 +15 kcal/day/week ramp", `every proposalEligible night within ${RAMP_MAX_KCAL} kcal of truth`,
     `worst error ${Math.round(rampWorst)} kcal`, rampWorst < RAMP_MAX_KCAL);
+  return claims;
 }
 
-function intakeErrorRows(): string[] {
-  const scenarios = intakeErrorScenarios();
-  return (["constantBias", "methodSwitch", "randomError", "omittedFat", "falseComplete"] as const)
-    .map((key) => {
-      const scenario = scenarios[key];
-      const runs = replayScenario(scenario, {
-        marksStartedOn: key === "falseComplete" ? START_DATE : null,
-      });
-      const mature = runs.filter((run) => toScenarioDay(run.date) >= 42);
-      const last = runs.at(-1)?.result;
-      const errors = mature.map((run) => run.result.tdeeKcal)
-        .filter((value): value is number => value !== null).map((value) => value - BASE_TDEE);
-      const eligible = mature.filter((run) => run.result.proposalEligible).length;
-      return `| ${scenario.label} | ${last?.tdeeKcal ?? "n/a"} | ${last?.tdeeKcal == null ? "n/a" : last.tdeeKcal - BASE_TDEE} | [${Math.min(...errors)}, ${Math.max(...errors)}] | ${eligible}/${mature.length} |`;
-    });
+function intakeErrorRows(scenarios: ScenarioRuns[]): string[] {
+  return scenarios.map(({ label, runs }) => {
+    const mature = runs.filter((run) => toScenarioDay(run.date) >= 42);
+    const last = runs.at(-1)?.result;
+    const errors = mature.map((run) => run.result.tdeeKcal)
+      .filter((value): value is number => value !== null).map((value) => value - BASE_TDEE);
+    const eligible = mature.filter((run) => run.result.proposalEligible).length;
+    return `| ${label} | ${last?.tdeeKcal ?? "n/a"} | ${last?.tdeeKcal == null ? "n/a" : last.tdeeKcal - BASE_TDEE} | [${Math.min(...errors)}, ${Math.max(...errors)}] | ${eligible}/${mature.length} |`;
+  });
 }
 
-/** The full Markdown record, deterministic for a given day. */
-export function renderRecord(today: string): string {
-  verdict();
+/** Pure with supplied evidence; the default collects real runs for the offline CLI. */
+export function renderRecord(today: string, evidence = collectBacktestEvidence()): string {
+  const claims = verdict(evidence);
   const lines = [
     `# Estimator backtest: ${today}`,
     "",
@@ -139,7 +148,7 @@ export function renderRecord(today: string): string {
     "",
     "| Scenario | Final status | Final TDEE | Final phase | Final data weight | Statuses seen |",
     "|---|---|---|---|---|---|",
-    ...SCENARIOS.map((s) => row(s.label, replayScenario(s))),
+    ...evidence.scenarios.map((scenario) => row(scenario.label, scenario.runs)),
     "",
     "## Acceptance claims (docs/specs/phase-16-adaptive-handoff.md, rulings R9)",
     "",
@@ -175,7 +184,7 @@ export function renderRecord(today: string): string {
     "",
     "| Scenario | Final TDEE | Final error vs true TDEE | Mature error interval, kcal/day | Mature proposal-eligible nights |",
     "|---|---|---|---|---|",
-    ...intakeErrorRows(),
+    ...intakeErrorRows(evidence.intakeErrors),
     "",
     "Tested bounds and eligibility:",
     "",
