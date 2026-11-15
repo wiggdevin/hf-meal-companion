@@ -57,5 +57,6 @@
       "kind": "synthetic"
     }
   ],
-  "corpusSha256": "288f8fb17efc7b52b83cfe5cdfb8c7732463843ea1e2511b68ae4f0a6648da9f"
+  "corpusSha256": "4459e250cdc2997cf8a635f550e0cc8c7946595c04dab1f01cb83683cc95bb70",
+  "labelGoldSha256": "455c4278b79cbf4c916d63a406eeee6cd24c6832f4b124039431728044c83787"
 }

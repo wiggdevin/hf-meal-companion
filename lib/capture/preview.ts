@@ -1,6 +1,7 @@
 import { snapshotFor } from "@/lib/log-client";
 import { MACRO_CODES } from "@/lib/nutrients/codes";
 import { itemKcal } from "@/lib/nutrients/energy";
+import { round4 } from "@/lib/nutrients/snapshot";
 import type { EditedItem } from "@/lib/capture-client";
 import type { ProposeResponse } from "@/lib/capture/types";
 import type { CachedRevision } from "@/lib/db/catalog-cache";
@@ -40,10 +41,10 @@ export function projectedCaptureMacros(
     if (!total || !revision || (item.foodRefId === null && !own)) return null;
     const snapshot = snapshotFor(revision, item.grams);
     return {
-      kcal: total.kcal + (itemKcal(snapshot) ?? 0),
-      protein: total.protein + (snapshot[MACRO_CODES.protein]?.amount ?? 0),
-      carbs: total.carbs + (snapshot[MACRO_CODES.carbs]?.amount ?? 0),
-      fat: total.fat + (snapshot[MACRO_CODES.fat]?.amount ?? 0),
+      kcal: round4(total.kcal + (itemKcal(snapshot) ?? 0)),
+      protein: round4(total.protein + (snapshot[MACRO_CODES.protein]?.amount ?? 0)),
+      carbs: round4(total.carbs + (snapshot[MACRO_CODES.carbs]?.amount ?? 0)),
+      fat: round4(total.fat + (snapshot[MACRO_CODES.fat]?.amount ?? 0)),
     };
   }, { kcal: 0, protein: 0, carbs: 0, fat: 0 });
   if (total === null) return null;

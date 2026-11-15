@@ -1,7 +1,7 @@
 [
   {
     "id": "label-40g",
-    "name": "Protein",
+    "name": "Synthetic Oat Squares",
     "servingGrams": 40,
     "printed": {
       "Calories": 120,
@@ -20,7 +20,7 @@
   },
   {
     "id": "label-50g",
-    "name": "Protein",
+    "name": "Synthetic Rice Apple Mix",
     "servingGrams": 50,
     "printed": {
       "Calories": 100,

@@ -8,7 +8,7 @@ Live: https://sasha-meal-companion.vercel.app
 
 ## Stack
 
-- Next.js 16.3.8, React 19, TypeScript
+- Next.js 16.4.2, React 19, TypeScript
 - Tailwind 4
 - Supabase (project `fivatgdpuenszxxnijpc`) for sync and the MCP server
 - Vitest for tests
