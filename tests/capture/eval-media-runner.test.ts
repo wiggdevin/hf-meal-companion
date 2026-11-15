@@ -39,11 +39,12 @@ describe("live-only fixture boundary", () => {
     expect(result.status).toBe("unlabelled");
   });
 
-  it("cleans a signed fixture after provider failure and keeps its failure distinct", async () => {
+  it("cleans a signed fixture without blaming an ambiguous service error on the provider", async () => {
     const line = fixture();
     boundary.propose.mockRejectedValue(Object.assign(new Error("provider down"), { code: "provider_unavailable" }));
     const result = await runLine(database, database, "test-user", line, inventoryCases([line])[0]);
-    expect(result.status).toBe("provider_failure");
+    expect(result.status).toBe("service_unavailable");
+    expect(result.errorCode).toBe("provider_unavailable");
     expect(boundary.remove).toHaveBeenCalledWith(database, path);
   });
 
@@ -71,5 +72,18 @@ describe("live-only fixture boundary", () => {
     const result = await runLine(database, database, "test-user", line, inventoryCases([line])[0]);
     expect(result.status).toBe("unlabelled");
     expect(result.cleanupError).toContain("cleanup failed");
+  });
+
+  it('distinguishes post-draft identity evaluation failure from upload setup failure', async () => {
+    const line = fixture();
+    boundary.propose.mockResolvedValue({ draftId: 'draft', method: 'label', notes: [],
+      spend: { usedToday: 0, softCap: 0 }, items: [{ label: 'milk', grams: 100,
+        foodRefId: 'ref-milk', autoResolved: true, alternatives: [] }] });
+    const failedReads = { from: () => ({ select: () => ({ in: async () => ({ data: null,
+      error: { message: 'local boundary unavailable' } }) }) }) } as unknown as SupabaseClient;
+    const result = await runLine(failedReads, database, 'test-user', line, inventoryCases([line])[0]);
+    expect(result.status).toBe('evaluation_failure');
+    expect(result.captureInvoked).toBe(true);
+    expect(boundary.remove).toHaveBeenCalledWith(database, path);
   });
 });

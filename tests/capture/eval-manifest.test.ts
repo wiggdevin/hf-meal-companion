@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderReportMarkdown } from "@/scripts/eval/coach-streak-report";
 import type { StreakRunConfig, StreakState } from "@/scripts/eval/coach-streak-state";
-import { createEvalManifest, routeFromCoachResponse } from "@/scripts/eval/capture-manifest";
+import { createEvalManifest, routeFromCoachResponse, unknownManifest } from "@/scripts/eval/capture-manifest";
 
 describe("eval provenance", () => {
   it("does not stamp a historical coach run with the current commit or configured route", () => {
@@ -15,7 +15,9 @@ describe("eval provenance", () => {
     expect(report).toContain("Schema hash: unknown");
     expect(report).toContain("Catalog snapshot: unknown");
     expect(report).toContain("route unknown");
-    expect(report).toContain("Configured lanes (not observed routes)");
+    expect(report).toContain("Configured lanes: unknown");
+    expect(unknownManifest().configuredLanes).toBeNull();
+    expect(unknownManifest().configuredOpenRouterPins).toBeNull();
   });
 
   it('keeps missing historical fallback evidence unknown while preserving the observed model', () => {
@@ -25,7 +27,7 @@ describe("eval provenance", () => {
       .fallbackUsed).toBe(false);
     expect(routeFromCoachResponse('fallback', { model: { provider: 'gemini', modelId: 'observed-model',
       fellBackBecause: 'capacity' } }).fallbackUsed).toBe(true);
-    expect(routeFromCoachResponse('fast', { model: { provider: 'gemini', modelId: '' } }).source).toBe('not_called');
+    expect(routeFromCoachResponse('fast', { model: { provider: 'gemini', modelId: '' } }).source).toBe('unknown');
   });
 
   it('names the exact source fingerprints and marks a local catalog snapshot as unknown', () => {
@@ -38,5 +40,19 @@ describe("eval provenance", () => {
     expect(manifest.sourceFiles.schema).toContain('lib/ai/schemas.ts');
     expect(manifest.catalogSnapshot).toBe('unknown');
     expect(manifest.routes).toEqual([]);
+  });
+
+  it('does not infer no auxiliary model calls from a blank coach answer model', () => {
+    const route = routeFromCoachResponse('photo-attachment', { model: { provider: 'gemini', modelId: '' },
+      provenance: { ai: true, source: 'model', purpose: 'photoToItems' }, timings: { model: 0, ground: 0, attach: 900 } });
+    expect(route.source).toBe('unknown');
+    expect(route.provider).toBeNull();
+  });
+
+  it('fingerprints the per-action definitions that build coach prompts and provider fields', () => {
+    const manifest = createEvalManifest({ kind: 'coach', execution: 'live',
+      datasetPath: 'scripts/eval/coach-corpus.json' });
+    expect(manifest.sourceFiles.prompt).toContain('lib/coach/actions/log-meal.ts');
+    expect(manifest.sourceFiles.schema).toContain('lib/coach/actions/wire-fields.ts');
   });
 });

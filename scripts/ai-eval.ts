@@ -13,30 +13,35 @@ import { scoreCases, type CaptureCase, type CaptureMethodScore, type CapturePred
   type MethodScore } from "./eval/capture-score";
 import { createEvalManifest, renderEvalManifest, sha256, type EvalManifest,
   type ObservedRoute } from "./eval/capture-manifest";
+import { validateCaptureLiveTarget } from "./eval/capture-live-target";
 export { scoreMethod } from "./eval/capture-score";
 export type { EvalResult, MethodScore } from "./eval/capture-score";
 
 const METHODS: CaptureMethod[] = ["text", "voice", "label", "photo"];
 const SET_PATH = "scripts/eval/phase-4-capture.jsonl";
 const lineSchema = z.object({
-  id: z.string().optional(), method: z.enum(["text", "voice", "label", "photo"]),
+  id: z.string().trim().min(1).optional(), method: z.enum(["text", "voice", "label", "photo"]),
   slot: z.string(), localDate: z.string(), tz: z.string().optional(),
   text: z.string().optional(), media: z.string().optional(),
   expect: z.array(z.object({ label: z.string().min(1), grams: z.number().nonnegative().nullable(),
     ids: z.array(z.string().regex(/^[^:]+:.+$/)).min(1).optional(),
+    aliases: z.array(z.string().trim().min(1)).min(1).optional(),
     quantitySource: z.enum(["stated_mass", "weighed", "printed_label", "reference_portion", "unknown"]).optional(),
   })),
-}).refine((line) => line.method === "text" ? Boolean(line.text) : Boolean(line.media),
-  "text captures need text; other methods need a local media fixture");
+}).refine((line) => line.method === "text" ? Boolean(line.text) && line.media === undefined
+  : Boolean(line.media) && line.text === undefined,
+  "text captures need only text; other methods need only a local media fixture");
 export type EvalLine = z.infer<typeof lineSchema>;
 
 export function readSet(path = SET_PATH): EvalLine[] {
-  return readFileSync(path, "utf8").split(/\r?\n/).filter((line) => line.trim())
+  const lines = readFileSync(path, "utf8").split(/\r?\n/).filter((line) => line.trim())
     .map((line, index) => {
       const parsed = lineSchema.safeParse(JSON.parse(line));
       if (!parsed.success) throw new Error(`${path}:${index + 1}: ${parsed.error.message}`);
-      return parsed.data;
+      return { ...parsed.data, id: parsed.data.id ?? `${parsed.data.method}-${index + 1}` };
     });
+  if (new Set(lines.map((line) => line.id)).size !== lines.length) throw new Error(`${path}: duplicate case IDs`);
+  return lines;
 }
 
 export function inventoryCases(lines: EvalLine[]): CaptureCase[] {
@@ -55,33 +60,39 @@ export function renderReport(scores: MethodScore[], at: string, manifest?: EvalM
     manifest?.execution === "offline_inventory" ? "Mode: offline inventory; no database or model calls."
       : "Identity and quantity are separate measurements. Missing evidence is not a zero error.", "",
     renderEvalManifest(manifest), "",
-    "| Method | lines | labelled | unlabelled | media present | media missing | not run | provider failures | scored cases |",
-    "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+    "| Method | lines | labelled | unlabelled | media present | media missing | not run | confirmed provider failures | scored cases | unavailable service (unattributed) |",
+    "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
   ];
   for (const score of scores) {
     const full = score as Partial<CaptureMethodScore>;
     const c = full.cases;
-    lines.push(`| ${score.method} | ${c?.total ?? "unknown"} | ${c?.labelled ?? "unknown"} | ${c?.unlabelled ?? "unknown"} | ${c?.mediaPresent ?? "unknown"} | ${c?.mediaMissing ?? "unknown"} | ${c?.notRun ?? "unknown"} | ${c?.providerFailure ?? "unknown"} | ${c?.scored ?? "unknown"} |`);
+    lines.push(`| ${score.method} | ${c?.total ?? "unknown"} | ${c?.labelled ?? "unknown"} | ${c?.unlabelled ?? "unknown"} | ${c?.mediaPresent ?? "unknown"} | ${c?.mediaMissing ?? "unknown"} | ${c?.notRun ?? "unknown"} | ${c?.providerFailure ?? "unknown"} | ${c?.scored ?? "unknown"} | ${c?.serviceUnavailable ?? "unknown"} |`);
   }
   lines.push("", "Gold includes skipped cases; evaluated gold is the identity denominator. Provider/setup failures retain their gold misses.",
     "Unmatched predictions fill misidentified gold slots first; remaining predictions are extras and remaining gold is missing.", "",
-    "| Method | all gold | evaluated gold | correct | misidentified | missing | extras | extras/case | failed items | failed cases | identity accuracy | canonical matches | label-only matches |",
+    "| Method | all gold | evaluated gold | correct | misidentified | missing | extras | extras/case | failed items | failed cases | parsed identity accuracy | canonical matches | label-only matches |",
     "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
   );
   for (const score of scores) {
     const s = score as Partial<CaptureMethodScore>;
     lines.push(`| ${score.method} | ${s.goldItems ?? "unknown"} | ${score.n} | ${s.correct ?? "unknown"} | ${s.misidentified ?? "unknown"} | ${s.missing ?? "unknown"} | ${s.extra ?? "unknown"} | ${s.extraPerCase == null ? "not measured" : s.extraPerCase.toFixed(2)} | ${score.failed} | ${s.taskFailureCases ?? "unknown"} | ${pct(score.itemAccuracy)} | ${s.canonicalMatches ?? "unknown"} | ${s.labelOnlyMatches ?? "unknown"} |`);
   }
-  lines.push("", "QTY requires correct identity and an explicit stated/weighed/printed/reference gold basis. Legacy gram guesses remain unscored.",
+  lines.push("", "QTY requires unambiguous identity pairing and stated_mass, weighed or printed_label gold. Reference portions alone and legacy gram guesses remain unscored.",
     "Percentiles use linear interpolation. These descriptive values have no confidence intervals or accuracy gate.", "",
-    "| Method | QTY n | QTY unscored | gram MAE | median abs | P90 abs | median % error | P90 % error | grounding | auto coverage/gold | top-3 containment |",
-    "|---|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|",
+    "Catalog grounding and top-3 require complete canonical gold/observable automatic IDs; extraction labels cannot certify an automatic catalog choice.",
+    "| Method | QTY n | QTY unscored | ambiguous identities | gram MAE | median abs | P90 abs | median % error | P90 % error | canonical auto precision | auto coverage/gold | top-3 containment | top-3 n | canonical incomplete cases |",
+    "|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|---:|---:|",
   );
   for (const score of scores) {
     const s = score as Partial<CaptureMethodScore>;
-    const auto = score.autoResolvePrecision === null ? `0 auto-resolved of ${score.n}`
-      : `${pct(score.autoResolvePrecision)} over ${score.autoResolved} auto-resolved`;
-    lines.push(`| ${score.method} | ${s.quantityN ?? "unknown"} | ${s.quantityUnscored ?? "unknown"} | ${amount(score.gramMae)} | ${amount(s.quantityMedianAbs ?? null)} | ${amount(s.quantityP90Abs ?? null)} | ${amount(s.quantityMedianPercent ?? null, " %")} | ${amount(s.quantityP90Percent ?? null, " %")} | ${auto} | ${pct(s.autoResolveCoverage ?? null)} | top-3 containment ${pct(score.top3Containment)} |`);
+    const auto = score.autoResolvePrecision === null ? `${score.autoResolved} auto-resolved of ${score.n}; precision not measured`
+      : `${pct(score.autoResolvePrecision)} over ${score.autoResolveMeasured} canonically measured auto-resolved (${score.autoResolved} observed)`;
+    lines.push(`| ${score.method} | ${s.quantityN ?? "unknown"} | ${s.quantityUnscored ?? "unknown"} | ${s.quantityAmbiguous ?? "unknown"} | ${amount(score.gramMae)} | ${amount(s.quantityMedianAbs ?? null)} | ${amount(s.quantityP90Abs ?? null)} | ${amount(s.quantityMedianPercent ?? null, " %")} | ${amount(s.quantityP90Percent ?? null, " %")} | ${auto} | ${pct(s.autoResolveCoverage ?? null)} (${score.autoResolveGold} canonical gold) | top-3 containment ${pct(score.top3Containment)} | ${score.top3N} | ${s.canonicalIncomplete ?? "unknown"} |`);
+  }
+  lines.push("", "Error codes by method (unattributed service errors do not prove provider failure):", "",
+    "| Method | Error code | Cases |", "|---|---|---:|");
+  for (const score of scores) for (const [code, count] of Object.entries((score as Partial<CaptureMethodScore>).errorCodes ?? {})) {
+    lines.push(`| ${score.method} | ${code} | ${count} |`);
   }
   return `${lines.join("\n")}\n`;
 }
@@ -125,7 +136,7 @@ export async function runLine(client: SupabaseClient, admin: SupabaseClient, use
   const { putSignedUpload } = await import("@/lib/capture/upload");
   let mediaPath: string | null = null;
   let captureInvoked = false;
-  let stage: "setup_failure" | "provider_failure" = "setup_failure";
+  let stage: "setup_failure" | "capture_failure" | "evaluation_failure" = "setup_failure";
   let result: CaptureCase;
   try {
     if (line.media) {
@@ -139,13 +150,13 @@ export async function runLine(client: SupabaseClient, admin: SupabaseClient, use
       const status = await putSignedUpload(signed.uploadUrl, new Blob([bytes], { type: contentType }), fetch);
       if (status !== null) throw new Error(`fixture upload failed (${status})`);
     }
-    stage = "provider_failure";
+    stage = "capture_failure";
     const context = { localDate: line.localDate, tz: line.tz ?? "UTC", slot: line.slot };
     captureInvoked = true;
     const draft = await proposeDraft(client, admin, userId, line.method === "text"
       ? { ...context, method: "text", text: line.text! }
       : { ...context, method: line.method, mediaPath: mediaPath! });
-    stage = "setup_failure";
+    stage = "evaluation_failure";
     result = { ...inventory, captureInvoked, status: line.expect.length === 0 ? "unlabelled" : "scored",
       predictions: await predictionItems(client, draft) };
   } catch (error) {
@@ -153,7 +164,7 @@ export async function runLine(client: SupabaseClient, admin: SupabaseClient, use
     const code = (error as { code?: unknown } | null)?.code;
     const errorCode = typeof code === "string" && /^[a-z0-9_]{1,64}$/.test(code) ? code : "unknown";
     result = { ...inventory, captureInvoked, errorCode,
-      status: stage === "provider_failure" && errorCode !== "provider_unavailable" ? "capture_failure" : stage,
+      status: stage === "capture_failure" && errorCode === "provider_unavailable" ? "service_unavailable" : stage,
       error: error instanceof Error ? error.name : "UnknownError" };
   }
   if (mediaPath !== null) {
@@ -171,18 +182,16 @@ function option(name: string): string | undefined {
   return value;
 }
 async function main(): Promise<void> {
+  const dryRun = process.argv.includes("--dry-run");
+  if (!dryRun) validateCaptureLiveTarget(process.env);
   const setPath = option("--set") ?? SET_PATH;
   const only = option("--method");
   if (only && !METHODS.includes(only as CaptureMethod)) throw new Error("unknown --method");
   const lines = readSet(setPath).filter((line) => !only || line.method === only);
-  const dryRun = process.argv.includes("--dry-run");
   let cases = inventoryCases(lines);
   const manifest = createEvalManifest({ kind: "capture", execution: dryRun ? "offline_inventory" : "live",
     datasetPath: setPath });
   if (!dryRun && cases.some((item) => item.status !== "media_missing")) {
-    const required = ["SUPABASE_TEST_URL", "SUPABASE_TEST_ANON_KEY", "SUPABASE_TEST_SERVICE_ROLE_KEY",
-      "SEARCH_EVAL_EMAIL", "SEARCH_EVAL_PASSWORD"];
-    for (const key of required) if (!process.env[key]) throw new Error(`live eval requires ${key}; no production fallback`);
     const { createClient } = await import("@supabase/supabase-js");
     const { adminClientForCli } = await import("@/lib/server/admin");
     const client = createClient(process.env.SUPABASE_TEST_URL!, process.env.SUPABASE_TEST_ANON_KEY!,
@@ -204,6 +213,7 @@ async function main(): Promise<void> {
   report += `\nMethod scope: ${only ?? "all four methods"}.\n`;
   report += `\nSetup failures (separate from provider failures): ${setupFailures}.\n`;
   report += `Capture refusals/errors (not attributed to provider failure): ${cases.filter((item) => item.status === "capture_failure").length}.\n`;
+  report += `Post-draft evaluation failures: ${cases.filter((item) => item.status === "evaluation_failure").length}.\n`;
   report += `Temporary-media cleanup failures: ${cases.filter((item) => item.cleanupError).length}.\n`;
   console.log(report);
   const out = option("--out") ?? (dryRun ? undefined : `docs/evals/${at.slice(0, 10)}-capture-${at.slice(11, 19).replaceAll(":", "")}.md`);
