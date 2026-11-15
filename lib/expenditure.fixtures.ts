@@ -72,6 +72,11 @@ export type ScenarioArgs = {
   noiseKcal?: number;
   /** Whether day `d` is fully logged (a qualified day). */
   logged?: (d: number) => boolean;
+  /** Recorded energy, independent of what was eaten. Defaults to the legacy logging path. */
+  loggedIntake?: (d: number, eatenKcal: number) => number;
+  /** Coverage and explicit marks describe the log; neither changes the true energy balance. */
+  energyCoverage?: (d: number) => number;
+  userMarkedComplete?: (d: number) => boolean;
   /** Whether the user stepped on the scale on day `d`. */
   weighed?: (d: number) => boolean;
   /** Optional device observations. Null is missing; numeric zero remains an observation. */
@@ -97,9 +102,13 @@ export function buildScenario(args: ScenarioArgs): Scenario {
     const date = fromDayNumber(toDayNumber(START_DATE) + d);
     const eaten = args.intake(d);
     const fed = logged(d);
-    intake.push(fed
+    const recorded = fed
       ? { date, kcal: Math.round(eaten + (noise() - 0.5) * 2 * noiseKcal), energyCoverage: 1 }
-      : { date, kcal: Math.round(eaten * 0.35), energyCoverage: 0.5 });
+      : { date, kcal: Math.round(eaten * 0.35), energyCoverage: 0.5 };
+    intake.push({ ...recorded,
+      ...(args.loggedIntake ? { kcal: Math.round(args.loggedIntake(d, eaten)) } : {}),
+      ...(args.energyCoverage ? { energyCoverage: args.energyCoverage(d) } : {}),
+      ...(args.userMarkedComplete ? { userMarkedComplete: args.userMarkedComplete(d) } : {}) });
     if (weighed(d)) {
       const reading = trueKg + artefact(d) + (noise() - 0.5) * 2 * noiseKg;
       weighIns.push({ date, kg: Math.round(reading * 1000) / 1000 });
@@ -251,6 +260,38 @@ export function underLogging(): Scenario {
 export const SCENARIOS: readonly Scenario[] = [
   steadyState(), waterSwing(), cycleSwing(), trainingStep(), rampUp(), underLogging(),
 ];
+
+/**
+ * Intake-error probes: true intake and expenditure are both 2,130 kcal/day, and the scale is
+ * exactly flat. Only the recorded intake/complete marks change. These are identifiability
+ * checks under the engine's energy-balance approximation, not real-world accuracy claims.
+ * The independent LCG gives the random log error its own reproducible stream.
+ */
+export function intakeErrorScenarios() {
+  const common = { seed: 3000, noiseKg: 0, noiseKcal: 0,
+    tdee: () => BASE_TDEE, intake: () => BASE_TDEE };
+  const random = lcg(3003);
+  const incomplete = (day: number) => day % 5 === 4;
+  return {
+    control: buildScenario({ ...common, label: "intake-error matched control" }),
+    constantBias: buildScenario({ ...common, label: "constant −15 % logged intake",
+      loggedIntake: (_day, eaten) => eaten * 0.85 }),
+    methodSwitch: buildScenario({ ...common, label: "−15 % logging bias from day 45",
+      loggedIntake: (day, eaten) => day >= 45 ? eaten * 0.85 : eaten }),
+    randomError: buildScenario({ ...common, label: "seeded uniform ±120 kcal log error",
+      loggedIntake: (_day, eaten) => eaten + (random() - 0.5) * 240 }),
+    omittedFat: buildScenario({ ...common, label: "120 kcal/day cooking fat omitted",
+      loggedIntake: (_day, eaten) => eaten - 120 }),
+    falseComplete: buildScenario({ ...common, label: "20 % falsely complete; 600 kcal omitted",
+      loggedIntake: (day, eaten) => eaten - (incomplete(day) ? 600 : 0),
+      energyCoverage: (day) => incomplete(day) ? 0.5 : 1,
+      userMarkedComplete: () => true }),
+    incompleteControl: buildScenario({ ...common, label: "same 20 % incomplete; marked honestly",
+      loggedIntake: (day, eaten) => eaten - (incomplete(day) ? 600 : 0),
+      energyCoverage: (day) => incomplete(day) ? 0.5 : 1,
+      userMarkedComplete: (day) => !incomplete(day) }),
+  };
+}
 
 export type ReplayRun = { date: string; result: ExpenditureResult };
 

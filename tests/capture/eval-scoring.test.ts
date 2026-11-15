@@ -13,7 +13,8 @@ describe("scoreMethod", () => {
     ]);
     expect(s.n).toBe(2);
     expect(s.itemAccuracy).toBe(0.5);
-    expect(s.gramMae).toBe(5);
+    // Identity errors no longer dilute the quantity error with an unrelated food's grams.
+    expect(s.gramMae).toBe(10);
     expect(s.top3Containment).toBe(0.5);
   });
 
@@ -43,6 +44,41 @@ describe("scoreMethod", () => {
     expect(s.itemAccuracy).toBe(0.5);
     expect(s.top3Containment).toBe(0.5);
     expect(s.gramMae).toBe(0);
+  });
+
+  it.each([['coconut milk', 'milk'], ['sweet potato', 'potato'], ['ricecake', 'rice'],
+    ['rice cake', 'rice'], ['almond milk', 'milk'], ['oat milk', 'milk']])(
+    'does not award identity credit for %s as %s', (actual, expected) => {
+      expect(scoreMethod('text', [result(actual, 100, expected, 100, false, false)])
+        .itemAccuracy).toBe(0);
+    });
+
+  it('does not measure quantity when no identity is correct', () => {
+    const score = scoreMethod('text', [result('rice', 100, 'pasta', 100, true, false)]);
+    expect(score.gramMae).toBeNull();
+    expect(score.failed).toBe(1);
+  });
+
+  it('reports an unmeasured empty method', () => {
+    const score = scoreMethod('photo', []);
+    expect(score.itemAccuracy).toBeNull();
+    expect(score.gramMae).toBeNull();
+    expect(score.top3Containment).toBeNull();
+  });
+
+  it('does not fall back to labels when accepted canonical IDs are present', () => {
+    const score = scoreMethod('text', [{
+      expected: { label: 'milk', grams: 100, ids: ['fdc:1'] },
+      got: { label: 'milk', grams: 100, ids: ['fdc:2'] },
+      autoResolved: true, inTop3: false,
+    }]);
+    expect(score.itemAccuracy).toBe(0);
+    expect(score.autoResolvePrecision).toBe(0);
+  });
+
+  it('rejects the legacy automatic-grounding shortcut as top-3 evidence', () => {
+    expect(scoreMethod('text', [result('coconut milk', 100, 'milk', 100, true, true)])
+      .top3Containment).toBe(0);
   });
 });
 

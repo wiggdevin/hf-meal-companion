@@ -4,6 +4,9 @@ import type {
   StreakRunConfig,
   StreakState,
 } from "./coach-streak-state";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { renderEvalManifest, routeFromCoachResponse, unknownManifest } from "./capture-manifest";
 
 function percentile(values: number[], fraction: number): number | null {
   if (values.length === 0) return null;
@@ -50,6 +53,17 @@ export function renderReportMarkdown(
   config: StreakRunConfig,
   corpus: CoachCase[],
 ): string {
+  // Stored turn proof is evidence of its answering model; current lane pins are not. The old
+  // state format recorded no run commit/prompt/schema/catalog marker, so those remain unknown.
+  const manifest = unknownManifest();
+  manifest.routes = state.turns.map((turn) => {
+    try {
+      const proof = JSON.parse(readFileSync(resolve(turn.proofPath), "utf8")) as { response?: unknown };
+      return routeFromCoachResponse(String(turn.turn), proof.response);
+    } catch {
+      return routeFromCoachResponse(String(turn.turn), null);
+    }
+  });
   const open = state.failures.filter((failure) => failure.status === "open").length;
   const resolved = state.failures.length - open;
   const turns = state.turns.length === 0
@@ -94,6 +108,7 @@ ${state.warming?.targetLine ? `- Facet warming target: **\`${state.warming.targe
 ${state.providerSpend ? `- Provider spend: **$${state.providerSpend.totalUsd.toFixed(8)}** (${state.providerSpend.providers.map((provider) => `${provider.provider}: ${provider.calls} calls, $${provider.costUsd.toFixed(8)}, ${provider.modelIds.join(", ")}`).join("; ")})\n` : ""}
 - Updated: ${state.updatedAt}
 ${state.blockedReason ? `- Blocker: ${state.blockedReason}\n` : ""}
+${renderEvalManifest(manifest)}
 ## Category summary
 
 | Category | Current streak | Turns | Failures | Status |

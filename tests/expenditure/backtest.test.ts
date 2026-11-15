@@ -132,4 +132,17 @@ describe("§4.3 bounds — the exit-record script re-declares the same numbers",
     expect(script.STEP_WITHIN_DAYS).toBe(STEP_WITHIN_DAYS);
     expect(script.RAMP_MAX_KCAL).toBe(RAMP_MAX_KCAL);
   });
+
+  it("names the output for the running engine and reports log-error limits separately from truth", async () => {
+    const script = await import("../../scripts/backtest-estimator");
+    const { ENGINE_VERSION } = await import("@/lib/expenditure");
+    expect(script).toHaveProperty("recordPath");
+    expect(script.recordPath("2026-11-14")).toBe(`docs/evals/2026-11-14-${ENGINE_VERSION}-backtest.md`);
+    const record = script.renderRecord("2026-11-14");
+    expect(record).toContain(`Engine \`${ENGINE_VERSION}\``);
+    expect(record).toContain("| constant −15 % logged intake | 1810 | -320 |");
+    expect(record).toContain("| −15 % logging bias from day 45 | 1810 | -320 |");
+    expect(record).toContain("| 120 kcal/day cooking fat omitted | 2010 | -120 |");
+    expect(record).toContain("not clinical validation");
+  });
 });

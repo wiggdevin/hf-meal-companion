@@ -13,7 +13,14 @@
  * Pure. No I/O.
  */
 
-const GRAMS_PER_OZ = 28.3495;
+const GRAMS_PER_POUND = 453.59237;
+const GRAMS_PER_OZ = GRAMS_PER_POUND / 16;
+const MASS_GRAMS: Record<string, number> = { g: 1, kg: 1000, mg: 0.001,
+  oz: GRAMS_PER_OZ, lb: GRAMS_PER_POUND };
+const VULGAR_FRACTIONS: Record<string, string> = {
+  "¼": "1/4", "½": "1/2", "¾": "3/4", "⅓": "1/3", "⅔": "2/3",
+  "⅛": "1/8", "⅜": "3/8", "⅝": "5/8", "⅞": "7/8",
+};
 
 const WORD_NUMBERS: Record<string, number> = {
   a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5,
@@ -24,7 +31,10 @@ const WORD_NUMBERS: Record<string, number> = {
 /** The units the prompts allow (lib/ai/prompts.ts UNITS) plus the spellings people use. */
 const UNIT_WORDS: Record<string, string> = {
   g: "g", gram: "g", grams: "g", gs: "g",
+  kg: "kg", kilogram: "kg", kilograms: "kg",
+  mg: "mg", milligram: "mg", milligrams: "mg",
   oz: "oz", ounce: "oz", ounces: "oz",
+  lb: "lb", lbs: "lb", pound: "lb", pounds: "lb",
   cup: "cup", cups: "cup",
   tbsp: "tbsp", tablespoon: "tbsp", tablespoons: "tbsp",
   tsp: "tsp", teaspoon: "tsp", teaspoons: "tsp",
@@ -43,18 +53,31 @@ function readQty(token: string): number | null {
   const fraction = token.match(/^(\d+)\/(\d+)$/);
   if (fraction) {
     const bottom = Number(fraction[2]);
-    return bottom === 0 ? null : Number(fraction[1]) / bottom;
+    const value = Number(fraction[1]) / bottom;
+    return Number.isFinite(value) && value > 0 ? value : null;
   }
   const n = Number(token);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 export function parseAmount(text: string): { qty: number; unit: string } | null {
-  const tokens = (text ?? "").toLowerCase().replace(/[^a-z0-9/.\s]/g, " ").split(/\s+/).filter(Boolean);
+  const expanded = (text ?? "").replace(/([¼½¾⅓⅔⅛⅜⅝⅞])/g,
+    (fraction) => ` ${VULGAR_FRACTIONS[fraction]} `);
+  // Do not erase a minus sign or choose one end of a range while normalizing punctuation.
+  if (/(?:^|[^\p{L}\p{N}])[-−]\s*(?:\d|\.\d)/u.test(expanded)
+    || /\d\s*(?:-|–|—|\bto\b)\s*\d/i.test(expanded)) return null;
+  const tokens = expanded.toLowerCase().replace(/[^a-z0-9/.\s]/g, " ").split(/\s+/).filter(Boolean);
   for (let i = 0; i < tokens.length; i += 1) {
-    const qty = readQty(tokens[i]);
+    let qty = readQty(tokens[i]);
     if (qty === null) continue;
-    for (const next of tokens.slice(i + 1, i + 3)) {
+    let unitStart = i + 1;
+    if (/^\d+$/.test(tokens[i]) && /^\d+\/\d+$/.test(tokens[i + 1] ?? "")) {
+      const fraction = readQty(tokens[i + 1]);
+      if (fraction === null) return null;
+      qty += fraction;
+      unitStart += 1;
+    }
+    for (const next of tokens.slice(unitStart, unitStart + 2)) {
       if (VAGUE.has(next)) return null;
       const unit = UNIT_WORDS[next];
       if (unit) return { qty, unit };
@@ -107,9 +130,10 @@ export function matchPortion(unit: string, portions: CapturePortion[]): CaptureP
 /** Grams for `qty` of `unit`, or null when nothing here can weigh it (the caller keeps its own). */
 export function gramsFor(qty: number, unit: string, portions: CapturePortion[]): number | null {
   if (!Number.isFinite(qty) || qty < 0) return null;
-  const want = unit.toLowerCase();
-  if (want === "g") return qty;
-  if (want === "oz") return qty * GRAMS_PER_OZ;
+  const raw = unit.trim().toLowerCase();
+  const want = UNIT_WORDS[raw] ?? raw;
+  const factor = MASS_GRAMS[want];
+  if (factor !== undefined) return qty * factor;
   const portion = matchPortion(want, portions);
   if (!portion) return null;
   return (qty * portion.gramWeight) / portionAmount(portion.description);

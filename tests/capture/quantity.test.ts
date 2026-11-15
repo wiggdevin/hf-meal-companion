@@ -18,11 +18,20 @@ describe("parseAmount", () => {
     ["1 tbsp olive oil", 1, "tbsp"],
     ["2 slices of bacon", 2, "slice"],
     ["quarter of a melon", 0.25, "whole"],
+    ["1 1/2 cups of cooked rice", 1.5, "cup"],
+    ["2 3/4 oz cheese", 2.75, "oz"],
+    ["1½ cups rice", 1.5, "cup"],
+    ["½ cup oats", 0.5, "cup"],
+    ["1 kg potatoes", 1, "kg"],
+    ["half a pound of salmon", 0.5, "lb"],
   ])("reads %s as %s %s", (text, qty, unit) => {
     expect(parseAmount(text)).toEqual({ qty, unit });
   });
 
-  it.each([["a handful of olives"], ["some rice"], ["a scoop of protein"], ["chicken"]])(
+  it.each([["a handful of olives"], ["some rice"], ["a scoop of protein"], ["chicken"],
+    ["0/2 cups rice"], ["1/0 cup rice"], ["-2 kg potatoes"], ["-0.5 cup rice"],
+    ["1-2 cups rice"], ["1–2 cups rice"], ["1 to 2 cups rice"], ["(−2 kg) potatoes"],
+    ["(-2 kg) potatoes"], ["-½ cup oats"], ["−¼ cup rice"], ["½–¾ cup oats"]])(
     "refuses the vague amount in %s", (text) => expect(parseAmount(text)).toBeNull()
   );
 });
@@ -59,6 +68,14 @@ describe("gramsFor", () => {
   it("passes grams through and converts ounces", () => {
     expect(gramsFor(150, "g", [])).toBe(150);
     expect(gramsFor(3, "oz", [])).toBeCloseTo(85.05, 2);
+  });
+  it("converts explicit metric and imperial mass without inventing a food density", () => {
+    expect(gramsFor(0.5, "kg", [])).toBe(500);
+    expect(gramsFor(250, "mg", [])).toBe(0.25);
+    expect(gramsFor(1, "lb", [])).toBeCloseTo(453.59237, 5);
+    expect(gramsFor(2, "pounds", [])).toBeCloseTo(907.18474, 5);
+    expect(gramsFor(16, "oz", [])).toBe(gramsFor(1, "lb", []));
+    expect(gramsFor(1, "ml", [])).toBeNull();
   });
   it("multiplies the matching portion's gram weight", () => {
     expect(gramsFor(2, "slice", PORTIONS)).toBe(56);

@@ -71,3 +71,7 @@ __pycache__/
 .panel
 /.priors-work/
 /scripts/page-gate/node_modules
+
+# Local implementation evidence and third-party reference captures.
+/.work/
+/scripts/eval/public-capture/generated/

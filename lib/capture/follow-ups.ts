@@ -30,7 +30,7 @@ export type FollowUpItem = { seq: number; removed?: boolean; portionId: number |
 
 /** The model's rule for "no amount given": one whole, and nothing more specific. */
 export function gaveNoAmount(item: Pick<DraftItem, "qty" | "unit">): boolean {
-  return item.unit === "whole" && item.qty <= 1;
+  return item.unit === "whole" && item.qty === 1;
 }
 
 /** "a Turkey sandwich" → "turkey sandwich"; an acronym such as "BLT" keeps its capitals. */

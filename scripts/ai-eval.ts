@@ -1,165 +1,219 @@
-/**
- * The Phase 4 exit gate (spec §9, contracts §8): 10 real items per method through the live model.
- *
- *   pnpm exec tsx scripts/ai-eval.ts [--method text] [--dry-run]
- *
- * It calls the live model and bills a real project, so it NEVER runs in CI. Env: SUPABASE_TEST_URL,
- * SUPABASE_TEST_ANON_KEY, SEARCH_EVAL_EMAIL, SEARCH_EVAL_PASSWORD, GEMINI_API_KEY, plus the admin
- * client's URL and secret key env, as read by lib/server/admin.ts.
- *
- * Media lines name a fixture under scripts/eval/fixtures/ that Devin supplies. A line whose expect
- * array is empty is unlabelled: it is run, printed, and left OUT of every score, because scoring
- * against an expectation nobody wrote would report our own guess back to us.
+/** Capture evaluation. --dry-run is an offline inventory and makes no database/provider calls.
+ * Live runs bill existing provider keys and require an explicit branch SUPABASE_TEST_* target:
+ * pnpm exec tsx --conditions=react-server scripts/ai-eval.ts [--set PATH] [--method text]
+ * pnpm exec tsx scripts/ai-eval.ts --dry-run [--out PATH]
  */
-
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, extname } from "node:path";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import type { CaptureMethod } from "@/lib/capture/flags";
-import { proposeDraft } from "@/lib/server/capture";
-import { adminClient } from "@/lib/server/admin";
-import { HttpError } from "@/lib/server/auth";
+import type { ProposeResponse } from "@/lib/capture/types";
+import { scoreCases, type CaptureCase, type CaptureMethodScore, type CapturePrediction,
+  type MethodScore } from "./eval/capture-score";
+import { createEvalManifest, renderEvalManifest, sha256, type EvalManifest,
+  type ObservedRoute } from "./eval/capture-manifest";
+export { scoreMethod } from "./eval/capture-score";
+export type { EvalResult, MethodScore } from "./eval/capture-score";
 
+const METHODS: CaptureMethod[] = ["text", "voice", "label", "photo"];
 const SET_PATH = "scripts/eval/phase-4-capture.jsonl";
+const lineSchema = z.object({
+  id: z.string().optional(), method: z.enum(["text", "voice", "label", "photo"]),
+  slot: z.string(), localDate: z.string(), tz: z.string().optional(),
+  text: z.string().optional(), media: z.string().optional(),
+  expect: z.array(z.object({ label: z.string().min(1), grams: z.number().nonnegative().nullable(),
+    ids: z.array(z.string().regex(/^[^:]+:.+$/)).min(1).optional(),
+    quantitySource: z.enum(["stated_mass", "weighed", "printed_label", "reference_portion", "unknown"]).optional(),
+  })),
+}).refine((line) => line.method === "text" ? Boolean(line.text) : Boolean(line.media),
+  "text captures need text; other methods need a local media fixture");
+export type EvalLine = z.infer<typeof lineSchema>;
 
-export type EvalLine = {
-  method: CaptureMethod; slot: string; localDate: string;
-  text?: string; media?: string; expect: { label: string; grams: number }[];
-};
-export type EvalResult = {
-  expected: { label: string; grams: number };
-  got: { label: string; grams: number } | null;
-  autoResolved: boolean; inTop3: boolean;
-};
-export type MethodScore = {
-  method: CaptureMethod; n: number; failed: number; itemAccuracy: number; gramMae: number;
-  autoResolved: number; autoResolvePrecision: number | null; top3Containment: number;
-};
-
-const norm = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-const hit = (r: EvalResult): boolean =>
-  r.got !== null && (norm(r.got.label).includes(norm(r.expected.label))
-    || norm(r.expected.label).includes(norm(r.got.label)));
-
-export function scoreMethod(method: CaptureMethod, results: EvalResult[]): MethodScore {
-  const n = results.length;
-  const correct = results.filter(hit).length;
-  const gramErrors = results.filter((r) => r.got !== null)
-    .map((r) => Math.abs((r.got as { grams: number }).grams - r.expected.grams));
-  const auto = results.filter((r) => r.autoResolved);
-  return {
-    method, n, failed: results.filter((r) => r.got === null).length,
-    itemAccuracy: n === 0 ? 0 : correct / n,
-    gramMae: gramErrors.length === 0 ? 0
-      : gramErrors.reduce((a, b) => a + b, 0) / gramErrors.length,
-    autoResolved: auto.length,
-    autoResolvePrecision: auto.length === 0 ? null : auto.filter(hit).length / auto.length,
-    top3Containment: n === 0 ? 0 : results.filter((r) => r.inTop3).length / n,
-  };
+export function readSet(path = SET_PATH): EvalLine[] {
+  return readFileSync(path, "utf8").split(/\r?\n/).filter((line) => line.trim())
+    .map((line, index) => {
+      const parsed = lineSchema.safeParse(JSON.parse(line));
+      if (!parsed.success) throw new Error(`${path}:${index + 1}: ${parsed.error.message}`);
+      return parsed.data;
+    });
 }
 
-export function renderReport(scores: MethodScore[], at: string): string {
-  const pct = (x: number): string => `${(x * 100).toFixed(1)} %`;
-  const lines = [
-    `# Phase 4 capture eval — ${at}`, "",
-    "Live model, run outside CI. Gate: item accuracy reported per method; grounding auto-resolve",
-    "precision ≥ 90 % **over auto-resolved items**. Thresholds come from lib/search/thresholds.ts",
-    "and are never lowered to make this table look better (contracts §8).", "",
-    "| Method | n | failed calls | item accuracy | gram MAE | auto-resolve |",
-    "|---|---|---|---|---|---|",
+export function inventoryCases(lines: EvalLine[]): CaptureCase[] {
+  return lines.map((line, index) => ({
+    id: line.id ?? `${line.method}-${index + 1}`, method: line.method,
+    expected: line.expect, predictions: [],
+    status: line.media && !existsSync(line.media) ? "media_missing" : "not_run",
+    ...(line.media ? { mediaPresent: existsSync(line.media) } : {}),
+  }));
+}
+
+const pct = (value: number | null) => value === null ? "not measured" : `${(value * 100).toFixed(1)} %`;
+const amount = (value: number | null, suffix = " g") => value === null ? "not measured" : `${value.toFixed(1)}${suffix}`;
+export function renderReport(scores: MethodScore[], at: string, manifest?: EvalManifest): string {
+  const lines = [`# Capture eval — ${at}`, "",
+    manifest?.execution === "offline_inventory" ? "Mode: offline inventory; no database or model calls."
+      : "Identity and quantity are separate measurements. Missing evidence is not a zero error.", "",
+    renderEvalManifest(manifest), "",
+    "| Method | lines | labelled | unlabelled | media present | media missing | not run | provider failures | scored cases |",
+    "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
   ];
-  for (const s of scores) {
-    const auto = s.autoResolvePrecision === null
-      ? `0 auto-resolved of ${s.n} — top-3 containment ${pct(s.top3Containment)}`
-      : `${pct(s.autoResolvePrecision)} over ${s.autoResolved} auto-resolved`;
-    lines.push(`| ${s.method} | ${s.n} | ${s.failed} | ${pct(s.itemAccuracy)} | ${s.gramMae.toFixed(1)} g | ${auto} |`);
+  for (const score of scores) {
+    const full = score as Partial<CaptureMethodScore>;
+    const c = full.cases;
+    lines.push(`| ${score.method} | ${c?.total ?? "unknown"} | ${c?.labelled ?? "unknown"} | ${c?.unlabelled ?? "unknown"} | ${c?.mediaPresent ?? "unknown"} | ${c?.mediaMissing ?? "unknown"} | ${c?.notRun ?? "unknown"} | ${c?.providerFailure ?? "unknown"} | ${c?.scored ?? "unknown"} |`);
+  }
+  lines.push("", "Gold includes skipped cases; evaluated gold is the identity denominator. Provider/setup failures retain their gold misses.",
+    "Unmatched predictions fill misidentified gold slots first; remaining predictions are extras and remaining gold is missing.", "",
+    "| Method | all gold | evaluated gold | correct | misidentified | missing | extras | extras/case | failed items | failed cases | identity accuracy | canonical matches | label-only matches |",
+    "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+  );
+  for (const score of scores) {
+    const s = score as Partial<CaptureMethodScore>;
+    lines.push(`| ${score.method} | ${s.goldItems ?? "unknown"} | ${score.n} | ${s.correct ?? "unknown"} | ${s.misidentified ?? "unknown"} | ${s.missing ?? "unknown"} | ${s.extra ?? "unknown"} | ${s.extraPerCase == null ? "not measured" : s.extraPerCase.toFixed(2)} | ${score.failed} | ${s.taskFailureCases ?? "unknown"} | ${pct(score.itemAccuracy)} | ${s.canonicalMatches ?? "unknown"} | ${s.labelOnlyMatches ?? "unknown"} |`);
+  }
+  lines.push("", "QTY requires correct identity and an explicit stated/weighed/printed/reference gold basis. Legacy gram guesses remain unscored.",
+    "Percentiles use linear interpolation. These descriptive values have no confidence intervals or accuracy gate.", "",
+    "| Method | QTY n | QTY unscored | gram MAE | median abs | P90 abs | median % error | P90 % error | grounding | auto coverage/gold | top-3 containment |",
+    "|---|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|",
+  );
+  for (const score of scores) {
+    const s = score as Partial<CaptureMethodScore>;
+    const auto = score.autoResolvePrecision === null ? `0 auto-resolved of ${score.n}`
+      : `${pct(score.autoResolvePrecision)} over ${score.autoResolved} auto-resolved`;
+    lines.push(`| ${score.method} | ${s.quantityN ?? "unknown"} | ${s.quantityUnscored ?? "unknown"} | ${amount(score.gramMae)} | ${amount(s.quantityMedianAbs ?? null)} | ${amount(s.quantityP90Abs ?? null)} | ${amount(s.quantityMedianPercent ?? null, " %")} | ${amount(s.quantityP90Percent ?? null, " %")} | ${auto} | ${pct(s.autoResolveCoverage ?? null)} | top-3 containment ${pct(score.top3Containment)} |`);
   }
   return `${lines.join("\n")}\n`;
 }
 
-function readSet(): EvalLine[] {
-  return readFileSync(SET_PATH, "utf8").trim().split("\n")
-    .filter((l) => l.trim().length > 0).map((l) => JSON.parse(l) as EvalLine);
-}
-
-async function signIn(): Promise<SupabaseClient> {
-  const client = createClient(process.env.SUPABASE_TEST_URL ?? "",
-    process.env.SUPABASE_TEST_ANON_KEY ?? "");
-  const { error } = await client.auth.signInWithPassword({
-    email: process.env.SEARCH_EVAL_EMAIL ?? "", password: process.env.SEARCH_EVAL_PASSWORD ?? "" });
-  if (error) throw new Error(`sign-in failed: ${error.message}`);
-  return client;
-}
-
-/** One line, live: null means "nothing to score" (skipped fixture, or an unlabelled line — printed
- * either way). A failed provider call is never silently retried or dropped: it is printed and, for
- * a labelled line, turned into one miss per expectation so the gate still reports on it. */
-async function runLine(
-  client: SupabaseClient, admin: SupabaseClient, userId: string, line: EvalLine
-): Promise<EvalResult[] | null> {
-  if (line.media && !existsSync(line.media)) {
-    console.log(`skipped (no fixture): ${line.media}`);
-    return null;
+/** Resolve only the supplied draft references. RLS client, never a time-window identity guess. */
+async function predictionItems(client: SupabaseClient, draft: ProposeResponse): Promise<CapturePrediction[]> {
+  const refs = [...new Set(draft.items.flatMap((item) =>
+    [item.foodRefId, ...item.alternatives.map((alternative) => alternative.foodRefId)]).filter((id): id is string => Boolean(id)))];
+  const canonicalByRef = new Map<string, string[]>();
+  if (refs.length > 0) {
+    const resolved = await client.from("food_refs").select("id,catalog_food_id").in("id", refs);
+    if (resolved.error) throw new Error("could not read draft food references");
+    const rows = resolved.data ?? [];
+    const catalogIds = [...new Set(rows.map((row) => row.catalog_food_id).filter((id) => id !== null))];
+    if (catalogIds.length > 0) {
+      const catalog = await client.from("catalog_foods").select("id,source,source_id").in("id", catalogIds);
+      if (catalog.error) throw new Error("could not read draft canonical catalog identities");
+      const byCatalog = new Map((catalog.data ?? []).map((row) => [row.id, `${row.source}:${row.source_id}`]));
+      for (const row of rows) {
+        const id = byCatalog.get(row.catalog_food_id);
+        if (id) canonicalByRef.set(row.id, [id]);
+      }
+    }
   }
-  const request = line.text
-    ? { method: line.method, localDate: line.localDate, tz: "America/New_York", slot: line.slot,
-        text: line.text }
-    : { method: line.method, localDate: line.localDate, tz: "America/New_York", slot: line.slot,
-        mediaPath: line.media as string };
-  const label = line.text ?? line.media ?? "";
-  let draft;
+  return draft.items.map((item) => ({ label: item.label, grams: item.grams,
+    ids: item.foodRefId ? canonicalByRef.get(item.foodRefId) : undefined,
+    autoResolved: item.autoResolved,
+    alternatives: item.alternatives.map((alternative) => ({ label: alternative.label, grams: null,
+      ids: canonicalByRef.get(alternative.foodRefId) })),
+  }));
+}
+
+const MIME: Record<string, string> = { ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+  ".m4a": "audio/mp4", ".aac": "audio/aac", ".mp3": "audio/mpeg", ".wav": "audio/wav" };
+export async function runLine(client: SupabaseClient, admin: SupabaseClient, userId: string,
+  line: EvalLine, inventory: CaptureCase): Promise<CaptureCase> {
+  if (inventory.status === "media_missing") return inventory;
+  const { proposeDraft } = await import("@/lib/server/capture");
+  const { signUpload, deleteMedia } = await import("@/lib/server/media");
+  const { validateAudio, validateImage } = await import("@/lib/media/validate");
+  const { putSignedUpload } = await import("@/lib/capture/upload");
+  let mediaPath: string | null = null;
+  let captureInvoked = false;
+  let stage: "setup_failure" | "provider_failure" = "setup_failure";
+  let result: CaptureCase;
   try {
-    draft = await proposeDraft(client, admin, userId, request as never);
-  } catch (e) {
-    const status = e instanceof HttpError ? e.status : "?";
-    const code = e instanceof HttpError ? e.code : "error";
-    const message = e instanceof Error ? e.message : String(e);
-    console.log(`failed: ${label} -> ${status} ${code} ${message}`);
-    return line.expect.length === 0 ? null
-      : line.expect.map((expected) => ({ expected, got: null, autoResolved: false, inTop3: false }));
+    if (line.media) {
+      const bytes = readFileSync(line.media); const contentType = MIME[extname(line.media).toLowerCase()];
+      const validation = line.method === "voice" ? validateAudio(bytes, contentType) : validateImage(bytes, contentType);
+      if (!validation.ok) throw new Error(`fixture validation failed: ${validation.reason}`);
+      const signed = await signUpload(admin, userId, {
+        kind: line.method === "voice" ? "audio" : "image", contentType, bytes: bytes.length,
+      });
+      mediaPath = signed.path;
+      const status = await putSignedUpload(signed.uploadUrl, new Blob([bytes], { type: contentType }), fetch);
+      if (status !== null) throw new Error(`fixture upload failed (${status})`);
+    }
+    stage = "provider_failure";
+    const context = { localDate: line.localDate, tz: line.tz ?? "UTC", slot: line.slot };
+    captureInvoked = true;
+    const draft = await proposeDraft(client, admin, userId, line.method === "text"
+      ? { ...context, method: "text", text: line.text! }
+      : { ...context, method: line.method, mediaPath: mediaPath! });
+    stage = "setup_failure";
+    result = { ...inventory, captureInvoked, status: line.expect.length === 0 ? "unlabelled" : "scored",
+      predictions: await predictionItems(client, draft) };
+  } catch (error) {
+    // Do not log provider bodies, signed URLs or credentials. Status alone is reproducible here.
+    const code = (error as { code?: unknown } | null)?.code;
+    const errorCode = typeof code === "string" && /^[a-z0-9_]{1,64}$/.test(code) ? code : "unknown";
+    result = { ...inventory, captureInvoked, errorCode,
+      status: stage === "provider_failure" && errorCode !== "provider_unavailable" ? "capture_failure" : stage,
+      error: error instanceof Error ? error.name : "UnknownError" };
   }
-  if (line.expect.length === 0) {
-    console.log(`unlabelled: ${label} -> ${draft.items.map((i) => i.label).join(", ")}`);
-    return null;
+  if (mediaPath !== null) {
+    try { await deleteMedia(admin, mediaPath); }
+    catch { result.cleanupError = "temporary fixture cleanup failed; test bucket sweep must retry"; }
   }
-  return line.expect.map((expected, seq) => {
-    const item = draft.items[seq] ?? null;
-    return {
-      expected,
-      got: item ? { label: item.label, grams: item.grams } : null,
-      autoResolved: item?.autoResolved ?? false,
-      inTop3: item !== null && (item.autoResolved
-        || item.alternatives.some((a) => norm(a.label).includes(norm(expected.label)))),
-    };
-  });
+  return result;
 }
 
+function option(name: string): string | undefined {
+  const index = process.argv.indexOf(name);
+  if (index < 0) return undefined;
+  const value = process.argv[index + 1];
+  if (!value || value.startsWith("--")) throw new Error(`${name} needs a value`);
+  return value;
+}
 async function main(): Promise<void> {
-  const only = process.argv.includes("--method")
-    ? (process.argv[process.argv.indexOf("--method") + 1] as CaptureMethod) : null;
-  const lines = readSet().filter((l) => (only ? l.method === only : true));
-  const client = await signIn();
-  const admin = adminClient();
-  const { data } = await client.auth.getUser();
-  const userId = data.user?.id ?? "";
-  const byMethod = new Map<CaptureMethod, EvalResult[]>();
-
-  for (const line of lines) {
-    const results = await runLine(client, admin, userId, line);
-    if (results === null) continue;
-    byMethod.set(line.method, [...(byMethod.get(line.method) ?? []), ...results]);
+  const setPath = option("--set") ?? SET_PATH;
+  const only = option("--method");
+  if (only && !METHODS.includes(only as CaptureMethod)) throw new Error("unknown --method");
+  const lines = readSet(setPath).filter((line) => !only || line.method === only);
+  const dryRun = process.argv.includes("--dry-run");
+  let cases = inventoryCases(lines);
+  const manifest = createEvalManifest({ kind: "capture", execution: dryRun ? "offline_inventory" : "live",
+    datasetPath: setPath });
+  if (!dryRun && cases.some((item) => item.status !== "media_missing")) {
+    const required = ["SUPABASE_TEST_URL", "SUPABASE_TEST_ANON_KEY", "SUPABASE_TEST_SERVICE_ROLE_KEY",
+      "SEARCH_EVAL_EMAIL", "SEARCH_EVAL_PASSWORD"];
+    for (const key of required) if (!process.env[key]) throw new Error(`live eval requires ${key}; no production fallback`);
+    const { createClient } = await import("@supabase/supabase-js");
+    const { adminClientForCli } = await import("@/lib/server/admin");
+    const client = createClient(process.env.SUPABASE_TEST_URL!, process.env.SUPABASE_TEST_ANON_KEY!,
+      { auth: { persistSession: false, autoRefreshToken: false } });
+    const signed = await client.auth.signInWithPassword({ email: process.env.SEARCH_EVAL_EMAIL!,
+      password: process.env.SEARCH_EVAL_PASSWORD! });
+    if (signed.error || !signed.data.user) throw new Error("test-account sign-in failed");
+    const admin = adminClientForCli();
+    const executed: CaptureCase[] = [];
+    for (const [index, line] of lines.entries()) executed.push(await runLine(client, admin, signed.data.user.id, line, cases[index]));
+    cases = executed;
   }
-
-  const scores = [...byMethod.entries()].map(([method, results]) => scoreMethod(method, results));
-  const at = new Date().toISOString().slice(0, 10);
-  const report = renderReport(scores, at);
+  manifest.routes = cases.map((item): ObservedRoute => ({ caseId: item.id!, provider: null, model: null,
+    fallbackUsed: null, source: item.captureInvoked === true ? "unknown" : "not_called" }));
+  const scores = METHODS.map((method) => scoreCases(method, cases));
+  const at = new Date().toISOString();
+  let report = renderReport(scores, at, manifest);
+  const setupFailures = cases.filter((item) => item.status === "setup_failure").length;
+  report += `\nMethod scope: ${only ?? "all four methods"}.\n`;
+  report += `\nSetup failures (separate from provider failures): ${setupFailures}.\n`;
+  report += `Capture refusals/errors (not attributed to provider failure): ${cases.filter((item) => item.status === "capture_failure").length}.\n`;
+  report += `Temporary-media cleanup failures: ${cases.filter((item) => item.cleanupError).length}.\n`;
   console.log(report);
-  if (!process.argv.includes("--dry-run")) {
-    mkdirSync("docs/evals", { recursive: true });
-    writeFileSync(`docs/evals/${at}-phase-4.md`, report);
-    console.log(`wrote docs/evals/${at}-phase-4.md`);
+  const out = option("--out") ?? (dryRun ? undefined : `docs/evals/${at.slice(0, 10)}-capture-${at.slice(11, 19).replaceAll(":", "")}.md`);
+  if (out) {
+    mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, report);
+    writeFileSync(`${out}.json`, `${JSON.stringify({ ...manifest, at, methodFilter: only ?? null, scores,
+      cases: cases.map((item, index) => ({ ...item, mediaSha256: lines[index].media && item.mediaPresent
+        ? sha256(readFileSync(lines[index].media!)) : null })) }, null, 2)}\n`);
   }
 }
-
 if (process.argv[1]?.endsWith("ai-eval.ts")) {
-  main().catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); });
+  main().catch((error: unknown) => { console.error(error instanceof Error ? error.message : "evaluation failed"); process.exitCode = 1; });
 }

@@ -63,7 +63,8 @@ pnpm build                  # production build
 | `components/` | UI: Today screen, Foods tabs, recipe discovery, shopping, Build Meal and Log Food sheets |
 | `lib/` | Food data, meal rules, recipe catalog and selection, shopping planner, scaling, store and server-only Supabase layer |
 | `docs/` | Architecture, features, specs, contributing |
-| `scripts/` | One-off build scripts, e.g. `scripts/build-food-db.py` |
+| `scripts/` | Build scripts, capture/coach evaluators, and public/synthetic capture fixtures |
+| `tests/` | Unit, boundary and integration regression tests, grouped by domain |
 
 See `AGENTS.md` for the path-by-path map and domain rules. Recipe eligibility uses each
 account's current rules and Avoid list; there are no hardcoded personal food exclusions.
@@ -87,6 +88,7 @@ scripts/test-stack.sh stop         # tear down only this stack
 
 ## Docs
 
+- [`docs/evals/capture-evaluation.md`](docs/evals/capture-evaluation.md) — capture evaluator commands, denominators, route provenance and smoke-set limits.
 - [`docs/architecture.md`](docs/architecture.md) — system architecture.
 - [`docs/features.md`](docs/features.md) — feature list and pilot behavior.
 - [`docs/recipes/pilot-release.md`](docs/recipes/pilot-release.md) — pilot release sequence and seed operation.
