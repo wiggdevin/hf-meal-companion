@@ -1,0 +1,40 @@
+[
+  {
+    "id": "label-40g",
+    "name": "Synthetic Oat Squares",
+    "servingGrams": 40,
+    "printed": {
+      "Calories": 120,
+      "Total Fat": "4 g",
+      "Total Carbohydrate": "16 g",
+      "Protein": "5 g"
+    },
+    "per100g": {
+      "energy_kcal": 300,
+      "fat_total": 10,
+      "carbohydrate": 40,
+      "protein": 12.5
+    },
+    "ingredientsText": "oats, water",
+    "omittedNutrients": "unknown, never zero"
+  },
+  {
+    "id": "label-50g",
+    "name": "Synthetic Rice Apple Mix",
+    "servingGrams": 50,
+    "printed": {
+      "Calories": 100,
+      "Total Fat": "0 g",
+      "Total Carbohydrate": "20 g",
+      "Protein": "5 g"
+    },
+    "per100g": {
+      "energy_kcal": 200,
+      "fat_total": 0,
+      "carbohydrate": 40,
+      "protein": 10
+    },
+    "ingredientsText": "rice, apple",
+    "omittedNutrients": "unknown, never zero"
+  }
+]

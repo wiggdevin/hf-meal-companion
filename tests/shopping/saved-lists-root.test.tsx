@@ -58,7 +58,7 @@ beforeEach(() => {
   mocks.listPantry.mockResolvedValue([]);
   mocks.deletePeriod.mockResolvedValue(undefined);
 });
-afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.clearAllMocks(); });
 
 async function deleteFromSheet(name: string) {
   fireEvent.click(screen.getByRole("button", { name: /Open your saved lists/ }));
@@ -116,14 +116,22 @@ it("Undo on a list that was not open restores it and keeps the open list open", 
   expect(mocks.deletePeriod).not.toHaveBeenCalled();
 });
 
-it("deleting the only list starts a fresh draft, not one with the deleted list's dates", async () => {
+it.each([
+  { timezone: "America/Los_Angeles", startDate: "2026-11-14" },
+  { timezone: "Asia/Tokyo", startDate: "2026-11-15" },
+])("deleting the only list starts a fresh draft on the local date ($timezone)", async ({ timezone, startDate }) => {
+  // The same instant falls on different calendar dates. Fake Date only so waitFor keeps its
+  // real timers, and fix the browser's reported zone independently of the test runner's zone.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-11-15T00:30:00Z"));
+  const options = Intl.DateTimeFormat().resolvedOptions();
+  vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions").mockReturnValue({ ...options, timeZone: timezone });
   rows = [B];
   render(<ShoppingRoot />);
   await waitFor(() => expect((screen.getByLabelText("From") as HTMLInputElement).value).toBe("2026-07-01"));
   rows = [];
   await deleteFromSheet("Party");
-  await waitFor(() => expect((screen.getByLabelText("From") as HTMLInputElement).value).toBe(
-    defaultShoppingDraft(new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(new Date()), "UTC").startDate));
+  await waitFor(() => expect((screen.getByLabelText("From") as HTMLInputElement).value).toBe(startDate));
 });
 
 it("an account switch inside the hold keeps the delete for that account, never sends it as another", async () => {

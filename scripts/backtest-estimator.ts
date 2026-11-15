@@ -1,10 +1,11 @@
 /**
- * Replays every synthetic scenario through the exp-3.0.0 engine and writes the exit record.
+ * Replays every synthetic scenario through the current engine and writes the exit record.
  * Run: `pnpm exec tsx scripts/backtest-estimator.ts`
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import {
-  BASE_TDEE, replayScenario, SCENARIOS, steadyState, toScenarioDay, waterSwingControl,
+  BASE_TDEE, intakeErrorScenarios, replayScenario, SCENARIOS, START_DATE,
+  toScenarioDay, waterSwingControl,
 } from "@/lib/expenditure.fixtures";
 import { ENGINE_VERSION } from "@/lib/expenditure";
 
@@ -20,12 +21,34 @@ export const STEP_WITHIN_DAYS = 28;
 export const RAMP_MAX_KCAL = 120;
 
 type Runs = ReturnType<typeof replayScenario>;
+type ScenarioRuns = { label: string; runs: Runs };
+export type BacktestEvidence = {
+  scenarios: ScenarioRuns[];
+  waterControl: Runs;
+  intakeErrors: ScenarioRuns[];
+};
 
-const control = replayScenario(steadyState());
+/** Run each series once; summaries and acceptance claims consume the same observations. */
+export function collectBacktestEvidence(): BacktestEvidence {
+  const errors = intakeErrorScenarios();
+  return {
+    scenarios: SCENARIOS.map((scenario) => ({ label: scenario.label, runs: replayScenario(scenario) })),
+    waterControl: replayScenario(waterSwingControl()),
+    intakeErrors: (["constantBias", "methodSwitch", "randomError", "omittedFat", "falseComplete"] as const)
+      .map((key) => ({ label: errors[key].label, runs: replayScenario(errors[key], {
+        marksStartedOn: key === "falseComplete" ? START_DATE : null,
+      }) })),
+  };
+}
+
+/** Version the filename from the engine too, so a new run cannot masquerade as an old engine. */
+export function recordPath(today: string): string {
+  return `docs/evals/${today}-${ENGINE_VERSION}-backtest.md`;
+}
 
 const tdeeOn = (runs: Runs, date: string) => runs.find((r) => r.date === date)?.result ?? null;
 
-function maxAbsDeviation(runs: Runs, against: Runs = control): number {
+function maxAbsDeviation(runs: Runs, against: Runs): number {
   let worst = 0;
   for (const run of runs) {
     const base = tdeeOn(against, run.date);
@@ -42,26 +65,23 @@ function row(label: string, runs: Runs) {
   return `| ${label} | ${last?.status ?? "n/a"} | ${last?.tdeeKcal ?? "n/a"} | ${last?.phase ?? "n/a"} | ${last?.dataWeight?.toFixed(2) ?? "n/a"} | ${[...statuses].sort().join(", ")} |`;
 }
 
-function scenario(label: string): Runs {
-  const match = SCENARIOS.find((s) => s.label === label);
-  if (!match) throw new Error(`unknown scenario: ${label}`);
-  return replayScenario(match);
-}
-
-const claims: string[] = [];
-function claim(name: string, bound: string, measured: string, pass: boolean) {
-  claims.push(`| ${name} | ${bound} | ${measured} | ${pass ? "pass" : "**MISS**"} |`);
-}
-
-function verdict() {
-  claims.length = 0;
+function verdict(evidence: BacktestEvidence): string[] {
+  const claims: string[] = [];
+  const claim = (name: string, bound: string, measured: string, pass: boolean) => {
+    claims.push(`| ${name} | ${bound} | ${measured} | ${pass ? "pass" : "**MISS**"} |`);
+  };
+  const scenario = (label: string): Runs => {
+    const match = evidence.scenarios.find((item) => item.label === label);
+    if (!match) throw new Error(`unknown scenario: ${label}`);
+    return match.runs;
+  };
   const water = scenario("1.5 kg water swing over 3 days");
   const cycle = scenario("±0.8 kg on a 28-day cycle");
   const under = scenario("under-logging: 3 qualified days a week");
   const step = scenario("+250 kcal/day step");
   const ramp = scenario("+15 kcal/day/week ramp");
 
-  const waterControl = replayScenario(waterSwingControl());
+  const waterControl = evidence.waterControl;
   const waterDev = maxAbsDeviation(water, waterControl);
   const badNights = water.filter((r, i) =>
     r.result.proposalEligible && !waterControl[i].result.proposalEligible);
@@ -100,11 +120,23 @@ function verdict() {
   }
   claim("3b/12 +15 kcal/day/week ramp", `every proposalEligible night within ${RAMP_MAX_KCAL} kcal of truth`,
     `worst error ${Math.round(rampWorst)} kcal`, rampWorst < RAMP_MAX_KCAL);
+  return claims;
 }
 
-/** The full Markdown record, deterministic for a given day. */
-export function renderRecord(today: string): string {
-  verdict();
+function intakeErrorRows(scenarios: ScenarioRuns[]): string[] {
+  return scenarios.map(({ label, runs }) => {
+    const mature = runs.filter((run) => toScenarioDay(run.date) >= 42);
+    const last = runs.at(-1)?.result;
+    const errors = mature.map((run) => run.result.tdeeKcal)
+      .filter((value): value is number => value !== null).map((value) => value - BASE_TDEE);
+    const eligible = mature.filter((run) => run.result.proposalEligible).length;
+    return `| ${label} | ${last?.tdeeKcal ?? "n/a"} | ${last?.tdeeKcal == null ? "n/a" : last.tdeeKcal - BASE_TDEE} | [${Math.min(...errors)}, ${Math.max(...errors)}] | ${eligible}/${mature.length} |`;
+  });
+}
+
+/** Pure with supplied evidence; the default collects real runs for the offline CLI. */
+export function renderRecord(today: string, evidence = collectBacktestEvidence()): string {
+  const claims = verdict(evidence);
   const lines = [
     `# Estimator backtest: ${today}`,
     "",
@@ -116,7 +148,7 @@ export function renderRecord(today: string): string {
     "",
     "| Scenario | Final status | Final TDEE | Final phase | Final data weight | Statuses seen |",
     "|---|---|---|---|---|---|",
-    ...SCENARIOS.map((s) => row(s.label, replayScenario(s))),
+    ...evidence.scenarios.map((scenario) => row(scenario.label, scenario.runs)),
     "",
     "## Acceptance claims (docs/specs/phase-16-adaptive-handoff.md, rulings R9)",
     "",
@@ -142,15 +174,58 @@ export function renderRecord(today: string): string {
     "|---|---|---|---|",
     ...claims,
     "",
+    "## Intake-error propagation (WP3)",
+    "",
+    "These are offline numerical probes, not clinical validation. True intake and expenditure",
+    "are both 2,130 kcal/day for 120 days. The scale is exactly flat: only the log changes.",
+    "Day indices are zero-based; each replay night reads prior days only. Mature nights are",
+    "days 42–120 (79 nights), after the seed has fully faded. There are no model, database or",
+    "private-data calls. `tests/expenditure/error-propagation.test.ts` tests each bound below.",
+    "",
+    "| Scenario | Final TDEE | Final error vs true TDEE | Mature error interval, kcal/day | Mature proposal-eligible nights |",
+    "|---|---|---|---|---|",
+    ...intakeErrorRows(evidence.intakeErrors),
+    "",
+    "Tested bounds and eligibility:",
+    "",
+    "- Constant −15 %: 2,130 × 0.85 is rounded to 1,811 in the log and 1,810 at the point",
+    "  estimate. Every mature night is exactly −320 kcal and proposal-eligible; no night before",
+    "  day 39 is eligible. The learned number follows the biased log, not the physiological truth.",
+    "- Day-45 method switch: mature error stays in [−320, 0] kcal; every night from day 73 has",
+    "  a −320 kcal error and is eligible. Of mature nights, only day 59 is ineligible: its short/long",
+    "  difference is 159.5 kcal, above 8 % of 1,970.5 = 157.64. True expenditure never changed.",
+    "- Seeded random error: each recorded daily error is at most ±120 kcal (LCG seed 3003).",
+    "  Every mature point stays within ±125 kcal of truth (input envelope plus 5 kcal display",
+    "  rounding) and is eligible. Short-minus-long is at most 120 kcal, below the 150 kcal",
+    "  agreement floor. This envelope is deterministic; it is not a population confidence interval.",
+    "- Omitted cooking fat: a fixed 120 kcal/day omission yields exactly −120 kcal mature error;",
+    "  every mature night remains eligible.",
+    "- False complete marks: every fifth day omits 600 kcal (24/120 days), reports coverage 0.5",
+    "  and is explicitly marked complete. All 28 recent days then count. A 28-day window has",
+    "  five or six omissions: mean missing energy is 107.14–128.57 kcal/day, giving −110 to −130",
+    "  kcal mature error after display rounding. Every mature night remains eligible. With the",
+    "  same incomplete logs marked honestly, only 22–23 days count and the point stays 2,130;",
+    "  that matched control is also eligible, because it still exceeds the 21-day gate.",
+    "",
+    "H2 is supported under these fixed synthetic assumptions: constant bias is absorbed into the",
+    "learned TDEE, and a logging-method change creates a false expenditure step. Absorbed means",
+    "the estimate shares the intake bias; it does not mean recovery of true TDEE. Proposal",
+    "eligibility alone cannot detect these consistent omissions. This record does not simulate",
+    "target approval, actual target changes, physiology beyond the fixture approximation, or",
+    "clinical outcomes. No engine coefficient was changed to satisfy these bounds.",
+    "",
+    "Historical comparison: `docs/evals/2026-09-20-exp-2.0.0-backtest.md` and",
+    "`docs/estimator-backtest-2026-09-12.md` are preserved as dated engine-specific receipts.",
+    "",
   ];
-  return `${lines.join("\n")}\n`;
+  return `${lines.join("\n").trimEnd()}\n`;
 }
 
 function main() {
   const today = new Date().toISOString().slice(0, 10);
   const doc = renderRecord(today);
   mkdirSync("docs/evals", { recursive: true });
-  const output = `docs/evals/${today}-exp-3.0.0-backtest.md`;
+  const output = recordPath(today);
   writeFileSync(output, doc, "utf8");
   console.log(`wrote ${output}`);
   console.log(doc.split("\n").slice(-12).join("\n"));

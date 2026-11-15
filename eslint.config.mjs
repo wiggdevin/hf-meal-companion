@@ -65,6 +65,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local REA receipts and scratch programs, also ignored by Git.
+    ".work/**",
     // Workflow scripts run inside the Claude Code Workflow runtime, not Node.
     "docs/audit/**/*.js",
   ]),

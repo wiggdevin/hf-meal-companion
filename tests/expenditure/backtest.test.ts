@@ -1,8 +1,10 @@
 // tests/expenditure/backtest.test.ts
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import * as fixtures from "@/lib/expenditure.fixtures";
 import {
-  cycleSwing, rampUp, replayScenario, steadyState, trainingStep, toScenarioDay, underLogging,
-  waterSwing, waterSwingControl, BASE_TDEE,
+  cycleSwing, intakeErrorScenarios, rampUp, replayScenario as replay, SCENARIOS, START_DATE,
+  steadyState, trainingStep, toScenarioDay, underLogging, waterSwing, waterSwingControl,
+  BASE_TDEE, type Scenario,
 } from "@/lib/expenditure.fixtures";
 
 /** exp-3.0.0's acceptance claims, re-declared here from the spec text — deliberately NOT imported
@@ -12,6 +14,19 @@ export const ARTEFACT_MAX_KCAL = 60;
 export const STEP_MIN_MOVE_KCAL = 200;
 export const STEP_WITHIN_DAYS = 28;
 export const RAMP_MAX_KCAL = 120;
+
+// Reuse identical real-engine runs between the acceptance assertions and report formatting.
+// The complete inputs/options form the key; changing either still runs the engine afresh.
+const replays = new Map<string, ReturnType<typeof replay>>();
+function replayScenario(scenario: Scenario, options: Parameters<typeof replay>[1] = {}) {
+  const key = JSON.stringify([scenario, options]);
+  let runs = replays.get(key);
+  if (!runs) {
+    runs = replay(scenario, options);
+    replays.set(key, runs);
+  }
+  return runs;
+}
 
 const control = replayScenario(steadyState());
 const tdeeOn = (runs: ReturnType<typeof replayScenario>, date: string) =>
@@ -131,5 +146,34 @@ describe("§4.3 bounds — the exit-record script re-declares the same numbers",
     expect(script.STEP_MIN_MOVE_KCAL).toBe(STEP_MIN_MOVE_KCAL);
     expect(script.STEP_WITHIN_DAYS).toBe(STEP_WITHIN_DAYS);
     expect(script.RAMP_MAX_KCAL).toBe(RAMP_MAX_KCAL);
+  });
+
+  it("names the output for the running engine and reports log-error limits separately from truth", async () => {
+    const script = await import("../../scripts/backtest-estimator");
+    const { ENGINE_VERSION } = await import("@/lib/expenditure");
+    expect(script).toHaveProperty("recordPath");
+    expect(script.recordPath("2026-11-14")).toBe(`docs/evals/2026-11-14-${ENGINE_VERSION}-backtest.md`);
+    const errors = intakeErrorScenarios();
+    const evidence = {
+      scenarios: SCENARIOS.map((scenario) => ({ label: scenario.label, runs: replayScenario(scenario) })),
+      waterControl: replayScenario(waterSwingControl()),
+      intakeErrors: (["constantBias", "methodSwitch", "randomError", "omittedFat", "falseComplete"] as const)
+        .map((key) => ({ label: errors[key].label, runs: replayScenario(errors[key], {
+          marksStartedOn: key === "falseComplete" ? START_DATE : null,
+        }) })),
+    };
+    // Guard the real boundary: formatting supplied evidence must never trigger another
+    // expensive simulation. The evidence above still comes from the actual engine.
+    const noReplay = vi.spyOn(fixtures, "replayScenario").mockImplementation(() => {
+      throw new Error("report rendering replayed the engine instead of using supplied evidence");
+    });
+    let record: string;
+    try { record = script.renderRecord("2026-11-14", evidence); }
+    finally { noReplay.mockRestore(); }
+    expect(record).toContain(`Engine \`${ENGINE_VERSION}\``);
+    expect(record).toContain("| constant −15 % logged intake | 1810 | -320 |");
+    expect(record).toContain("| −15 % logging bias from day 45 | 1810 | -320 |");
+    expect(record).toContain("| 120 kcal/day cooking fat omitted | 2010 | -120 |");
+    expect(record).toContain("not clinical validation");
   });
 });

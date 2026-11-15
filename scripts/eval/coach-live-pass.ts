@@ -17,6 +17,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { writeFileSync } from "node:fs";
+import { createEvalManifest, routeFromCoachResponse, sha256, type ObservedRoute } from "./capture-manifest";
 import {
   openHarness, safeError, TIMEZONE,
 } from "./coach-streak-harness";
@@ -29,7 +30,7 @@ type CallObs = {
 type TurnObs = {
   turn: number; label: string; sentence: string; elapsedMs: number; error: string | null;
   reply: string | null; actions: string[]; cards: number; model: string | null;
-  timings: unknown; calls: CallObs[]; logs: string[];
+  timings: unknown; calls: CallObs[]; logs: string[]; route: ObservedRoute;
 };
 
 const BULK_PROMPTS = [
@@ -208,6 +209,8 @@ async function main(): Promise<void> {
   const out = option("--out");
   if (!mode || !["bulk", "offplan", "f10", "diag"].includes(mode)) throw new Error("--mode must be bulk, offplan, f10 or diag.");
   if (!out) throw new Error("--out is required.");
+  const manifest = createEvalManifest({ kind: "coach", execution: "live",
+    datasetPath: "scripts/eval/coach-live-pass.ts" });
   installFetchObserver();
   installConsoleObserver();
   capturePrompts = mode === "f10";
@@ -266,6 +269,7 @@ async function main(): Promise<void> {
       actions: response?.actions.map((action) => action.kind) ?? [],
       cards: response?.composed?.length ?? 0,
       model: response ? `${response.model?.provider}/${response.model?.modelId}` : null,
+      route: routeFromCoachResponse(item.label, response, true),
       timings: response?.timings ?? null,
       calls: calls.filter((call) => call.turn === index + 1),
       logs: turnLogs.get(index + 1) ?? [],
@@ -282,6 +286,13 @@ async function main(): Promise<void> {
   const result: Record<string, unknown> = {
     generatedAt: new Date().toISOString(), mode, branch: "coach-eval",
     coachProvider: COACH_PROVIDER, coachModel: COACH_MODEL_ID, turns,
+    manifest: { ...manifest, planSha256: sha256(JSON.stringify(plan)),
+      routes: [...turns.map((turn) => turn.route), ...calls.map((call, index): ObservedRoute => ({
+        caseId: `turn-${call.turn}-request-${index + 1}`, provider: "openrouter", model: call.model,
+        fallbackUsed: null, source: "provider-response",
+      }))] },
+    configuredRouteNote: "coachProvider/coachModel are configuration; manifest routes are observed evidence",
+    aiCallsScope: "all rows for this test user; not a per-run route join",
     aiCalls: aiCalls.error ? { error: aiCalls.error.message } : aiCalls.data,
   };
   if (mode === "offplan") {

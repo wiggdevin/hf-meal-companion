@@ -55,7 +55,15 @@ describe("portion follow-ups", () => {
     expect(gaveNoAmount({ qty: 1, unit: "whole" })).toBe(true);
     expect(gaveNoAmount({ qty: 2, unit: "whole" })).toBe(false);
     expect(gaveNoAmount({ qty: 1, unit: "slice" })).toBe(false);
+    expect(gaveNoAmount({ qty: 0.5, unit: "whole" })).toBe(false);
+    expect(gaveNoAmount({ qty: 0, unit: "whole" })).toBe(false);
     expect(followUpSubject("The BLT")).toBe("BLT");
     expect(followUpSubject("an Apple")).toBe("apple");
+  });
+
+  it("does not ask again after an explicit half or quarter of a whole food", () => {
+    const proposed = [item(0, "sandwich", 0.3, { qty: 0.5 }),
+      item(1, "melon", 0.3, { qty: 0.25 })];
+    expect(portionFollowUps(proposed, shown(proposed), () => PORTIONS)).toEqual([]);
   });
 });

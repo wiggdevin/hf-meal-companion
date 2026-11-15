@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "scope": "Small pipeline smoke set, not an accuracy certification or a representative population sample.",
+  "cases": [
+    {
+      "id": "dish_1565972591",
+      "sha256": "59ed61bfd5631ad7602439a2b9efb25a03ba46cdf3c227de4067e184d6de1803",
+      "url": "https://storage.googleapis.com/nutrition5k_dataset/nutrition5k_dataset/imagery/realsense_overhead/dish_1565972591/rgb.png",
+      "license": "CC-BY-4.0",
+      "metadataRow": [
+        "dish_1565972591",
+        "195.199997",
+        "122.000000",
+        "12.200000",
+        "3.660000",
+        "17.080000",
+        "ingr_0000000510",
+        "chicken apple sausage",
+        "122.000000",
+        "195.2",
+        "12.2",
+        "3.66",
+        "17.08"
+      ]
+    },
+    {
+      "id": "dish_1568649312",
+      "sha256": "31adb26653c9892c0d9b93b09e0020570bb31ed0f15b79e8660ecb7df46b23b0",
+      "url": "https://storage.googleapis.com/nutrition5k_dataset/nutrition5k_dataset/imagery/realsense_overhead/dish_1568649312/rgb.png",
+      "license": "CC-BY-4.0",
+      "metadataRow": [
+        "dish_1568649312",
+        "44.459999",
+        "78.000000",
+        "0.234000",
+        "10.920000",
+        "0.546000",
+        "ingr_0000000013",
+        "berries",
+        "78.000000",
+        "44.46",
+        "0.234",
+        "10.92",
+        "0.546"
+      ]
+    }
+  ],
+  "authoredAssets": [
+    {
+      "path": "scripts/eval/public-capture/label-40g.png",
+      "sha256": "ed4d573612e3601a40da906ce28926a6b4fdfd8ba8f9dcd9af10673caf6b8a26",
+      "kind": "synthetic"
+    },
+    {
+      "path": "scripts/eval/public-capture/label-50g.png",
+      "sha256": "fac663f2685ad205a2c48ba8aa8a32253e584fbd437c5dc3673f39ce1879a3ca",
+      "kind": "synthetic"
+    }
+  ],
+  "corpusSha256": "4459e250cdc2997cf8a635f550e0cc8c7946595c04dab1f01cb83683cc95bb70",
+  "labelGoldSha256": "455c4278b79cbf4c916d63a406eeee6cd24c6832f4b124039431728044c83787"
+}

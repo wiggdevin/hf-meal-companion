@@ -14,6 +14,7 @@
 
 import { z } from "zod";
 import { NUTRIENT_CODES, type NutrientCode } from "@/lib/nutrients/codes";
+import { massGramsPerUnit, MAX_CAPTURE_GRAMS } from "@/lib/capture/quantity";
 
 export type CapturePurpose = "textToItems" | "voiceToItems" | "labelToNutrients" | "photoToItems";
 
@@ -36,19 +37,19 @@ export type LabelNutrients = {
  * schema, so the provider never sees any of these caps: the prompt's UNITS rule steers the model
  * and this refinement checks the reply when it is parsed.
  */
-const MAX_GRAMS = 5000;
-const QTY_CAP_BY_UNIT: Record<string, number> = { g: MAX_GRAMS, oz: MAX_GRAMS / 28.3495 };
+const MAX_GRAMS = MAX_CAPTURE_GRAMS;
 const QTY_CAP_DEFAULT = 100;
 
 export const captureItemSchema: z.ZodType<CaptureItem> = z.object({
   label: z.string().min(1).max(120),
   grams: z.number().min(0).max(MAX_GRAMS),
-  qty: z.number().min(0).max(MAX_GRAMS),
+  qty: z.number().min(0).max(MAX_GRAMS * 1000), // maximum mass quantity: milligrams
   unit: z.string().min(1).max(24),
   confidence: z.number().min(0).max(1),
   brand: z.string().max(120).optional(),
 }).superRefine((item, ctx) => {
-  const cap = QTY_CAP_BY_UNIT[item.unit.trim().toLowerCase()] ?? QTY_CAP_DEFAULT;
+  const massPerUnit = massGramsPerUnit(item.unit);
+  const cap = massPerUnit === null ? QTY_CAP_DEFAULT : MAX_GRAMS / massPerUnit;
   if (item.qty > cap) {
     ctx.addIssue({ code: "too_big", maximum: cap, origin: "number", inclusive: true,
       path: ["qty"], message: `qty above ${Math.round(cap)} for unit ${item.unit}` });
