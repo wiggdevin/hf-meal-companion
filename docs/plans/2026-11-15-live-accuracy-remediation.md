@@ -49,6 +49,16 @@ The first CI run found a spent-budget response regression and a provider-timeout
 
 One full local unit run before this batch passed 16,489 tests, with 1,409 skipped. After the batch, run focused regressions, types, lint and size checks; the full suite runs in CI. The candidate uses its actual available source pins, without a temporary overlay. A fresh supplemental photo validation set stays sealed from the photo author until source freeze. Show the measured results before deployment.
 
+### Final meal repair batch before the requested rerun
+
+The completed intermediate cohort at `110a1d4` scored76/114coach turns and12/50photos under the original frozen assertions. Its source lock, run IDs, outputs and costs remain preserved. These are intermediate results; the following changes require their own full rerun.
+
+`lib/coach/completed-plan.ts` now renders a pure requested meal read from one successful `get_plan`, using only its validated date, slot, time, title and gram items. It self-checks against the existing plan-report grammar and then passes through the normal reply guard. Mixed requests, missing or mismatched records and unsafe titles stay on the existing model path. The saved-plan dietary caveat appears only beside a retained factual report.
+
+`lib/coach/wire.ts` discards a zero-gram suggestion only when its absent reference and exact normalized name duplicate an item in a structurally accepted `set_slot_meal`. It never turns a card into a quantity or reference. Other zero cards remain invalid, and actions still pass through grounding and policy checks. `lib/coach/portion-bands.ts` gives plain cooked oats a150/235/350g fallback band based on the bundled234g cup; explicit grams and actual catalog portions retain priority. Dry oats and prepared products retain their previous rules. This editable serving guess is not a measured photo portion.
+
+Focused meal and composition checks pass without golden changes. Full lint/types, independent contract verification, a new clean-source lock and the complete200capture/114coach rerun are required before reporting final gains. Production remains unchanged.
+
 ### Historical R3 comparison
 
 The prior implementation and frozen live rerun completed on `fix/live-accuracy-remediation`; these are R3 results, not the current R4 candidate. Production is unchanged.

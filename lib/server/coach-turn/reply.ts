@@ -257,7 +257,7 @@ export async function modelReply(
   // is written out of the row as soon as the food list is known in full (review t3r4 WARN 4).
   const foods = accountFoodNames(env.context?.lists);
   const scanResult = planExempt && scan ? await scan : null;
-  if (planExempt && scanResult && (scanResult.hardRulesActive || !scanResult.complete)) {
+  if (planExempt && !checked.replaced && scanResult && (scanResult.hardRulesActive || !scanResult.complete)) {
     content += " That is what your saved plan says. Its foods were not re-checked against your current food rules.";
   }
   if (!checked.replaced && composed.length > 0 && state.suggestMessage && !content.includes(state.suggestMessage)) {

@@ -3,6 +3,7 @@ import type { CoachAction } from "@/lib/coach/actions";
 import type { FoodHit } from "@/lib/coach/executors";
 import { localAvoidCommand } from "@/lib/profile/local-avoid-command";
 import { mayReachJev } from "@/lib/profile/taste-safety";
+import { EMPTY_WIRE_STEP } from "@/lib/coach/wire";
 import { completedIdeasReply } from "@/lib/coach/completed-ideas";
 import { ACCEPTANCE_LOCAL, HEALTH_CORPUS, REDTEAM_CORPUS } from "@/tests/fixtures/taste-safety-corpus";
 
@@ -111,6 +112,35 @@ describe("R3 actual final and tool shapes", () => {
     });
     expect(result.actions).toMatchObject([{ kind: "set_slot_meal", dates: expect.any(Array) }]);
     expect(result.suggestions.every((s) => s.verdict === "allowed")).toBe(true);
+  });
+
+  it.each([
+    ["Your weekday plan is ready.", ["gluten", "dairy"]],
+    ["Set oatmeal with blueberries for Meal 1 every weekday through November 29.", []],
+  ] as const)("grounds zero-placeholder meal cards with normal reply checks: %s", async (text, allergens) => {
+    const searchFoods = async (_u: string, name: string) => [{
+      ...(name === "oatmeal" ? hit("Oatmeal, cooked with water")
+        : hit("Blueberries, raw", [], ID.replace(/1$/, "2"))), portionGrams: null,
+    }];
+    const result = await runTurn(db([...allergens]), db(), "u",
+      req("set oatmeal with blueberries every weekday"), {
+        generate: vi.fn(async ({ schema }: { schema: { parse: (input: unknown) => unknown } }) => schema.parse({ ...EMPTY_WIRE_STEP,
+          kind: "final", text,
+          actions: [{ kind: "set_slot_meal", from: "2026-11-15", through: "2026-11-29",
+            weekdays: [1, 2, 3, 4, 5], slot: "meal-1", title: "Oatmeal with blueberries",
+            items: [{ name: "oatmeal", grams: 0 }, { name: "blueberries", grams: 0 }],
+            item: { name: "oatmeal", grams: 0 }, name: "oatmeal", grams: 0,
+            entryId: "", numericArgs: [], stringArgs: [] }],
+          suggestions: [{ name: "oatmeal", foodRefId: null, grams: 0 },
+            { name: "blueberries", foodRefId: null, grams: 0 }],
+        })) as never,
+        ports: { searchFoods }, newId: () => ID, now: () => 0,
+        replyCheck: { searchFoods: async () => [], profileRules: async () => null },
+      });
+    expect(result.actions).toMatchObject([{ kind: "set_slot_meal", dates: expect.any(Array),
+      items: [{ foodRefId: ID, grams: 235 }, { foodRefId: ID.replace(/1$/, "2"), grams: 120 }] }]);
+    expect(result.suggestions).toEqual([]);
+    expect(result.messages.at(-1)?.blocks?.some((block) => block.kind === "food_ideas")).not.toBe(true);
   });
 
   it.each([

@@ -15,6 +15,7 @@ import { CallRefused, ProviderHttpError, SchemaRejection } from "@/lib/ai/call";
 import { isCallerCancellation } from "@/lib/ai/failures";
 import { mergeFoodEvidence } from "@/lib/coach/food-evidence";
 import { ASSISTANT_NAME } from "@/lib/brand";
+import { completedPlanReply } from "@/lib/coach/completed-plan";
 import { completedIdeasReply } from "@/lib/coach/completed-ideas";
 import {
   ABORT_CORRECTION, planTurn, TURN_LIMITS, TURN_STOP_REASONS, type TurnStep,
@@ -58,7 +59,8 @@ export async function runModelLoop(
       if (step.kind !== "tool") break;
       if (await runToolBatch(turn, kit, env, state, step.calls) === "late") break;
       const completed = !turn.req.planSource && !turn.req.planSkipped?.length
-        ? completedIdeasReply(turn.req.text, state.toolCalls, state.composed, state.blocks, state.suggestMessage) : null;
+        ? completedIdeasReply(turn.req.text, state.toolCalls, state.composed, state.blocks, state.suggestMessage)
+          ?? completedPlanReply(turn.req.text, state.toolCalls, state.planReads, turn.clock.date) : null;
       if (completed) {
         const final: Extract<TurnStep, { kind: "final" }> = { kind: "final", text: completed };
         state.step = final;

@@ -85,10 +85,12 @@ describe("plan facts and list confirmation audit controls", () => {
     expect(result.content).not.toContain("not re-checked");
   });
 
-  it("keeps the read caveat and fails closed when the profile scan cannot finish", async () => {
+  it("fails closed without an authored-fact caveat when the profile scan cannot finish", async () => {
     const result = await report("What's my breakfast a week from today?",
       "Tofu bowl. It is planned for 08:00 on November 22.", false, [read], true);
-    expect(result.content).toContain("not re-checked against your current food rules");
+    expect(result.content).toContain("couldn’t finish checking");
+    expect(result.content).not.toContain("not re-checked against your current food rules");
+    expect(result.content).not.toContain("Tofu bowl");
     expect(result.body.actions).toEqual([]);
   });
 
