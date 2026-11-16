@@ -45,6 +45,8 @@ The user requests remaining coach, suggestion and photo repairs, followed by a n
 
 The four-model escalation audit is complete. Opus checked the findings against the frozen source and consolidated one repair batch: food identity and preparation boundaries, grounded log retention, warning scan/display consistency, requested plan facts, truthful suggestion caveats, no-cook admission, catalog review binding and cancellation handling. The live benchmark, scorer and gold remain unchanged. At this source checkpoint, the final R4 live cohort has not started; no R4 accuracy gain is claimed here. The locked run protocol and the task report carry the subsequent measured results.
 
+The first CI run found a spent-budget response regression and a provider-timeout/SDK-abort race in cancellation hardening. The initial live cohort was stopped after its current attempts and all five accounts were cleaned up. Its partial results and costs remain engineering evidence, outside the final accuracy score. The narrow deadline corrections pass the five existing CI failures and the new deterministic SDK-race regression; 484 focused checks pass. The final cohort requires a new committed source lock and fresh run IDs.
+
 One full local unit run before this batch passed 16,489 tests, with 1,409 skipped. After the batch, run focused regressions, types, lint and size checks; the full suite runs in CI. The candidate uses its actual available source pins, without a temporary overlay. A fresh supplemental photo validation set stays sealed from the photo author until source freeze. Show the measured results before deployment.
 
 ### Historical R3 comparison

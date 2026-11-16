@@ -115,10 +115,11 @@ export async function withDeadline<T>(ms: number, run: (signal: AbortSignal) => 
   let timer: ReturnType<typeof setTimeout> | undefined;
   const expiry = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
-      controller.abort();
       const err = new Error(`the provider did not answer within ${ms}ms`);
       err.name = "AbortError";
+      // Settle the known deadline before an SDK synchronously rejects on cancellation.
       reject(err);
+      controller.abort();
     }, ms);
   });
   try {

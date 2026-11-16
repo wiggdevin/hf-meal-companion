@@ -141,8 +141,7 @@ async function nextStep(
     const stalled = (e: unknown) => stalledWithTime(e, remaining(), kit.turnAbort.signal.aborted);
     // A new step (a correction round, or another model after a failure) replaces the draft shown.
     const call = (modelId: string, remainingMs = remaining()) => {
-      kit.turnAbort.signal.throwIfAborted();
-      if (remainingMs <= 0) throw new Error("the turn has no model budget left");
+      if (remainingMs > 0) kit.turnAbort.signal.throwIfAborted();
       draft.reset();
       return withWallClock(
         () => model.step(modelId, state.transcript, remainingMs, draft.onText), remainingMs);
