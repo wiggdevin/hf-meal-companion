@@ -335,33 +335,36 @@ describe("checkReplyLive — confirmed profile hard rules (§6 row 5)", () => {
       kcalPer100g: 89, proteinPer100g: 1.1, carbsPer100g: 22.8, fatPer100g: 0.3,
       verdict: "allowed" as const }],
   };
+  const bananaEvidence = { [banana.name]: { foodRefId: REF(7), catalogFoodRevisionId: 77,
+    allergenTags: [], category: [], onEatsList: true, onAvoidList: false } };
 
   it("keeps the reply and the log_meal action when the only unresolved food is the one being logged", async () => {
     const result = await live(baseInput({
-      text: "Logged one medium banana as a snack.", actions: [bananaLogMeal],
+      text: "Logged 118 g of banana as a snack.", actions: [bananaLogMeal], evidence: bananaEvidence,
     }), {
       searchFoods: vi.fn(async () => [banana]), profileRules: async () => rules,
       foodEvidence: async () => new Map(),
     });
-    expect(result.content).toBe("Logged one medium banana as a snack.");
+    expect(result.content).toBe("Logged 118 g of banana as a snack.");
     expect(result.actions).toEqual([bananaLogMeal]);
   });
 
   it("keeps a mirror card of the logged food, with no id or with the logged id", async () => {
     for (const card of [{ name: "banana" }, { name: "banana", foodRefId: REF(7) }]) {
-      const result = await live(baseInput({ text: "Logged one medium banana as a snack.",
-        actions: [bananaLogMeal], named: [card] }), {
+      const result = await live(baseInput({ text: "Logged 118 g of banana as a snack.",
+        actions: [bananaLogMeal], named: [card], evidence: bananaEvidence }), {
         searchFoods: vi.fn(async () => [banana]), profileRules: async () => rules,
         foodEvidence: async () => new Map(),
       });
-      expect(result.content).toBe("Logged one medium banana as a snack.");
+      expect(result.content).toBe("Logged 118 g of banana as a snack.");
     }
   });
 
   // Grok audit round 12: a card named like the log but holding another food's id is advice.
   it("judges a card named like the logged food that carries a different id", async () => {
-    const result = await live(baseInput({ text: "Logged one medium banana as a snack.",
-      actions: [bananaLogMeal], named: [{ name: "banana", foodRefId: bacon.foodRefId! }] }), {
+    const result = await live(baseInput({ text: "Logged 118 g of banana as a snack.",
+      actions: [bananaLogMeal], evidence: bananaEvidence,
+      named: [{ name: "banana", foodRefId: bacon.foodRefId! }] }), {
       searchFoods: vi.fn(async () => [banana]), profileRules: async () => rules,
       foodEvidence: async () => new Map(),
     });
@@ -431,13 +434,15 @@ describe("checkReplyLive — round-4 audit", () => {
     expect(isReask(result.content)).toBe(true);
   });
 
-  it("exempts the logged food itself when its phrase comes back as the logged ref", async () => {
+  it("exempts only a quantified confirmation bound to the actual logged ref and lookup", async () => {
     const searchFoods = vi.fn(async (_u: string, phrase: string) =>
       [hit({ name: phrase, foodRefId: REF(8), allergenTags: ["dairy"] })]);
-    const input = { ...baseInput({ text: "Logged your yogurt bowls.", profile: DAIRY,
-      named: [{ name: "Yogurt bowl", foodRefId: REF(8) }] }),
-      groundedLogged: Promise.resolve({ names: new Set(["yogurt bowl"]), refs: new Set([REF(8)]) }) };
-    const result = await live(input, { searchFoods });
-    expect(result.content).toBe("Logged your yogurt bowls.");
+    const input = { ...baseInput({ text: "Logged 150 g of yogurt bowl.", profile: DAIRY,
+      named: [{ name: "Yogurt bowl", foodRefId: REF(8) }], evidence: { "Yogurt bowl": {
+        foodRefId: REF(8), allergenTags: ["dairy"], category: [], onEatsList: true, onAvoidList: false,
+      } } }), groundedLogged: Promise.resolve({ names: new Set(["yogurt bowl"]), refs: new Set([REF(8)]),
+        items: [{ name: "Yogurt bowl", foodRefId: REF(8), grams: 150 }] }) };
+    const result = await startReplyScan(input, { searchFoods }, Date.now() + 1000);
+    expect(result.failing).toEqual([]);
   });
 });

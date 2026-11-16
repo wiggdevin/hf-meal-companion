@@ -77,7 +77,9 @@ export function buildDraft(
     method: ctx.method,
     items,
     ...(ctx.labelFood ? { labelFood: ctx.labelFood } : {}),
-    notes: [...parsed.notes, ...(ctx.notes ?? [])],
+    notes: [...parsed.notes, ...(ctx.notes ?? []),
+      ...(ctx.method === "photo" && items.length > 0
+        ? ["Photo portions are estimates. Check the grams against a scale, or choose a portion below."] : [])],
     spend: ctx.spend,
     ...(ctx.timings ? { timings: ctx.timings } : {}),
   }, { deterministic: runDeterministic });

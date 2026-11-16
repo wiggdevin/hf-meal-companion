@@ -116,6 +116,35 @@ describe("runTurn — the live reply check (§6 row 5, §9 R7)", () => {
     expect(row.tool_calls.composed).toEqual([]);
   });
 
+  it.each([
+    ["show me salmon in the catalog so I can decide whether to avoid it", true],
+    ["show me salmon so I can decide whether to avoid it", true],
+    ["suggest salmon for dinner", false],
+    ["show me dinner ideas from my eats list", false],
+  ])("keeps only catalog review results alongside a policy warning: %s", async (text, keepSearch) => {
+    const generate = vi.fn()
+      .mockResolvedValueOnce({ kind: "tool", calls: [{ name: "search_foods",
+        args: { query: "salmon", intent: "avoid" } }] })
+      .mockResolvedValueOnce({ kind: "final", text: "Have some salmon with dinner." });
+    const writes: Writes = { rows: [] };
+    await runTurn(db({ constraint_profiles: FISH }, writes), db({}, writes), "u1", { ...REQ, text }, {
+      generate: generate as never,
+      ports: { ...ports, searchFoods: async () => [{ ...salmon, catalogFoodRevisionId: 71 }] },
+      now: () => 0, newId: () => "3f1b1a2c-0000-4000-8000-000000000081",
+    });
+    const row = assistantRow(writes);
+    expect(isReask(row.content)).toBe(true);
+    expect(row.content).toContain("fish");
+    expect(row.content).not.toContain("Have some");
+    expect(row.tool_calls).toMatchObject({ actions: [], suggestions: [] });
+    expect(row.tool_calls.composed).toEqual([]);
+    expect(row.tool_calls.blocks).toEqual(keepSearch ? [expect.objectContaining({
+      kind: "food_search", intent: "avoid", results: [expect.objectContaining({
+        foodRefId: salmon.foodRefId, name: salmon.name, blocked: true,
+      })],
+    })] : []);
+  });
+
   it("offers to add a food nothing checked yet to Eats, with quick replies", async () => {
     // A card whose id came only from the model: no search checked it (unchecked_id).
     const generate = vi.fn().mockResolvedValueOnce({ kind: "final", text: "Here is an idea.",
@@ -216,7 +245,7 @@ describe("runTurn — the live reply check (§6 row 5, §9 R7)", () => {
     expect(row.tool_calls.actions).toEqual([]);
   });
 
-  it("keeps the reply when the same advised food actually grounds and logs", async () => {
+  it("still rejects advice about a forbidden food even when the same food actually grounds and logs", async () => {
     const sourdough: FoodHit = { foodRefId: "3f1b1a2c-0000-4000-8000-00000000001e",
       name: "Sourdough bread", brand: null, kcalPer100g: 270, prefStatus: null,
       allergenTags: ["gluten"], category: null };
@@ -233,8 +262,8 @@ describe("runTurn — the live reply check (§6 row 5, §9 R7)", () => {
         replyCheck: { searchFoods: async () => [sourdough], profileRules: async () => null },
       });
     const row = assistantRow(writes) as unknown as { content: string; tool_calls: { actions: unknown[] } };
-    expect(isReask(row.content)).toBe(false);
-    expect(row.tool_calls.actions).toHaveLength(1);
+    expect(isReask(row.content)).toBe(true);
+    expect(row.tool_calls.actions).toEqual([]);
   });
 
   // DeepSeek audit round 10: a clarification REPLACES the reply, so no prose is scanned, yet the

@@ -16,7 +16,7 @@ import { activeTargets } from "@/lib/server/targets";
 import { addIsoDays, resolveAccountDay } from "@/lib/server/account-day";
 import { isMealSlot } from "@/lib/meals";
 import { mapCatalogFoodHit } from "@/lib/server/coach";
-import { eatsOwnFood } from "@/lib/server/eats-own-food";
+import { observedOwnFood, type FoodLookupObserver } from "@/lib/server/coach-turn/food-evidence";
 import type { ExecutorPorts } from "@/lib/coach/executors";
 import type { FoodHit } from "@/lib/coach/executors";
 import { clampMealTarget } from "@/lib/coach/compose";
@@ -235,11 +235,7 @@ async function pendingMealSlots(
 export function defaultPorts(
   client: SupabaseClient, admin: SupabaseClient, newId: () => string,
   clock: { tz: string; date: string; now?: string },
-  /**
-   * `signal` aborts once the turn has stopped waiting (review r2): a lookup still in flight then
-   * does not go on to mint food refs for an answer nobody will read.
-   */
-  opts: { signal?: AbortSignal; profile?: StoredProfile } = {},
+  opts: FoodLookupObserver & { profile?: StoredProfile } = {},
 ): ExecutorPorts {
   const tz = clock.tz;
   /** The turn's own policy profile (constraint row + confirmed profile rules), already read once
@@ -277,7 +273,10 @@ export function defaultPorts(
         ]);
         return mapCatalogFoodHit(hit, detail, typeof data === "string" ? data : null);
       }));
-      return [...(custom ? [custom] : []), ...catalog].slice(0, limit);
+      const hits = [...(custom ? [custom] : []), ...catalog].slice(0, limit);
+      opts.signal?.throwIfAborted();
+      opts.onFoodHits?.(userId, hits);
+      return hits;
     },
     // Phase 13 §4, §9 R5 (owner ruling 2026-10-02): the confirmed profile hard rules travel with
     // the constraint row here too, the same as every other policy call site — a model that calls
@@ -349,8 +348,8 @@ export function defaultPorts(
         profile,
         target: async () => target,
         searchFoods: ports.searchFoods,
-        ownFood: eatsOwnFood(client, (uid, name, signal) =>
-          searchExactUserFood(admin, uid, name, signal ?? opts.signal)),
+        ownFood: observedOwnFood(client, (uid, name, signal) =>
+          searchExactUserFood(admin, uid, name, signal ?? opts.signal), opts),
         eatsNames: async (uid) => (await suggestionEats(uid)).all,
         eatsAnchors: async (uid) => (await suggestionEats(uid)).anchors,
         ...composePoolPorts(client, admin, clock.now, clock.date),

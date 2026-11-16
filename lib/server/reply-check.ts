@@ -21,6 +21,9 @@
  * (REPLY_CHECK_BUDGET_MS, the Jev verify window), and `checkReplyLive` only awaits it.
  */
 import { withoutListMarkConfirmations } from "@/lib/coach/list-mark-confirmation";
+import { withoutLogConfirmations } from "@/lib/coach/log-confirmation";
+import { occasionAt } from "@/lib/meals/occasion";
+import { foodEvidenceFor } from "@/lib/coach/food-evidence";
 import { shoppingItemNames, withoutShoppingConfirmations } from "@/lib/coach/shopping-confirmation";
 import type { CoachAction } from "@/lib/coach/actions";
 import { allergenFacts, checkItem, type EvidenceByName } from "@/lib/coach/policy";
@@ -54,6 +57,8 @@ export type ReplyCheckPorts = ProfileEvidencePorts & {
   searchFoods: (userId: string, query: string, limit: number) => Promise<FoodHit[]>;
   /** The account's active confirmed profile hard rules (lib/policy/profiles/account-rules.ts). */
   profileRules?: (userId: string) => Promise<ProfileRuleSet | null>;
+  /** Account-scoped membership existence read; needed only without another hard restriction. */
+  hasAvoidFoods?: (userId: string) => Promise<boolean>;
 };
 
 /** `text` is the model's own prose — never copy the turn built and already checked itself. */
@@ -125,7 +130,7 @@ function inText(prose: string, name: string): boolean {
  * a model id policy already blocks on (that card recommends nothing). Null: a model-only id.
  */
 function checkedCardEntry(s: RawSuggestion, input: ReplyScanInput): Entry | null {
-  const found = input.evidence[s.name];
+  const found = foodEvidenceFor(input.evidence, s.name);
   if (found && found.foodRefId !== null && (!s.foodRefId || s.foodRefId === found.foodRefId)) {
     return found;
   }
@@ -172,6 +177,7 @@ type CatalogSearch = {
 
 function startCatalogSearch(
   input: ReplyScanInput, ports: ReplyCheckPorts, deadlineAt: number,
+  cache = new Map<string, Promise<Settled<FoodHit[]>>>(),
 ): CatalogSearch {
   const heldNames = [...Object.keys(input.evidence), ...input.named.map((s) => s.name)];
   const holders: string[] = [];
@@ -185,8 +191,11 @@ function startCatalogSearch(
   const exclude = new Set([...heldNames.map(normalizeFoodText), ...lexiconMentions(input.text),
     ...SLOT_WORDS]);
   const sweep = candidatePhrases(input.text, exclude);
-  const search = (phrase: string) =>
-    settleBy(ports.searchFoods(input.userId, phrase, SEARCH_LIMIT), deadlineAt);
+  const search = (phrase: string) => {
+    if (!cache.has(phrase)) cache.set(phrase,
+      settleBy(ports.searchFoods(input.userId, phrase, SEARCH_LIMIT), deadlineAt));
+    return cache.get(phrase)!;
+  };
   // Every shopping item is looked up too (DeepSeek audit round 9, HIGH): its confirmation sentence
   // and mirror card leave the scan, so the item itself must still meet the account's hard rules.
   const shopping = shoppingItemNames([...(input.actions ?? []), ...(input.pendingActions ?? [])]);
@@ -279,7 +288,10 @@ function judge(
 function rawLoggedIdentities(input: ReplyScanInput): LoggedIdentities {
   const identities = loggedFoodIdentities(input.actions ?? []);
   for (const name of input.loggedNames ?? []) identities.names.add(name.toLowerCase());
-  return identities;
+  return { ...identities, items: (input.actions ?? []).flatMap((action) => action.kind === "log_meal"
+    ? action.items.map((item) => ({ ...item, slot: action.slot, at: action.at,
+      occasion: occasionAt(action.at) })) : []), listMarks: (input.actions ?? []).flatMap((action) =>
+    "name" in action ? [{ kind: action.kind, name: action.name }] : []) };
 }
 
 /**
@@ -300,7 +312,7 @@ async function resolveLoggedIdentities(
 async function scan(
   input: ReplyScanInput, ports: ReplyCheckPorts, deadlineAt: number,
 ): Promise<ReplyScan> {
-  const legacyActive = hasActiveHardRules(input.profile);
+  let legacyActive = hasActiveHardRules(input.profile);
   const rulesRead = ports.profileRules
     ? await settleBy(ports.profileRules(input.userId), deadlineAt)
     : { ok: true as const, value: null };
@@ -311,21 +323,42 @@ async function scan(
   // or never answers cannot prove the account has none, so it re-asks; only a read that answered
   // with no rules lets an account without legacy rules skip the scan.
   if (!rulesRead.ok) return incomplete;
-  if (!legacyActive && rules === null) return { hardRulesActive: false, complete: true, failing: [] };
+  // A standalone acknowledgement with no food surface has no dietary advice to check.
+  if (!legacyActive && rules === null && input.named.length === 0
+      && shoppingItemNames([...(input.actions ?? []), ...(input.pendingActions ?? [])]).length === 0
+      && /^(?:hi|hello|thanks|thank you|ok|okay|got it)[.!]?\s*$/i.test(input.text.trim())) {
+    return { hardRulesActive: false, complete: true, failing: [] };
+  }
 
   const failing: ReplyFailure[] = [];
-  const prose = normalizeFoodText(input.text);
   // finding #6 / live smoke 2026-10-02: the model mirrors a food it logs into `suggestions`, which
   // made the user's own record fail as an unchecked card. Logged foods are not advice.
   // finding #3 (2026-10-02 DeepSeek audit): resolved from the GROUNDED log, not the model's raw
   // pre-grounding claim — see resolveLoggedIdentities above.
-  const searching = startCatalogSearch(input, ports, deadlineAt);
-  searching.hits.catch(() => {});
+  const hasAvoid = () => Object.values(input.evidence).some((entry) => entry.onAvoidList);
+  if (!legacyActive && rules === null && !hasAvoid() && ports.hasAvoidFoods) {
+    const membership = await settleBy(ports.hasAvoidFoods(input.userId), deadlineAt);
+    if (!membership.ok) return incomplete;
+    legacyActive = membership.value;
+  }
+  const cache = new Map<string, Promise<Settled<FoodHit[]>>>();
+  let searching = legacyActive || rules !== null || hasAvoid()
+    ? startCatalogSearch(input, ports, deadlineAt, cache) : null;
+  searching?.hits.catch(() => {});
   const logged = await resolveLoggedIdentities(input, deadlineAt);
+  legacyActive ||= hasAvoid();
+  if (!legacyActive && rules === null) return { hardRulesActive: false, complete: true, failing: [] };
+  const adviceText = withoutLogConfirmations(withoutListMarkConfirmations(input.text,
+    logged.listMarks ?? []), logged.items ?? [], input.evidence);
+  if (!searching || adviceText !== input.text) {
+    input = { ...input, text: adviceText };
+    searching = startCatalogSearch(input, ports, deadlineAt, cache);
+  }
+  const prose = normalizeFoodText(input.text);
   // A card mirrors a logged food only when it carries no id of its own or that food's id (Grok
   // audit round 12): a card named like the log but holding another id is advice, and is judged.
   const mirrorsLog = (s: RawSuggestion) => logged.names.has(s.name.toLowerCase())
-    && (!s.foodRefId || logged.refs.has(s.foodRefId));
+    && (!s.foodRefId || logged.refs.has(s.foodRefId)) && !inText(prose, s.name);
   const advised = { ...input, named: input.named.filter((s) => !mirrorsLog(s)) };
   const held = heldMentions(advised, prose, failing);
   const live = await resolveByCatalog(searching, advised, held, failing);
@@ -339,12 +372,9 @@ async function scan(
     if (resolved === null) return { ...incomplete, failing };
     evidence = resolved;
   }
-  // finding #6: a food this turn's own log_meal already logged is the user's record of what they
-  // ate, not advice — exempt from the hard-rule judgment below, by name or by its grounded id.
+  // Grounded log confirmations were removed above. Every remaining food mention is advice,
+  // including another recommendation of the exact same logged name or ref.
   for (const mention of mentions) {
-    // A logged food is exempt as a record; putting it on the list is still judged.
-    if (!mention.shopping && (logged.names.has(mention.name.toLowerCase())
-      || (mention.entry.foodRefId !== null && logged.refs.has(mention.entry.foodRefId)))) continue;
     const evidenceFor = mention.entry.foodRefId === null ? undefined
       : evidence.get(mention.entry.foodRefId);
     const failure = judge(mention, input.profile, legacyActive, rules, evidenceFor);
@@ -388,8 +418,7 @@ export function startReplyScan(
   // W087: so are the sentences that only confirm this turn's Eats or Avoid marks; every other
   // mention of those foods is still judged (lib/coach/list-mark-confirmation.ts).
   const turnActions = [...(input.actions ?? []), ...(input.pendingActions ?? [])];
-  input = { ...input, text: withoutShoppingConfirmations(
-    withoutListMarkConfirmations(input.text, turnActions), turnActions) };
+  input = { ...input, text: withoutShoppingConfirmations(input.text, turnActions) };
   const legacyActive = hasActiveHardRules(input.profile);
   // A scan that never finishes cannot prove a profile rule is absent either (owner ruling above).
   const fallback: ReplyScan = { hardRulesActive: legacyActive || ports.profileRules !== undefined,

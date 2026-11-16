@@ -74,9 +74,23 @@ export const PROMPTS: Record<CapturePurpose, { system: string; maxOutputTokens: 
   photoToItems: {
     system: [
       "You look at one photograph of a plate of food and list what is on it.",
-      UNTRUSTED, UNITS, CONFIDENCE,
-      "For a whole or mostly whole divisible food, count only clearly visible pieces or slices " +
-        "and derive the grams for one piece from the total grams divided by that count.",
+      UNTRUSTED, UNITS,
+      "Name each food only as specifically as the visible evidence supports. Include a preparation " +
+        "state when it is visible; do not invent a variety, recipe, hidden ingredient or raw/cooked " +
+        "state that the image cannot establish.",
+      "grams is the TOTAL edible mass of that food in the photo, never the mass of one piece. " +
+        "For a whole or mostly whole divisible food, count only clearly visible pieces or slices " +
+        "in qty. A visible count does not establish their weight.",
+      "Estimate the photographed portion from its visible size, shape, spread and depth, accounting " +
+        "for overlap and occlusion. Do not assume a standard plate size or substitute a default " +
+        "serving for a visibly different portion. A single image without a known scale cannot " +
+        "establish absolute mass reliably.",
+      "confidence is your own 0 to 1 estimate that BOTH the food identity and its total grams are " +
+        "right. When food is identifiable but weight is only a visual estimate, keep the food, " +
+        "give a rough total grams estimate, use confidence below 0.6 and add a short note that " +
+        "the weights need confirmation. A readable scale weight or other readable weight evidence " +
+        "must clearly refer to this portion before it supports higher weight confidence. Return " +
+        "an empty items array when no food can be identified, rather than inventing a meal.",
       "Use each food once. Do not count the same food twice because it appears in two places.",
     ].join("\n"),
     maxOutputTokens: 1024,

@@ -14,17 +14,25 @@
 
 import { LIST_MARK_KINDS } from "@/lib/coach/actions/food-lists";
 
+const LIST = "(?:your|the)\\s+(?:favou?red|favou?rites|eats|avoid)(?:\\s+list)?";
+// The lists are exclusive: adding a mark can also describe clearing the other one. Only the
+// list-only pronoun clause is set aside; any food advice after it still leaves the sentence in.
+const MIRROR_REMOVAL = "(?:\\s+and\\s+removed\\s+(?:it|them)\\s+from\\s+" + LIST + ")?";
+
 const CONFIRMATION = new RegExp(
   "^\\W*(?:(?:done|got it|sure|okay|ok|all set)\\W+)?(?:i(?:'ve|’ve| have|'m|’m| am)?\\s+)?"
   + "(?:just\\s+)?(?:now\\s+)?"
   + "(?:added|adding|put|putting|marked|marking|moved|moving|removed|removing|took|taking|taken)"
   + "\\s+(?:(?:and|&|,|both|also|back)\\s*)*(?:on|to|onto|from|off|off of|back on|back to)\\s+"
-  + "(?:your|the)\\s+(?:favou?red|favou?rites|eats|avoid)(?:\\s+list)?\\W*$", "i");
+  + LIST + MIRROR_REMOVAL + "\\W*$", "i");
 
 /** "Greek yogurt is now on your Avoid list." */
 const STATE = new RegExp(
   "^\\W*(?:(?:and|&|,|both)\\s*)*(?:is|are)\\s+(?:now\\s+)?(?:back\\s+)?(?:on|off)\\s+(?:of\\s+)?"
-  + "(?:your|the)\\s+(?:favou?red|favou?rites|eats|avoid)(?:\\s+list)?(?:\\s+now)?\\W*$", "i");
+  + LIST + "(?:\\s+now)?\\W*$", "i");
+
+const NO_LONGER = new RegExp(
+  "^\\W*(?:is|are)\\s+(?:now\\s+)?no\\s+longer\\s+(?:favou?red|on\\s+" + LIST + ")\\W*$", "i");
 
 const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -51,7 +59,9 @@ export function listMarkNames(actions: readonly ActionLike[]): string[] {
 }
 
 /** The text without the sentences that only confirm this turn's Eats or Avoid marks. */
-export function withoutListMarkConfirmations(text: string, actions: readonly ActionLike[]): string {
+export function withoutListMarkConfirmations(
+  text: string, actions: readonly ActionLike[], onMismatch?: () => void,
+): string {
   const names = listMarkNames(actions).sort((a, b) => b.length - a.length);
   if (names.length === 0) return text;
   const items = new RegExp(`(?<![\\p{L}\\p{N}])(?:${names.map(escape).join("|")})(?![\\p{L}\\p{N}])`, "giu");
@@ -59,8 +69,25 @@ export function withoutListMarkConfirmations(text: string, actions: readonly Act
     if (!items.test(sentence)) return true;
     items.lastIndex = 0;
     const rest = sentence.replace(items, " ").replace(/\s+/g, " ").trim();
-    return !(CONFIRMATION.test(rest) || STATE.test(rest));
+    if (!(CONFIRMATION.test(rest) || STATE.test(rest) || NO_LONGER.test(rest))) return true;
+    const primary = rest.split(/\band removed\b/i)[0];
+    const target = /\bavoid\b/i.test(primary) ? "avoid" : "eats";
+    const operation = /\b(?:removed|removing|took|taking|taken|off|no longer)\b/i.test(primary)
+      ? "remove_from" : "add_to";
+    const matching = new Set(listMarkNames(actions.filter((action) =>
+      action.kind === `${operation}_${target}`)).map((name) => name.toLowerCase()));
+    items.lastIndex = 0;
+    const matches = Array.from(sentence.matchAll(items), (match) => match[0].toLowerCase())
+      .every((name) => matching.has(name));
+    if (!matches) onMismatch?.();
+    return !matches;
   }).join(" ");
+}
+
+export function hasMismatchedListConfirmation(text: string, actions: readonly ActionLike[]): boolean {
+  let mismatch = false;
+  withoutListMarkConfirmations(text, actions, () => { mismatch = true; });
+  return mismatch;
 }
 
 /** A suggestion card that only mirrors a food this turn marked: the action's own card shows it. */

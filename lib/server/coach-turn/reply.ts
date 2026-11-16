@@ -5,6 +5,9 @@
  */
 
 import { withoutListMarkMirrors } from "@/lib/coach/list-mark-confirmation";
+import { claimsAction } from "@/lib/coach/actions";
+import { occasionAt } from "@/lib/meals/occasion";
+import { mergeFoodEvidence } from "@/lib/coach/food-evidence";
 import { shoppingItemNames, withoutShoppingMirrors } from "@/lib/coach/shopping-confirmation";
 import { hydrateNextActionChip } from "@/lib/coach/blocks/hydrate-next-action";
 import { hydrateQuickReplies } from "@/lib/coach/blocks/quick-replies";
@@ -38,7 +41,8 @@ export async function modelReply(
   const { req, newId } = turn;
   const { profile, profileInstances } = kit;
   const { step, claimWithoutAction, claimCorrectionRequested, groundingLate, actionClarifications,
-    recipeRefusals, logPolicyNotices, lookupSources, evidence, replyScan, replyClaimDropped } = state;
+    recipeRefusals, logPolicyNotices, lookupSources, replyScan, replyClaimDropped } = state;
+  const evidence = mergeFoodEvidence(state.evidence, kit.foodEvidence);
   let { draft, composed, blocks, actions } = state;
   let text = claimWithoutAction
     ? "I have not logged that yet. Tell me the amounts once more and I will."
@@ -50,7 +54,7 @@ export async function modelReply(
   let scanText: string | null = !claimWithoutAction && step.kind === "final" ? text : null;
   const clarifying = !claimWithoutAction && actionClarifications.length > 0
     && (recipeRefusals.length > 0 || claimCorrectionRequested || replyClaimDropped
-      || !/\?\s*$/.test(text));
+      || claimsAction(text) || !/\?\s*$/.test(text));
 
   // The cards beside the reply; a card that only mirrors a shopping add or a list mark is not advice.
   let named = step.kind === "final" && !groundingLate
@@ -134,16 +138,26 @@ export async function modelReply(
   // ---- the policy pass: after the model, before render (lib/server/reply-check.ts, §9 R7) ----
   const scan = scanText === null ? null
     : replyScan?.text === scanText ? replyScan.scan : scanReply(turn, kit, state, scanText, named).scan;
-  const checked = await checkReplyLive({ text, named, draft, actions, evidence, profile }, scan);
+  const logItems = actions.flatMap((action) => action.kind === "log_meal"
+    ? action.items.map((item) => ({ ...item, slot: action.slot, at: action.at,
+      occasion: occasionAt(action.at ?? (env.context?.day.date === action.date
+        ? env.context.day.slots.find((slot) => slot.slot === action.slot)?.time : undefined)) })) : []);
+  const checked = await checkReplyLive({ text, adviceText: scanText ?? "", logItems,
+    named, draft, actions, evidence, profile }, scan);
   const { suggestions, draftChecks, textChecks } = checked;
   let { content } = checked;
   logFallback(state, claimWithoutAction, checked.replaced);
   draft = checked.draft;
   actions = checked.actions;
   if (content !== text) {
-    // A re-ask carries no food: no composed meal, no food card beside it (§9 R7).
+    // Catalog review shows the server's own membership/blocked flags, not eating advice. Keep
+    // that requested control beside the warning; a re-ask still drops every meal/recipe block.
+    const catalogReview = checked.replaced?.incomplete === false
+      && !/\b(?:not|no|don't|do not)\b/i.test(req.text)
+      && /^\s*(?:please\s+)?(?:show|find|search|browse|look\s+up)\b[^.!?]*\b(?:catalog|decide\s+(?:whether|if)\s+to\s+(?:avoid|favou?r))\b[^.!?]*[.!?]?\s*$/i.test(req.text);
     composed = [];
-    blocks = blocks.filter((b) => b.kind === "dietary_profile_proposal");
+    blocks = blocks.filter((b) => b.kind === "dietary_profile_proposal"
+      || (catalogReview && b.kind === "food_search"));
     // 2026-10-17 rerun item 2: a food held only because nothing checked it yet gets a way to be
     // checked (add it to Eats) instead of a dead end. It stays held in this reply; a food a rule
     // blocks, or one already on Eats or Avoid, is never offered.

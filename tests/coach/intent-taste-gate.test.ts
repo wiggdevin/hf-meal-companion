@@ -18,6 +18,7 @@ import { ACCEPTANCE_LOCAL, HEALTH_CORPUS, REDTEAM_CORPUS } from "@/tests/fixture
 
 /** One message per command form of the grammar (lib/profile/coach-commands.ts). */
 const COMMANDS = ["16 oz water", "drank 500 ml", "add cheese to my avoid list", "I weigh 128 lb", "avoid cake",
+  "put salmon back on eats",
   "move my meals 30 minutes later", "make me 5 suggestions from my eats list", "a chicken wrap that fits my macros",
   "what should I eat for lunch?", "set kcal to 2300", "I am 34", "show my weight trend", "log 2 eggs and toast",
   "set my breakfast to oatmeal with blueberries every weekday for the next two weeks", "how am I doing this week"];
@@ -55,6 +56,11 @@ describe("the coach intent pre-pass and the taste safety check", () => {
 
   it("16 oz water, drank 500 ml and add cheese to my avoid list still reach the intent pass", () => {
     for (const text of ["16 oz water", "drank 500 ml", "add cheese to my avoid list"]) expect(mayReachJev(text)).toBe(true);
+  });
+
+  it("accepts putting a known food back on a named list without a possessive", () => {
+    expect(mayReachJev("put salmon back on eats")).toBe(true);
+    expect(mayReachJev("put salmon back on eats because it makes me sick")).toBe(false);
   });
 
   it("still classifies the app's own commands", async () => {

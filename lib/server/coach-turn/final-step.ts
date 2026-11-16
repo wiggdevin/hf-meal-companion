@@ -6,9 +6,11 @@
  */
 
 import { actionsInScope, scopeDropNotice } from "@/lib/coach/scope";
-import { withoutListMarkMirrors } from "@/lib/coach/list-mark-confirmation";
+import { hasMismatchedListConfirmation, withoutListMarkMirrors } from "@/lib/coach/list-mark-confirmation";
+import { LIST_MARK_KINDS } from "@/lib/coach/actions/food-lists";
+import { occasionAt } from "@/lib/meals/occasion";
 import { withoutShoppingMirrors } from "@/lib/coach/shopping-confirmation";
-import { claimsAction, groundAndExpandActions } from "@/lib/coach/actions";
+import { actionSpecFor, claimsAction, groundAndExpandActions } from "@/lib/coach/actions";
 import { hydrateComparison } from "@/lib/coach/blocks/hydrate-comparison";
 import { INVALID_ARGS_PREFIX } from "@/lib/coach/dispatch";
 import { isGenericRefusal, needsRefusalCorrection, REFUSAL_CORRECTION } from "@/lib/coach/refusal-guard";
@@ -164,7 +166,14 @@ export async function settleFinalStep(
   state.actions = skips.actions;
   // The real, grounded log_meal identities — an action log-meal.ts turned into a clarification
   // (no catalog row grounded it) contributes nothing here, by design (finding #3 above).
-  resolveGroundedLogged(loggedFoodIdentities(policy.actions));
+  resolveGroundedLogged({ ...loggedFoodIdentities(policy.actions),
+    items: policy.actions.flatMap((action) => action.kind === "log_meal"
+      ? action.items.map((item) => ({ ...item, slot: action.slot, at: action.at,
+        occasion: occasionAt(action.at ?? (context?.day.date === action.date
+          ? context.day.slots.find((slot) => slot.slot === action.slot)?.time : undefined)) })) : []),
+    listMarks: policy.actions.flatMap((action) => "name" in action
+      && (LIST_MARK_KINDS as readonly string[]).includes(action.kind)
+      ? [{ kind: action.kind, name: action.name }] : []) });
   state.logPolicyNotices = policy.logNotices;
   state.recipeRefusals = policy.recipeRefusals;
   state.actionClarifications = [...grounded.clarifications, ...policy.recipeRefusals,
@@ -172,6 +181,12 @@ export async function settleFinalStep(
   const reply = sanitiseReply(finalStep.text);
   if (scopeDropped && (claimsSkip(reply) || claimsAction(reply))) state.replyClaimDropped = true;
   const actions = state.actions;
+  if (hasMismatchedListConfirmation(reply, actions)) {
+    state.replyClaimDropped = true;
+    state.actionClarifications.push(...actions.flatMap((action) =>
+      (LIST_MARK_KINDS as readonly string[]).includes(action.kind)
+        ? [actionSpecFor(action.kind)!.fastPath!.reply(action)] : []));
+  }
   // Re-audit r1 #2 and #4: a write the server dropped must not stay claimed in the bubble. A
   // dropped skip whose prose says it happened, and recipe-widget prose that says anything was
   // logged or changed (nothing there is ever an action), are replaced by the plain sentence even

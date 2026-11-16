@@ -63,7 +63,7 @@ export function allergenFacts(hit: {
 }
 
 /** Evidence keyed by the food name the model used. A name with no entry has no evidence. */
-export type EvidenceByName = Record<string, Omit<PolicyItem, "name" | "grams">>;
+export type EvidenceByName = Record<string, Omit<PolicyItem, "name" | "grams"> & { ambiguous?: true }>;
 
 function narrow(v: { verdict: "allowed" | "blocked" | "unverified"; reason?: string }): Verdict {
   if (v.verdict === "blocked") return { verdict: "blocked", reason: v.reason ?? "blocked" };

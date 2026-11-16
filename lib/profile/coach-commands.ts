@@ -69,9 +69,9 @@ const FORMS: readonly Form[] = [
   (m) => /^(?:i )?weighed in(?: today)?$/.test(m)
     || /^(?:i weigh|i weighed|weighed|my weight is|log my weight(?: as)?) (\d+(?:\.\d+)?) ?(?:kg|kgs|kilos?|lbs?|pounds?)?(?: today| this morning| yesterday| last night)?$/.test(m)
     || /^\d+(?:\.\d+)? ?(?:kg|kgs|kilos?|lbs?|pounds?)(?: today| this morning| yesterday| last night)?$/.test(m),
-  // Lists: "add cheese to my avoid list", "remove salmon from my eats".
+  // Lists: "add cheese to my avoid list", "put salmon back on eats".
   (m) => {
-    const found = new RegExp(`^(?:please )?(?:add|put|remove|take|drop) (.+?) (?:to|on|onto|from|off) (?:my|the) ${LISTS}(?: list)?$`).exec(m);
+    const found = new RegExp(`^(?:please )?(?:add|put|remove|take|drop) (.+?)(?: back)? (?:to|on|onto|from|off) (?:(?:my|the) )?${LISTS}(?: list)?$`).exec(m);
     return found !== null && foodName(found[1]);
   },
   (m) => m === "drop it" || ((/^(?:please )?(?:avoid|unavoid) (.+)$/.exec(m)?.[1]) !== undefined

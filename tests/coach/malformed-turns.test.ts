@@ -133,7 +133,7 @@ describe("an Eats or Avoid mark is not advice (F001, F010, F022)", () => {
   const yogurt = "3f1b1a2c-0000-4000-8000-0000000000a1";
   const evidence = { "greek yogurt": { foodRefId: yogurt, allergenTags: ["dairy"], category: [],
     onEatsList: false, onAvoidList: false } };
-  const mark = (kind: "add_to_eats" | "add_to_avoid" | "remove_from_avoid") => ({
+  const mark = (kind: "add_to_eats" | "add_to_avoid" | "remove_from_avoid" | "remove_from_eats") => ({
     kind, actionId: "a1", flagged: [], name: "Greek yogurt, plain", foodRefId: yogurt,
     catalogFoodRevisionId: 1, kcalPer100g: 59, proteinPer100g: 10, carbsPer100g: 4, fatPer100g: 0,
     verdict: "blocked", alsoFoodRefIds: ["3f1b1a2c-0000-4000-8000-0000000000a2"],
@@ -150,6 +150,9 @@ describe("an Eats or Avoid mark is not advice (F001, F010, F022)", () => {
     ["add_to_eats", "Done, I've added Greek yogurt to your Eats."],
     ["add_to_avoid", "Greek yogurt is now on your Avoid list."],
     ["remove_from_avoid", "I took Greek yogurt off your Avoid list."],
+    ["remove_from_eats", "Greek yogurt is no longer favored."],
+    ["remove_from_avoid", "Greek yogurt is no longer on your Avoid list."],
+    ["add_to_avoid", "I have added Greek yogurt to your avoid list and removed it from your favorites."],
   ] as const)("keeps the %s confirmation and its mark: %s", (kind, text) => {
     const action = mark(kind);
     const result = check(text, [action]);
@@ -159,7 +162,9 @@ describe("an Eats or Avoid mark is not advice (F001, F010, F022)", () => {
 
   it("still re-asks when the same reply also recommends the marked food", () => {
     for (const text of ["Added Greek yogurt to your Favored list. Have Greek yogurt with honey for breakfast.",
-      "Added Greek yogurt to your Favored list, it's a great snack."]) {
+      "Added Greek yogurt to your Favored list, it's a great snack.",
+      "Greek yogurt is no longer on your Avoid list, so have it for breakfast.",
+      "I added Greek yogurt to your avoid list and removed it from your favorites, but have a spoonful."]) {
       const result = check(text, [mark("add_to_eats")]);
       expect(result.content).toBe(`Greek yogurt has dairy, which your rules exclude. ${REASK_TAIL}`);
       expect(result.actions).toEqual([]);
