@@ -9,6 +9,7 @@ import {
 } from "@/lib/coach/actions";
 import type { ClassifiedIntentResult } from "@/lib/coach/intent";
 import { NO_MEAL_FIT_MESSAGE, NOTHING_LEFT_MESSAGE } from "@/lib/coach/suggest-messages";
+import { ideaReviewCopy } from "@/lib/coach/idea-review-copy";
 import type { SuggestionResult } from "@/lib/coach/suggest";
 
 /**
@@ -41,9 +42,10 @@ export function fastSuggestionReply(
   // snack was impossible on a day with 1 700 kcal still to eat.
   if (composed.length === 0) return result.message
     ?? (kind === "snack" ? NOTHING_LEFT_MESSAGE : NO_MEAL_FIT_MESSAGE);
-  if (result.partial && result.message) return result.message;
-  const shortfall = composed.find((card) => card.shortfallNote)?.shortfallNote;
-  if (shortfall) return shortfall;
+  const notices = kind === "recipe" ? ["Shared recipe discovery is unavailable. These are checked meal ideas instead, not complete recipes."] : [];
+  if (notices.length || result.message || composed.some((card) => !card.fitsTarget || card.shortfallNote || card.leftOut?.length)) {
+    return ideaReviewCopy(composed, { notices, messages: result.message ? [result.message] : [] });
+  }
   if (kind === "snack" && fitRemaining) {
     return `Here are ${composed.length} snacks that fit what you have left today.`;
   }

@@ -75,9 +75,18 @@ export const PROMPTS: Record<CapturePurpose, { system: string; maxOutputTokens: 
     system: [
       "You look at one photograph of a plate of food and list what is on it.",
       UNTRUSTED, UNITS,
+      "First distinguish the meal being logged from unrelated background food. A meal may span " +
+        "a main plate and side containers: include all foods clearly presented as that meal. " +
+        "Exclude a separate vessel only when framing clearly places it in the background. " +
+        "When it is unclear which vessels belong to the meal, state that ambiguity in notes " +
+        "for confirmation; do not silently choose one plate or assume every vessel belongs.",
       "Name each food only as specifically as the visible evidence supports. Include a preparation " +
         "state when it is visible; do not invent a variety, recipe, hidden ingredient or raw/cooked " +
         "state that the image cannot establish.",
+      "Use a concise food identity in label for catalog matching. Retain distinctions that affect " +
+        "nutrition or safety, including visible preparation. Put incidental cutting, arrangement " +
+        "and color descriptions in notes rather than appending them to the food's name; represent " +
+        "piece or slice counts with qty and unit. Keep distinct foods as separate items.",
       "grams is the TOTAL edible mass of that food in the photo, never the mass of one piece. " +
         "For a whole or mostly whole divisible food, count only clearly visible pieces or slices " +
         "in qty. A visible count does not establish their weight.",

@@ -541,7 +541,7 @@ describe("runCapture: voice stays on Gemini, OpenRouter is only the fallback", (
     expect(callGemini.mock.calls[0][0]).toBe("gemini-3.8-flash");
     const args = generateOpenRouter.mock.calls[0][0];
     expect(args.payload.purpose).toBe("voiceToItems-openrouter");
-    expect(args.modelId).toBe("google/gemini-2.5-flash");
+    expect(args.modelId).toBe("google/gemini-3-flash-preview");
     expect(args.inputHash).toBe("\\xabc");
   });
 

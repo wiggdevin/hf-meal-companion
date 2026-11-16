@@ -15,6 +15,9 @@
  * Pure: no I/O.
  */
 import raw from "@/lib/food-db.json";
+import { catalogNameMatches } from "@/lib/coach/food-names";
+import { PREP_WORDS } from "@/lib/search/query";
+import { DISH_MARKERS } from "@/lib/search/rerank";
 
 /** The most best-effort sweep phrases one reply pays catalog searches for. */
 export const MAX_SWEEP_CANDIDATES = 6;
@@ -42,6 +45,8 @@ const GENERIC_FOODS = [
   "chicken", "beef", "pork", "lamb", "turkey", "rice", "pasta", "noodles", "bread", "toast",
   "cheese", "milk", "oats", "beans", "steak", "sausage", "fish", "nuts", "cereal", "cilantro",
 ];
+const PROSE_MODIFIERS = new Set([...PREP_WORDS, "breaded", "battered", "tempura", "uncooked",
+  "smoked", "cured", "glazed", "stuffed", "cheesy", "soy", "crispy", "deep-fried"]);
 
 /** Lower-cased, accents folded, anything but letters, apostrophes and hyphens read as a space. */
 export function normalizeFoodText(value: string): string {
@@ -93,8 +98,14 @@ export function lexiconMentions(text: string): string[] {
       if (used.slice(i, i + n).some(Boolean)) continue;
       const canonical = forms.get(tokens.slice(i, i + n).join(" "));
       if (!canonical) continue;
-      found.add(canonical);
-      used.fill(true, i, i + n);
+      let from = i;
+      let through = i + n;
+      if (PROSE_MODIFIERS.has(tokens[i - 1])) from--;
+      else if (/^(?:white|brown|red|green)$/.test(tokens[i - 1]) && PROSE_MODIFIERS.has(tokens[i - 2])) from -= 2;
+      const right = tokens[through]?.replace(/s$/, "");
+      if (DISH_MARKERS.has(right) || ["wrap", "parmesan", "milk", "butter", "flour", "powder"].includes(right)) through++;
+      found.add(from !== i || through !== i + n ? tokens.slice(from, through).join(" ") : canonical);
+      used.fill(true, from, through);
     }
   }
   return [...found];
@@ -136,6 +147,5 @@ export function candidatePhrases(text: string, exclude: ReadonlySet<string>): st
  * cooked" is salmon) — in any plural/singular spelling. "Breakfast burrito" is not "breakfast".
  */
 export function hitNamesPhrase(hitName: string, phrase: string): boolean {
-  const forms = new Set(spellings(normalizeFoodText(phrase)));
-  return forms.has(normalizeFoodText(hitName)) || forms.has(normalizeFoodText(hitName.split(",")[0]));
+  return catalogNameMatches(hitName, phrase);
 }

@@ -5,13 +5,17 @@
  */
 
 import { isCapacityFailure, worthAnotherModel } from "@/lib/ai/adapter";
-import { openRouterAttested } from "@/lib/ai/attestation";
+import { geminiAttested, openRouterAttested } from "@/lib/ai/attestation";
 import {
   coachOpenRouterFallbackModel, COACH_FALLBACK_MODEL_ID, COACH_MODEL_ID, GEMINI_COACH,
   isOpenRouterModelId,
 } from "@/lib/ai/models";
 import { openRouterConfigured } from "@/lib/ai/provider-env";
+import { CallRefused, ProviderHttpError, SchemaRejection } from "@/lib/ai/call";
+import { isCallerCancellation } from "@/lib/ai/failures";
+import { mergeFoodEvidence } from "@/lib/coach/food-evidence";
 import { ASSISTANT_NAME } from "@/lib/brand";
+import { completedIdeasReply } from "@/lib/coach/completed-ideas";
 import {
   ABORT_CORRECTION, planTurn, TURN_LIMITS, TURN_STOP_REASONS, type TurnStep,
 } from "@/lib/coach/turn";
@@ -30,7 +34,7 @@ export async function runModelLoop(
   const { now } = turn;
   const { startedAt } = kit;
   // OD06: the final step's text streams as a draft while the model writes it (draft.ts).
-  const draft = draftStream(turn.deps.draft, kit.profile, () => state.evidence);
+  const draft = draftStream(turn.deps.draft, kit.profile, () => mergeFoodEvidence(state.evidence, kit.foodEvidence));
   try {
     for (let round = 0; round <= TURN_LIMITS.maxToolCalls; round += 1) {
       const output = await nextStep(turn, kit, state, model, draft);
@@ -53,6 +57,14 @@ export async function runModelLoop(
       }
       if (step.kind !== "tool") break;
       if (await runToolBatch(turn, kit, env, state, step.calls) === "late") break;
+      const completed = !turn.req.planSource && !turn.req.planSkipped?.length
+        ? completedIdeasReply(turn.req.text, state.toolCalls, state.composed, state.blocks, state.suggestMessage) : null;
+      if (completed) {
+        const final: Extract<TurnStep, { kind: "final" }> = { kind: "final", text: completed };
+        state.step = final;
+        await settleFinalStep(turn, kit, env, state, final, round);
+        break;
+      }
     }
   } finally {
     draft.close();
@@ -94,6 +106,7 @@ async function tryDifferentKeyFallback(
   state: ModelState, generateStarted: number, lastFailure: unknown,
 ): Promise<unknown> {
   if (openRouterIsPrimary) {
+    if (!geminiAttested()) throw lastFailure;
     fellBack(state, GEMINI_COACH, generateStarted);
     return call(GEMINI_COACH);
   }
@@ -128,6 +141,8 @@ async function nextStep(
     const stalled = (e: unknown) => stalledWithTime(e, remaining(), kit.turnAbort.signal.aborted);
     // A new step (a correction round, or another model after a failure) replaces the draft shown.
     const call = (modelId: string, remainingMs = remaining()) => {
+      kit.turnAbort.signal.throwIfAborted();
+      if (remainingMs <= 0) throw new Error("the turn has no model budget left");
       draft.reset();
       return withWallClock(
         () => model.step(modelId, state.transcript, remainingMs, draft.onText), remainingMs);
@@ -138,7 +153,9 @@ async function nextStep(
     } catch (primaryFailure) {
       // Only a model out of CAPACITY is worth trying anything else: a schema refusal is ours and
       // a second model refuses the same reply for the same reason (Grok pass 1, MEDIUM 17).
-      if (primaryFailure instanceof HttpError || state.modelId !== COACH_MODEL_ID
+      if (kit.turnAbort.signal.aborted || remaining() <= 0 || isCallerCancellation(primaryFailure)
+          || primaryFailure instanceof HttpError || primaryFailure instanceof SchemaRejection
+          || primaryFailure instanceof CallRefused || state.modelId !== COACH_MODEL_ID
           || !(isCapacityFailure(primaryFailure) || stalled(primaryFailure))) {
         throw primaryFailure;
       }
@@ -160,12 +177,19 @@ async function nextStep(
         } catch (crossFailure) {
           // Grok audit round 5 (MED): an OpenRouter 400, 401 or 503 must not end a turn that the
           // same-key Gemini model can still answer.
-          if (crossFailure instanceof HttpError
+          const recoverableHttp = (crossFailure instanceof ProviderHttpError && [400, 401].includes(crossFailure.status))
+            || (crossFailure instanceof Error && /\bopenrouter (?:400|401)\b/i.test(crossFailure.message));
+          if (kit.turnAbort.signal.aborted || remaining() <= 0 || isCallerCancellation(crossFailure)
+            || crossFailure instanceof HttpError || crossFailure instanceof SchemaRejection
+            || crossFailure instanceof CallRefused
+            || !(recoverableHttp || isCapacityFailure(crossFailure) || stalled(crossFailure))
+            || sameKeyModel === COACH_MODEL_ID
             || !(worthAnotherModel(primaryFailure) || stalled(primaryFailure))) throw crossFailure;
           fellBack(state, sameKeyModel, generateStarted);
           generated = await call(state.modelId);
         }
-      } else if (worthAnotherModel(primaryFailure) || stalled(primaryFailure)) {
+      } else if (sameKeyModel !== state.modelId
+          && (worthAnotherModel(primaryFailure) || stalled(primaryFailure))) {
         // T6 §5: the pinned coach model answered 503 through its whole retry budget. The fallback
         // is the same provider, the same key and the same schema, so the SAME turn is tried once
         // more on it. The adapter writes its own ai_calls row with that model_id, and the reply
@@ -174,7 +198,8 @@ async function nextStep(
         try {
           generated = await call(state.modelId);
         } catch (fallbackFailure) {
-          if (fallbackFailure instanceof HttpError
+          if (isCallerCancellation(fallbackFailure) || fallbackFailure instanceof HttpError
+            || fallbackFailure instanceof SchemaRejection || fallbackFailure instanceof CallRefused
             || !(isCapacityFailure(fallbackFailure) || stalled(fallbackFailure))) {
             throw fallbackFailure;
           }

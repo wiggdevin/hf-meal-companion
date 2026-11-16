@@ -888,8 +888,9 @@ describe("runTurn", () => {
       { ...REQ, text: "can I have raw onion" },
       { generate: generate as never, ports: onionPorts(), now: () => 0, newId: () => "id-1" });
     expect(isReask(res.messages.at(-1)!.content)).toBe(true);
-    expect(res.suggestions).toEqual([expect.objectContaining({
-      name: "Onions, raw", verdict: "blocked", reason: "category:onion_garlic" })]);
+    expect(res.suggestions).toEqual([]);
+    expect(res.actions).toEqual([]);
+    expect(res.messages.at(-1)!.content).not.toContain("raw onion works");
     expect(policyChecks(writes).some((c) => c.verdict === "blocked"
       && c.reason === "category:onion_garlic")).toBe(true);
   });

@@ -13,6 +13,12 @@
  * Pure. No I/O.
  */
 
+/** An abort without an explicit provider deadline is caller cancellation, never a retry. */
+export function isCallerCancellation(e: unknown): boolean {
+  return e instanceof Error && e.name === "AbortError"
+    && !/did not answer within|timed? ?out/i.test(e.message);
+}
+
 export function isCapacityFailure(e: unknown): boolean {
   const status = (e as { status?: unknown } | null)?.status;
   if (status === 503 || status === 429) return true;

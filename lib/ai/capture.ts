@@ -1,3 +1,4 @@
+import { isCallerCancellation } from "@/lib/ai/failures";
 /**
  * The only impure capture module (spec §7): it resolves the purpose, builds the two parts, hands
  * them to the adapter — which sends inline bytes or a Files API upload, deletes the provider file
@@ -103,6 +104,7 @@ export function geminiPrimaryBudgetMs(leftMs: number): number | null {
 /** A model out of capacity, or one that never answered, is worth the other model. A key quota,
  *  a refused reply or the spend cap is not: the other model meets the same answer. */
 function worthFallback(e: unknown): boolean {
+  if (isCallerCancellation(e)) return false;
   if (e instanceof HttpError || e instanceof SchemaRejection) return false;
   if (e instanceof Error && e.name === "AbortError") return true;
   return worthAnotherModel(e);
@@ -129,6 +131,7 @@ const OPENROUTER_BUDGET_MS = 8_000;
  * only mask it and bill twice.
  */
 export function worthGemini(e: unknown): boolean {
+  if (isCallerCancellation(e)) return false;
   if (e instanceof HttpError || e instanceof SchemaRejection) return false;
   if (e instanceof ProviderHttpError || classifyFailure(e) === "timeout") return true;
   // undici's own network failure (DNS, reset, TLS): the provider could not be reached.

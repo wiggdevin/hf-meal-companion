@@ -1,3 +1,4 @@
+import { isCallerCancellation } from "@/lib/ai/failures";
 import "server-only";
 
 /**
@@ -97,6 +98,7 @@ export function onboardingExtractOpenRouterReady(): boolean {
  * a second provider would only mask it and bill twice.
  */
 export function worthGeminiFallback(e: unknown): boolean {
+  if (isCallerCancellation(e)) return false;
   if (e instanceof HttpError || e instanceof SchemaRejection) return false;
   if (e instanceof ProviderHttpError || classifyFailure(e) === "timeout") return true;
   if (e instanceof TypeError && e.message === "fetch failed") return true;

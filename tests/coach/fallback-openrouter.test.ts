@@ -12,6 +12,7 @@ vi.mock("@/lib/ai/lanes", async (importOriginal) => {
   return { ...actual, OPENROUTER_PINS: { ...actual.OPENROUTER_PINS,
     coachFallback: "openai/gpt-5-mini" } };
 });
+import { SchemaRejection } from "@/lib/ai/call";
 import { runTurn } from "@/tests/coach/fixtures/run-turn";
 import { COACH_FALLBACK_MODEL_ID, COACH_MODEL_ID } from "@/lib/ai/models";
 
@@ -156,6 +157,20 @@ describe("the coach's OpenRouter capacity fallback (owner request 2026-10-02)", 
       { generate, generateOpenRouter, ports, classifyIntent: noClassify() });
     expect(generateOpenRouter).toHaveBeenCalledTimes(1);
     expect(res.model.modelId).toBe(OPENROUTER_MODEL);
+  });
+
+  it.each([new SchemaRejection("bad structured reply"),
+    Object.assign(new Error("the caller stopped waiting for the model"), { name: "AbortError" })])
+  ("does not retry Gemini after a cross-provider schema rejection or cancellation", async (failure) => {
+    readyEnv();
+    const writes = { rows: [] as { table: string; row: unknown }[] };
+    const generate = vi.fn().mockRejectedValue(overloaded503());
+    const generateOpenRouter = vi.fn().mockRejectedValue(failure);
+    await expect(runTurn(db(writes), db(writes), "u1", REQ,
+      { generate: generate as never, generateOpenRouter: generateOpenRouter as never,
+        ports, classifyIntent: noClassify() })).rejects.toMatchObject({ status: 503, code: "coach_unavailable" });
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(generateOpenRouter).toHaveBeenCalledTimes(1);
   });
 
   it("without OpenRouter key and attestation a failing Gemini fallback is still a 503", async () => {

@@ -20,6 +20,7 @@ export function hydrateFoodSearch(
   const results = hits.flatMap((hit) => {
     if (!hit.foodRefId || !Number.isInteger(hit.catalogFoodRevisionId)) return [];
     const blocked = evaluatePolicy(profile, {
+      profileRules: profile.profileRules,
       foodRefId: hit.foodRefId,
       allergenTags: hit.allergenTags ?? null, ...allergenFacts(hit),
       foodName: hit.name,
@@ -29,6 +30,7 @@ export function hydrateFoodSearch(
     }).verdict === "blocked";
     const status: "eats" | "avoid" | "neutral" = hit.prefStatus ?? "neutral";
     return [{
+      profileRules: profile.profileRules,
       foodRefId: hit.foodRefId,
       revisionId: String(hit.catalogFoodRevisionId),
       name: hit.name,

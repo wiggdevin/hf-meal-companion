@@ -9,6 +9,7 @@ import { intentEvent, recordCoachIntentEvent } from "@/lib/server/coach-intent-t
 import { afterResponse, beforeDeadline, LATE } from "@/lib/server/coach-turn/deadline";
 import type { Started, ThreadHistory } from "@/lib/server/coach-turn/setup";
 import type { OpenTurn } from "@/lib/server/coach-turn/types";
+import { localAvoidCommand } from "@/lib/profile/local-avoid-command";
 
 /**
  * The food each list clause names, one entry per clause, in message order. A message with two
@@ -38,6 +39,7 @@ export async function readIntent(turn: OpenTurn, started: Started) {
   const classify = deps.classifyIntent ?? classifyIntent;
   const historyStarted = started.history;
   const intentStarted = Date.now();
+  const localAvoidCandidate = localAvoidCommand(req.text);
   const mentionedFoods = foodMentions(req.text);
   // The Plan sheet is a structured, read-only request for one named meal. Its slot and kind
   // come from the validated wire contract; Jev must not turn "remaining macros" into a snack.
@@ -48,7 +50,7 @@ export async function readIntent(turn: OpenTurn, started: Started) {
   // reply deadline (Sol r4). Late, the history is empty and the intent unknown: the model path.
   const [historyRead, classifiedRead] = await Promise.all([
     beforeDeadline(() => historyStarted, replyDeadlineAt),
-    structuredPlan ? Promise.resolve(null) : beforeDeadline(() => classify(req.text, {
+    structuredPlan || localAvoidCandidate ? Promise.resolve(null) : beforeDeadline(() => classify(req.text, {
       now: clock.now,
       userId,
       ...(mentionedFoods ? { foodsMentioned: mentionedFoods } : {}),
@@ -57,6 +59,8 @@ export async function readIntent(turn: OpenTurn, started: Started) {
   const history = historyRead === LATE
     ? { summary: null, messages: [] as ThreadHistory["messages"], pendingDraft: null }
     : historyRead;
+  const clarifying = lastAssistantAskedQuestion(history.messages);
+  const localAvoid = !clarifying && historyRead !== LATE ? localAvoidCandidate : null;
   const intentResult = classifiedRead === LATE ? null : classifiedRead;
   const intentMs = Date.now() - intentStarted;
   let telemetryWritten = false;
@@ -76,7 +80,8 @@ export async function readIntent(turn: OpenTurn, started: Started) {
       ? { ...intentResult, intent: "question" as const } as IntentResult
       : intentResult;
     await recordCoachIntentEvent(admin, userId,
-      structuredPlan ? {
+      localAvoid ? { intent: "add_to_avoid", winningConfidence: null, minArgumentConfidence: null,
+        fastPathTaken, fallbackReason: reason, latencyMs: 0 } : structuredPlan ? {
         intent: "suggest_options", winningConfidence: null, minArgumentConfidence: null,
         fastPathTaken, fallbackReason: reason, latencyMs: 0,
       } : intentEvent(telemetryIntent, fastPathTaken, reason, intentMs))
@@ -88,8 +93,9 @@ export async function readIntent(turn: OpenTurn, started: Started) {
   };
   let intentReason: IntentFallbackReason = structuredPlan ? "none" : intentResult === null
     ? "jev_down" : intentFallbackReason(intentResult, req.text);
-  if (!structuredPlan && intentReason === "none" && lastAssistantAskedQuestion(history.messages)) {
+  if (!structuredPlan && clarifying && (localAvoidCandidate || intentReason === "none")) {
     intentReason = "clarifying";
   }
-  return { history, intentResult, intentMs, structuredPlan, intentReason, recordIntent };
+  return { history, intentResult, intentMs, structuredPlan, intentReason, recordIntent,
+    ...(localAvoid ? { localAvoid } : {}) };
 }

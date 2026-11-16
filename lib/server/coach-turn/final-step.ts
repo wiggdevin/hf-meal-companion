@@ -6,7 +6,7 @@
  */
 
 import { actionsInScope, scopeDropNotice } from "@/lib/coach/scope";
-import { hasMismatchedListConfirmation, withoutListMarkMirrors } from "@/lib/coach/list-mark-confirmation";
+import { claimsListMark, hasMismatchedListConfirmation, withoutListMarkConfirmations, withoutListMarkMirrors } from "@/lib/coach/list-mark-confirmation";
 import { LIST_MARK_KINDS } from "@/lib/coach/actions/food-lists";
 import { occasionAt } from "@/lib/meals/occasion";
 import { withoutShoppingMirrors } from "@/lib/coach/shopping-confirmation";
@@ -166,10 +166,10 @@ export async function settleFinalStep(
   state.actions = skips.actions;
   // The real, grounded log_meal identities — an action log-meal.ts turned into a clarification
   // (no catalog row grounded it) contributes nothing here, by design (finding #3 above).
-  resolveGroundedLogged({ ...loggedFoodIdentities(policy.actions),
+  resolveGroundedLogged({ ...loggedFoodIdentities(policy.actions), notices: policy.logNotices,
     items: policy.actions.flatMap((action) => action.kind === "log_meal"
       ? action.items.map((item) => ({ ...item, slot: action.slot, at: action.at,
-        occasion: occasionAt(action.at ?? (context?.day.date === action.date
+        occasion: action.slot === "snack" ? "snack" : occasionAt(action.at ?? (context?.day.date === action.date
           ? context.day.slots.find((slot) => slot.slot === action.slot)?.time : undefined)) })) : []),
     listMarks: policy.actions.flatMap((action) => "name" in action
       && (LIST_MARK_KINDS as readonly string[]).includes(action.kind)
@@ -179,9 +179,21 @@ export async function settleFinalStep(
   state.actionClarifications = [...grounded.clarifications, ...policy.recipeRefusals,
     ...(skips.dropped ? [SKIP_NOT_CONFIRMED] : []), ...(scopeDropped ? [scopeDropped] : [])];
   const reply = sanitiseReply(finalStep.text);
-  if (scopeDropped && (claimsSkip(reply) || claimsAction(reply))) state.replyClaimDropped = true;
+  if (scopeDropped && (claimsSkip(reply) || claimsAction(reply) || claimsListMark(reply))) state.replyClaimDropped = true;
   const actions = state.actions;
-  if (hasMismatchedListConfirmation(reply, actions)) {
+  const pendingList = (finalStep.actions ?? []).filter((action) =>
+    (LIST_MARK_KINDS as readonly string[]).includes(action.kind));
+  const actualList = actions.filter((action) => (LIST_MARK_KINDS as readonly string[]).includes(action.kind));
+  const allListsGrounded = pendingList.length === actualList.length && pendingList.every((pending) =>
+    pendingList.filter((action) => action.kind === pending.kind).length === actualList.filter((action) => action.kind === pending.kind).length);
+  const mismatchedList = hasMismatchedListConfirmation(reply, actions);
+  if (!mismatchedList && pendingList.length > 0 && claimsListMark(withoutListMarkConfirmations(reply, actions), allListsGrounded)) {
+    state.replyClaimDropped = true;
+    if (state.actionClarifications.length === 0) {
+      state.actionClarifications.push("I could not confirm that list change. Please name the food and list again.");
+    }
+  }
+  if (mismatchedList) {
     state.replyClaimDropped = true;
     state.actionClarifications.push(...actions.flatMap((action) =>
       (LIST_MARK_KINDS as readonly string[]).includes(action.kind)
@@ -193,7 +205,7 @@ export async function settleFinalStep(
   // when the reply ends in a question. The local claim check is enough: no correction round can
   // put the write back.
   if (skips.dropped && (claimsSkip(reply) || claimsAction(reply))) state.replyClaimDropped = true;
-  if (recipeWidget && (claimsSkip(reply) || claimsAction(reply))) {
+  if (recipeWidget && (claimsSkip(reply) || claimsAction(reply) || claimsListMark(reply))) {
     state.actionClarifications = [...state.actionClarifications, RECIPE_WIDGET_NO_WRITE];
     state.replyClaimDropped = true;
   }

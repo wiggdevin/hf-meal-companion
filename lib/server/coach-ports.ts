@@ -24,7 +24,6 @@ import type { SuggestInput } from "@/lib/coach/suggest";
 import { runLookup } from "@/lib/server/lookup-lane";
 import type { DayContext } from "@/lib/server/day-context";
 import { viewedDay } from "@/lib/server/viewed-day";
-import { recipeSearchFromWish } from "@/lib/coach/recipe-query";
 import type { SkipPreview } from "@/lib/plan/skip-preview";
 import type { SlotId, Store } from "@/lib/types";
 
@@ -318,19 +317,8 @@ export function defaultPorts(
     },
     suggest: async (userId, args) => {
       if (args.kind === "recipe") {
-        const { recipeAccessEnabled } = await import("@/lib/server/recipe-access");
-        if (!recipeAccessEnabled(userId)) return { candidates: [], noResultReasons: [
-          "Shared recipe discovery is not available for this account yet.",
-        ] };
-        const { loadRecipeCandidates } = await import("@/lib/server/recipe-candidates");
-        const { search, unsupportedExclusion } = recipeSearchFromWish(args.wish ?? "", args.count ?? 3);
-        if (unsupportedExclusion) return { candidates: [], noResultReasons: [
-          "This search cannot check a one-off ingredient exclusion. Add the ingredient to Avoids, then search again.",
-        ] };
-        const result = await loadRecipeCandidates(client, userId,
-          search, clock.now ? new Date(clock.now) : new Date());
-        return { candidates: result.candidates, noResultReasons: result.noResultReasons,
-          exactMatch: result.exactMatch };
+        const { coachRecipeSuggestions } = await import("@/lib/server/coach-recipe-suggestions");
+        return coachRecipeSuggestions(client, userId, args, clock.now, ports.suggest);
       }
       const { suggestOptions } = await import("@/lib/coach/suggest");
       const { eatsForSuggestions } = await import("@/lib/server/coach-context");

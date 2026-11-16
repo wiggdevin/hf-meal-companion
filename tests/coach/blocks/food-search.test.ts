@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ruleId } from "@/lib/policy/profiles/types";
 import { hydrateResolvedTool } from "@/lib/coach/blocks";
 import { hydrateFoodSearch } from "@/lib/coach/blocks/hydrate-food-search";
 import { TEST_PROFILE as DEFAULT_PROFILE } from "@/tests/helpers/constraint-profile";
@@ -28,6 +29,16 @@ describe("food search block hydration", () => {
       }],
       truncated: false,
     });
+  });
+
+  it("marks an explicit catalog review with the confirmed dietary-profile prohibition", () => {
+    const profile = { avoid_allergens: [], avoid_food_ref_ids: [], banned_categories: [], profileRules: {
+      asOf: new Date("2026-11-15T08:14:23Z"), items: [{ id: ruleId("p", "pork"), profileId: "p",
+        facet: "pork" as const, strength: "never" as const, hardBasis: "religious" as const,
+        evidenceStrength: null, confirmation: "confirmed" as const, expiresAt: null }],
+    } };
+    expect(hydrateFoodSearch("review", { query: "pork", intent: "avoid" },
+      [hit(1, { name: "Pork chop" })], profile)?.results[0].blocked).toBe(true);
   });
 
   it("trims the look-ahead row and marks the block truncated", () => {

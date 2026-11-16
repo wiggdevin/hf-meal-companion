@@ -38,6 +38,17 @@ const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 type ActionLike = { kind: string; name?: unknown };
 
+/** A list-write-shaped claim, even when grounding supplied no food names to remove. */
+export function claimsListMark(text: string, ignoreResolvedPronouns = false): boolean {
+  return text.split(/(?<=[.!?])\s+/).some((sentence) => {
+    const active = /^(.*?\b(?:added|adding|put|putting|marked|marking|moved|moving|removed|removing|took|taking|taken)\s+)(.+?)(\s+(?:on|to|onto|from|off|off of|back on|back to)\s+(?:your|the)\b.*)$/i.exec(sentence);
+    const ignored = (name: string) => ignoreResolvedPronouns && /^(?:it|them)$/i.test(name.trim());
+    if (active && !ignored(active[2]) && CONFIRMATION.test(active[1] + active[3])) return true;
+    const state = /^(.+?)(\s+(?:is|are)\b.*)$/i.exec(sentence);
+    return state !== null && !ignored(state[1]) && (STATE.test(state[2].trim()) || NO_LONGER.test(state[2].trim()));
+  });
+}
+
 /** A name short and plain enough to be a food's name, not a clause ("rice, then try shrimp"). */
 const MAX_NAME_WORDS = 4;
 
@@ -74,10 +85,13 @@ export function withoutListMarkConfirmations(
     const target = /\bavoid\b/i.test(primary) ? "avoid" : "eats";
     const operation = /\b(?:removed|removing|took|taking|taken|off|no longer)\b/i.test(primary)
       ? "remove_from" : "add_to";
+    const mirror = /\band removed\b(.+)$/i.exec(rest);
+    const mirrorValid = !mirror || (operation === "add_to"
+      && (/\bavoid\b/i.test(mirror[1]) ? "avoid" : "eats") !== target);
     const matching = new Set(listMarkNames(actions.filter((action) =>
       action.kind === `${operation}_${target}`)).map((name) => name.toLowerCase()));
     items.lastIndex = 0;
-    const matches = Array.from(sentence.matchAll(items), (match) => match[0].toLowerCase())
+    const matches = mirrorValid && Array.from(sentence.matchAll(items), (match) => match[0].toLowerCase())
       .every((name) => matching.has(name));
     if (!matches) onMismatch?.();
     return !matches;

@@ -87,7 +87,8 @@ describe("already-eaten logs survive catalog aliases in confirmation prose", () 
       text: "Logged 100 g of smoked tofu for lunch. Try tofu for dinner.", allergens: ["soy"],
       grounded: hit("Smoked tofu", 1, ["soy"]), scanHit: hit("Tofu, firm", 2, ["soy"]) });
     expect(policy.grounded).toHaveLength(1);
-    expect(result.actions).toEqual([]);
+    expect(result.actions).toMatchObject([{ kind: "log_meal", slot: "meal-2", at: "12:00",
+      items: [{ foodRefId: REF(1), grams: 100 }] }]);
     expect(result.messages.at(-1)?.content).not.toContain("Try tofu");
   });
 
@@ -97,7 +98,8 @@ describe("already-eaten logs survive catalog aliases in confirmation prose", () 
       text: "Logged 100 g tofu for lunch. Try tofu for dinner.", allergens: ["soy"],
       grounded: tofu, scanHit: tofu });
     expect(policy.grounded).toHaveLength(1);
-    expect(result.actions).toEqual([]);
+    expect(result.actions).toMatchObject([{ kind: "log_meal", slot: "meal-2", at: "12:00",
+      items: [{ foodRefId: REF(1), grams: 100 }] }]);
     expect(result.messages.at(-1)?.content).not.toContain("Try tofu");
   });
 
@@ -114,6 +116,23 @@ describe("already-eaten logs survive catalog aliases in confirmation prose", () 
     expect(result.actions).toEqual([]);
     expect(result.messages.at(-1)?.content).not.toContain("Added tofu");
   });
+
+  it.each(["Tofu is on your Avoid list now. Anything else?",
+    "Tofu is no longer on your Avoid list. Anything else?"])(
+    "shows the failed grounding clarification instead of a false list-state claim: %s", async (text) => {
+      const generate = vi.fn().mockResolvedValue({ kind: "final", text,
+        actions: [{ kind: "add_to_avoid", name: "Tofu" }] });
+      const result = await runTurn(db(), db(), "u1", {
+        threadId: null, messageId: REF(9), text: "add tofu to my avoid list",
+      }, { generate: generate as never, now: () => 0, newId: () => REF(8),
+        ports: { searchFoods: async () => [] },
+        replyCheck: { searchFoods: async () => [], profileRules: async () => null },
+      });
+      expect(result.actions).toEqual([]);
+      expect(result.messages.at(-1)?.content).toContain("could not find");
+      expect(result.messages.at(-1)?.content).not.toContain("is on your Avoid");
+      expect(result.messages.at(-1)?.content).not.toContain("no longer");
+    });
 
   it("does not claim an Avoid removal beside an actual grounded Avoid addition", async () => {
     const generate = vi.fn().mockResolvedValueOnce({ kind: "final",

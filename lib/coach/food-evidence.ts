@@ -1,4 +1,5 @@
 import type { EvidenceByName } from "@/lib/coach/policy";
+import { catalogNameMatches } from "@/lib/coach/food-names";
 
 type Entry = EvidenceByName[string];
 const key = (name: string) => name.normalize("NFKD").replace(/[̀-ͯ]/g, "")
@@ -12,13 +13,19 @@ export function unknownFoodEvidence(onAvoidList = false): Entry {
 function combine(entries: Entry[]): Entry {
   const ids = new Set(entries.map((entry) => entry.foodRefId).filter(Boolean));
   const avoided = entries.some((entry) => entry.onAvoidList);
-  if (ids.size > 1 || entries.some((entry) => entry.ambiguous)) return unknownFoodEvidence(avoided);
+  const revisions = new Set(entries.map((entry) => entry.catalogFoodRevisionId).filter((id) => id != null));
+  const tags = new Set(entries.filter((entry) => entry.allergenTags != null)
+    .map((entry) => JSON.stringify([...entry.allergenTags!].sort())));
+  if (ids.size > 1 || revisions.size > 1 || tags.size > 1 || entries.some((entry) => entry.ambiguous)) {
+    return unknownFoodEvidence(avoided);
+  }
   return { ...entries.at(-1)!, onAvoidList: avoided };
 }
 
 /** One normalized name can never borrow facts from a different resolved identity. */
 export function foodEvidenceFor(evidence: EvidenceByName, name: string): Entry | undefined {
-  const entries = Object.entries(evidence).filter(([held]) => key(held) === key(name)).map(([, value]) => value);
+  const entries = Object.entries(evidence).filter(([held]) =>
+    catalogNameMatches(held, name)).map(([, value]) => value);
   return entries.length ? combine(entries) : undefined;
 }
 

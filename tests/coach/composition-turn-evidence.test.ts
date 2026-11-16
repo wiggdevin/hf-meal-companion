@@ -14,7 +14,7 @@ async function scan(foodEvidence = evidence, foodRefId = REF, blocked = false) {
   const kit = { profile: { ...EMPTY_PROFILE, avoid_allergens: ["fish"],
     avoid_food_ref_ids: blocked ? [REF] : [] }, foodEvidence,
     replyPorts: { searchFoods: async () => [], profileRules: async () => null } } as unknown as TurnKit;
-  const turn = { userId: "u1", replyDeadlineAt: Date.now() + 1000 } as OpenTurn;
+  const turn = { userId: "u1", req: { text: "dinner?" }, replyDeadlineAt: Date.now() + 1000 } as OpenTurn;
   return scanReply(turn, kit, newModelState([], 0), blocked ? "Try Chicken breast, roasted." : "Choose an option.",
     [{ name: chicken.name, foodRefId }]).scan;
 }
@@ -29,7 +29,7 @@ describe("server composition evidence reaches the reply guard", () => {
     const grounded = new Promise<{ names: Set<string>; refs: Set<string> }>((resolve) => { complete = resolve; });
     const kit = { profile: { ...EMPTY_PROFILE, avoid_allergens: ["fish"] }, foodEvidence,
       replyPorts: { searchFoods: async () => [], profileRules: async () => null } } as unknown as TurnKit;
-    const turn = { userId: "u1", replyDeadlineAt: Date.now() + 1000 } as OpenTurn;
+    const turn = { userId: "u1", req: { text: "dinner?" }, replyDeadlineAt: Date.now() + 1000 } as OpenTurn;
     const result = scanReply(turn, kit, newModelState([], 0), "Choose an option.",
       [{ name: chicken.name, foodRefId: REF }], [], grounded).scan;
     Object.assign(foodEvidence, evidence);

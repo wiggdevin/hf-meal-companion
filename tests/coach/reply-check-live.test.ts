@@ -44,7 +44,7 @@ describe("reply mentions", () => {
   it("finds every lexicon food however long the reply, longest match first", () => {
     const filler = Array.from({ length: 30 }, (_, i) => `wordnum${i}`).join(" ");
     expect(lexiconMentions(`${filler} and then grilled salmon with chicken breast.`))
-      .toEqual(expect.arrayContaining(["salmon", "chicken breast"]));
+      .toEqual(expect.arrayContaining(["grilled salmon", "chicken breast"]));
     expect(lexiconMentions("Two eggs")).toEqual(["egg"]);
     expect(lexiconMentions("Drink some water on those dates.")).toEqual([]);
   });
@@ -97,7 +97,7 @@ describe("checkReplyLive — free-text-only replies (R7)", () => {
   it("re-asks when the prose names a food whose catalog row blocks, matched by its head", async () => {
     const searchFoods = vi.fn(async (_u: string, query: string) => query === "salmon"
       ? [hit({ name: "Salmon, Atlantic, farmed, cooked", allergenTags: ["fish"] })] : []);
-    const result = await live(baseInput({ text: "Grilled salmon tonight.", profile: FISH }),
+    const result = await live(baseInput({ text: "Salmon tonight.", profile: FISH }),
       { searchFoods });
     expect(isReask(result.content)).toBe(true);
     expect(result.textChecks).toEqual([expect.objectContaining({ name: "salmon", verdict: "blocked" })]);

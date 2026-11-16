@@ -1,9 +1,11 @@
+import { isCallerCancellation } from "@/lib/ai/failures";
 import { CallRefused, classifyFailure, ProviderHttpError, SchemaRejection } from "@/lib/ai/call";
 import { isPermissionDeniedFailure } from "@/lib/ai/failures";
 import { HttpError } from "@/lib/server/auth";
 
 /** Try another governed call only for a transport outage, timeout, rate limit or server error. */
 export function providerFallbackWorthTrying(error: unknown): boolean {
+  if (isCallerCancellation(error)) return false;
   if (error instanceof HttpError || error instanceof CallRefused || error instanceof SchemaRejection) return false;
   // 2026-10-06: a 403 PERMISSION_DENIED is the project being blocked outright, worth trying a
   // DIFFERENT PROVIDER (this predicate's whole job) even though lib/ai/failures.ts

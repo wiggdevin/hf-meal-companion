@@ -2,7 +2,7 @@
 
 User request: fix coach failures, meal suggestions and photo portions, rerun tests, and show measured improvement.
 
-Baseline: `e3f605d8`, with the separately archived experimental OpenRouter 3 Flash pins. Frozen capture set: 100 development + 100 holdout inputs; coach: 38 cases ×3. Results: 197 usable captures, text50/50, label50/50, voice47/50, strict photo names12/50; coach35/114 all checks,48/114 excluding latency/path,8/38 cases passing all repeats. All baseline artifacts remain unchanged.
+Historical R0 baseline: `e3f605d8`, with the separately archived experimental OpenRouter 3 Flash pins. Frozen capture set: 100 development + 100 holdout inputs; coach: 38 cases ×3. Results: 197 usable captures, text50/50, label50/50, voice47/50, strict photo names12/50; coach35/114 all checks,48/114 excluding latency/path,8/38 cases passing all repeats. All baseline artifacts remain unchanged.
 
 ## Success criteria
 
@@ -10,7 +10,7 @@ Baseline: `e3f605d8`, with the separately archived experimental OpenRouter 3 Fla
 2. Successful server food searches retain their real identities and policy evidence through composition and final action grounding. Failed lookups, model-only IDs and unrelated foods remain untrusted.
 3. Pure list-membership confirmations survive the reply scan; advice attached to those confirmations remains scanned.
 4. Photo instructions distinguish total edible mass from counts and avoid unsupported weight confidence. The review sheet identifies photo masses as estimates and permits measured correction. Do not use reference answers, image IDs, food-specific multipliers or scorer changes in runtime.
-5. Repeat the frozen200 capture inputs and all114 coach attempts with the same pin overlay, fixed clock, original assertions and fixture settings. Report measured changes, uncertainty, service failures and unresolved failures. Original meal expectations that conflict with dietary fixtures remain visible and are not counted as corrected by changing policy.
+5. For the historical R3 comparison, repeat the frozen200 capture inputs and all114 coach attempts with the same pin overlay, fixed clock, original assertions and fixture settings. Report measured changes, uncertainty, service failures and unresolved failures. Original meal expectations that conflict with dietary fixtures remain visible and are not counted as corrected by changing policy.
 6. Preserve source/prompt/corpus hashes, per-turn outputs, provider usage and cleanup receipts. The comparison is an integration experiment on the isolated coach-eval database, not a production-UI accuracy benchmark. A previously inspected holdout is a repeated benchmark, not a fresh validation set.
 7. Independent code/security review, targeted tests, one full unit run, lint and type check pass before the branch is offered for integration. Do not ship the experimental provider overlay or relax retention settings.
 
@@ -31,7 +31,25 @@ Baseline: `e3f605d8`, with the separately archived experimental OpenRouter 3 Fla
 
 ## Status
 
-Implementation and the frozen live rerun are complete on `fix/live-accuracy-remediation`; production is unchanged.
+### Follow-up authorized after the first comparison
+
+The user requests remaining coach, suggestion and photo repairs, followed by a new live comparison **before deployment**. Reuse this branch and draft PR257. The previous results below remain historical evidence; do not overwrite their artifacts.
+
+1. Diagnose every remaining failed assertion against raw turns and governing rules. Coach worker owns coach/meal runtime and regressions; photo worker owns generalized photo extraction fixes; the independent verifier owns failure adjudication. Root owns provider availability, evaluation protocol and integration.
+2. Prove confirmed runtime defects with failing regressions, then apply the smallest fixes. Keep account/policy/identity checks, original gold, scorer, assertions and fixtures intact. Record fixture contradictions separately; supplemental corrected cases must never replace original scores.
+3. Check the actual default provider route as well as the prior experimental configuration. No new vendor, retention relaxation, production database writes, additional top-up or deployment.
+4. Use bounded development checks before freezing the final candidate. Repeat all200capture inputs and114coach turns; add independent validation where available without teaching runtime the benchmark answers. Report photo identity and mass separately, including every failure and matching denominators.
+5. Obtain independent code/security review, run focused regressions, one full local suite plus lint/types and CI, then publish a new comparison with source/gold hashes, exact coverage, costs and verified cleanup. Show results to the user before any deployment.
+
+### Current R4 follow-up: repair verification in progress
+
+The four-model escalation audit is complete. Opus checked the findings against the frozen source and consolidated one repair batch: food identity and preparation boundaries, grounded log retention, warning scan/display consistency, requested plan facts, truthful suggestion caveats, no-cook admission, catalog review binding and cancellation handling. The live benchmark, scorer and gold remain unchanged. At this source checkpoint, the final R4 live cohort has not started; no R4 accuracy gain is claimed here. The locked run protocol and the task report carry the subsequent measured results.
+
+One full local unit run before this batch passed 16,489 tests, with 1,409 skipped. After the batch, run focused regressions, types, lint and size checks; the full suite runs in CI. The candidate uses its actual available source pins, without a temporary overlay. A fresh supplemental photo validation set stays sealed from the photo author until source freeze. Show the measured results before deployment.
+
+### Historical R3 comparison
+
+The prior implementation and frozen live rerun completed on `fix/live-accuracy-remediation`; these are R3 results, not the current R4 candidate. Production is unchanged.
 
 | Original repeated benchmark | Before | Candidate |
 |---|---:|---:|

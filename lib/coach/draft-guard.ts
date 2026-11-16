@@ -18,6 +18,8 @@
 
 import { checkItem, type EvidenceByName } from "@/lib/coach/policy";
 import type { ConstraintProfile } from "@/lib/policy/constraints";
+import { catalogFoodNames, catalogNameMatches } from "@/lib/coach/food-names";
+import { foodEvidenceFor } from "@/lib/coach/food-evidence";
 import { textNames } from "@/lib/policy/allergens";
 
 /** True when no draft may be shown this turn, whatever it says. */
@@ -37,10 +39,15 @@ export function draftNamesBlocked(
   if (profile.avoid_allergens.some((allergen) => allergen.trim() !== "" && textNames(allergen, text))) {
     return true;
   }
-  const lower = text.toLowerCase();
-  return Object.entries(evidence).some(([name, found]) => {
-    const key = name.toLowerCase().trim();
-    if (key === "" || !lower.includes(key)) return false;
-    return checkItem({ ...found, name, grams: null }, profile, true).verdict === "blocked";
+  const words = text.toLowerCase().match(/[\p{L}\p{N}]+(?:[-'’][\p{L}\p{N}]+)*/gu) ?? [];
+  return Object.keys(evidence).some((name) => {
+    const lengths = new Set(catalogFoodNames(name).map((alias) => alias.split(/[\s,]+/).length));
+    for (const length of lengths) for (let at = 0; at + length <= words.length; at += 1) {
+      const phrase = words.slice(at, at + length).join(" ");
+      if (!catalogNameMatches(name, phrase)) continue;
+      const found = foodEvidenceFor(evidence, phrase);
+      if (found && checkItem({ ...found, name, grams: null }, profile, true).verdict === "blocked") return true;
+    }
+    return false;
   });
 }

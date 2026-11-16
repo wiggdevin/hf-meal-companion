@@ -11,11 +11,14 @@
  */
 import { withCoachSaveTurn } from "@/tests/helpers/coach-save-turn";
 import { afterEach, describe, expect, it, vi } from "vitest";
+const pins = vi.hoisted(() => ({ same: false }));
 
 vi.mock("@/lib/ai/lanes", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/ai/lanes")>();
   return { ...actual, OPENROUTER_PINS: { ...actual.OPENROUTER_PINS,
-    coach: "openai/gpt-5-mini", coachFallback: "anthropic/claude-haiku" } };
+    coach: "openai/gpt-5-mini", get coachFallback() {
+      return pins.same ? "openai/gpt-5-mini" : "anthropic/claude-haiku";
+    } } };
 });
 
 // Each case resets the module registry and re-imports the coach graph (~1.2 s alone); under the
@@ -71,6 +74,7 @@ const overloaded503 = () => new Error("503 model overloaded");
 
 function readyEnv(): void {
   vi.stubEnv("COACH_ENABLED", "1");
+  vi.stubEnv("TYPESAFE_API_KEY", "");
   vi.stubEnv("HEALTH_CONTEXT_PROVIDER", "gemini");
   vi.stubEnv("GEMINI_BILLING_ATTESTED", "1");
   vi.stubEnv("COACH_PROVIDER", "openrouter");
@@ -79,7 +83,42 @@ function readyEnv(): void {
 }
 
 describe("the coach's capacity fallback direction flips with COACH_PROVIDER (2026-10-02 Grok audit)", () => {
-  afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
+  afterEach(() => { pins.same = false; vi.unstubAllEnvs(); vi.resetModules(); });
+
+  it("reports coach_unavailable without calling an unattested Gemini fallback", async () => {
+    readyEnv();
+    vi.stubEnv("GEMINI_BILLING_ATTESTED", "");
+    pins.same = true;
+    vi.resetModules();
+    const { runTurn } = await import("@/lib/server/coach-turn");
+    const writes = { rows: [] as { table: string; row: unknown }[] };
+    const generateOpenRouter = vi.fn().mockRejectedValue(overloaded503());
+    const generate = vi.fn();
+    await expect(runTurn(db(writes), db(writes), "u1", REQ, {
+      generate: generate as never, generateOpenRouter: generateOpenRouter as never, ports,
+      classifyIntent: noClassify(), newId: () => "3f1b1a2c-0000-4000-8000-0000000000c6",
+    })).rejects.toMatchObject({ status: 503, code: "coach_unavailable" });
+    expect(generateOpenRouter).toHaveBeenCalledTimes(1);
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it.each([overloaded503, () => new Error("did not answer within 5000ms")])(
+    "skips a same-model fallback and uses the existing different-key path", async (failure) => {
+      readyEnv();
+      pins.same = true;
+      vi.resetModules();
+      const { runTurn } = await import("@/lib/server/coach-turn");
+      const writes = { rows: [] as { table: string; row: unknown }[] };
+      const generateOpenRouter = vi.fn(async () => { throw failure(); });
+      const generate = vi.fn(async () => ({ kind: "final", text: "Gemini answered." }));
+      const result = await runTurn(db(writes), db(writes), "u1", REQ, {
+        generate: generate as never, generateOpenRouter: generateOpenRouter as never, ports,
+        classifyIntent: noClassify(), newId: () => "3f1b1a2c-0000-4000-8000-0000000000c5",
+      });
+      expect(generateOpenRouter).toHaveBeenCalledTimes(1);
+      expect(generate).toHaveBeenCalledTimes(1);
+      expect(result.model?.provider).toBe("gemini");
+    });
 
   it("an OpenRouter-primary key-quota 429 falls back to Gemini, not another OpenRouter model", async () => {
     readyEnv();

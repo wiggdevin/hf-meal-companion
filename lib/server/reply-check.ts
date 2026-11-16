@@ -24,6 +24,7 @@ import { withoutListMarkConfirmations } from "@/lib/coach/list-mark-confirmation
 import { withoutLogConfirmations } from "@/lib/coach/log-confirmation";
 import { occasionAt } from "@/lib/meals/occasion";
 import { foodEvidenceFor } from "@/lib/coach/food-evidence";
+import { withoutPlanReports, type PlanRead } from "@/lib/coach/plan-report";
 import { shoppingItemNames, withoutShoppingConfirmations } from "@/lib/coach/shopping-confirmation";
 import type { CoachAction } from "@/lib/coach/actions";
 import { allergenFacts, checkItem, type EvidenceByName } from "@/lib/coach/policy";
@@ -68,6 +69,8 @@ const SLOT_WORDS = ["snack", "snacks", "breakfast", "brunch", "lunch", "dinner",
 export type ReplyScanInput = {
   userId: string; text: string; named: readonly RawSuggestion[]; evidence: EvidenceByName;
   profile: ConstraintProfile;
+  logNotices?: readonly string[];
+  planReads?: readonly PlanRead[];
   /** §6 "block food ids first": the foods the turn's own blocks resolved through the catalog. */
   blockFoods?: readonly { name: string; foodRefId: string }[];
   /** finding #6: this turn's own actions, so a logged food is exempt from the prose scan below. */
@@ -105,7 +108,7 @@ export type ReplyScan = { hardRulesActive: boolean; complete: boolean; failing: 
 
 type Entry = EvidenceByName[string];
 /** `shopping`: an item this turn puts on the shopping list, judged only on a definite clash. */
-type Mention = { name: string; entry: Entry; named: boolean; inProse: boolean; shopping?: boolean };
+type Mention = { name: string; entry: Entry; named: boolean; inProse: boolean; shopping?: boolean; ambiguous?: boolean };
 
 export function hasActiveHardRules(profile: ConstraintProfile): boolean {
   return profile.avoid_allergens.length > 0 || profile.avoid_food_ref_ids.length > 0
@@ -171,7 +174,7 @@ function heldMentions(input: ReplyScanInput, prose: string, failing: ReplyFailur
 /** The catalog searches the prose needs, started at once (round-4 audit #2): they run while the
  *  grounded log settles, so a slow grounding no longer spends the scan's budget first. */
 type CatalogSearch = {
-  holders: string[]; lexicon: string[]; sweep: string[]; shopping: string[];
+  holders: { name: string; phrase: string }[]; lexicon: string[]; sweep: string[]; shopping: string[];
   hits: Promise<[Settled<FoodHit[]>[], Settled<FoodHit[]>[], Settled<FoodHit[]>[]]>;
 };
 
@@ -180,12 +183,12 @@ function startCatalogSearch(
   cache = new Map<string, Promise<Settled<FoodHit[]>>>(),
 ): CatalogSearch {
   const heldNames = [...Object.keys(input.evidence), ...input.named.map((s) => s.name)];
-  const holders: string[] = [];
+  const holders: CatalogSearch["holders"] = [];
   const lexicon: string[] = [];
   for (const phrase of lexiconMentions(input.text)) {
-    const holder = heldNames.find((name) => hitNamesPhrase(name, phrase));
-    if (holder === undefined) lexicon.push(phrase);
-    else holders.push(holder);
+    const matches = heldNames.filter((name) => hitNamesPhrase(name, phrase));
+    if (matches.length === 0) lexicon.push(phrase);
+    else holders.push({ name: matches[0], phrase });
   }
   // A meal slot named in the prose ("as a snack", "for lunch") is not a food to resolve.
   const exclude = new Set([...heldNames.map(normalizeFoodText), ...lexiconMentions(input.text),
@@ -210,12 +213,17 @@ async function resolveByCatalog(
   const mentions: Mention[] = [];
   // The prose names a food the turn already holds an id for: judge that id as named in prose. A
   // holder that is this turn's own logged food is in neither list and is not advice.
-  for (const holder of started.holders) {
+  for (const { name: holder, phrase } of started.holders) {
+    const identity = foodEvidenceFor(input.evidence, phrase);
+    if (identity?.ambiguous) {
+      failing.push({ name: holder, reason: null });
+      continue;
+    }
     const heldMention = held.find((m) => m.name === holder);
     if (heldMention) heldMention.inProse = true;
-    else if (input.evidence[holder]) {
-      mentions.push({ name: holder, entry: input.evidence[holder], named: false, inProse: true });
-    }
+    else if (identity) {
+      mentions.push({ name: holder, entry: identity, named: false, inProse: true });
+    } else failing.push({ name: phrase, reason: null });
   }
   const [lexiconHits, sweepHits, shoppingHits] = await started.hits;
 
@@ -226,9 +234,12 @@ async function resolveByCatalog(
       complete = false;
       return;
     }
-    const hit = found.value.find((h) => hitNamesPhrase(h.name, phrase));
-    if (!hit || hit.foodRefId === null) failing.push({ name: phrase, reason: null });
-    else mentions.push({ name: phrase, entry: toEvidenceEntry(hit), named: false, inProse: true });
+    const hits = found.value.filter((h) => hitNamesPhrase(h.name, phrase));
+    if (hits.length === 0) failing.push({ name: phrase, reason: null });
+    for (const hit of hits) {
+      if (hit.foodRefId === null) failing.push({ name: phrase, reason: null });
+      else mentions.push({ name: phrase, entry: toEvidenceEntry(hit), named: false, inProse: true });
+    }
   });
   // The sweep is best effort: its phrases are not known to be foods until the catalog names one.
   // A rejected search is not "no match", though (round-4 audit #3): it re-asks like the lexicon's.
@@ -238,10 +249,10 @@ async function resolveByCatalog(
       complete = false;
       return;
     }
-    const hit = found.value.find((h) => hitNamesPhrase(h.name, phrase));
-    if (!hit) return;
-    if (hit.foodRefId === null) failing.push({ name: phrase, reason: null });
-    else mentions.push({ name: phrase, entry: toEvidenceEntry(hit), named: false, inProse: true });
+    for (const hit of found.value.filter((h) => hitNamesPhrase(h.name, phrase))) {
+      if (hit.foodRefId === null) failing.push({ name: phrase, reason: null });
+      else mentions.push({ name: phrase, entry: toEvidenceEntry(hit), named: false, inProse: true });
+    }
   });
   // A shopping item the catalog does not know (paper towels) has nothing to clash with.
   started.shopping.forEach((name, i) => {
@@ -250,9 +261,10 @@ async function resolveByCatalog(
       complete = false;
       return;
     }
-    const hit = found.value.find((h) => hitNamesPhrase(h.name, name));
-    if (hit && hit.foodRefId !== null) {
-      mentions.push({ name, entry: toEvidenceEntry(hit), named: false, inProse: true, shopping: true });
+    const hits = found.value.filter((h) => hitNamesPhrase(h.name, name));
+    const ambiguous = new Set(hits.map((hit) => hit.foodRefId)).size > 1;
+    for (const hit of hits) if (hit.foodRefId !== null) {
+      mentions.push({ name, entry: toEvidenceEntry(hit), named: false, inProse: true, shopping: true, ambiguous });
     }
   });
   return { mentions, complete };
@@ -268,7 +280,7 @@ function judge(
     const hit = marks.find((mark) => mark.outcome === "present");
     if (hit) return { name, reason: `rule:${hit.facet}` };
     // A shopping item is checked at the shelf: only a definite clash stops it going on the list.
-    if (!mention.shopping && marks.some((mark) => mark.outcome === "unknown")) {
+    if ((!mention.shopping || mention.ambiguous) && marks.some((mark) => mark.outcome === "unknown")) {
       return { name, reason: null };
     }
   }
@@ -279,7 +291,7 @@ function judge(
   }
   // With a legacy hard rule, an unverified food in the prose is not a checked one; a suggestion
   // card carries its own "Check the label" mark (§5).
-  return legacyActive && verdict.verdict === "unverified" && !mention.named && !mention.shopping
+  return legacyActive && verdict.verdict === "unverified" && !mention.named && (!mention.shopping || mention.ambiguous)
     ? { name, reason: null } : null;
 }
 
@@ -290,7 +302,8 @@ function rawLoggedIdentities(input: ReplyScanInput): LoggedIdentities {
   for (const name of input.loggedNames ?? []) identities.names.add(name.toLowerCase());
   return { ...identities, items: (input.actions ?? []).flatMap((action) => action.kind === "log_meal"
     ? action.items.map((item) => ({ ...item, slot: action.slot, at: action.at,
-      occasion: occasionAt(action.at) })) : []), listMarks: (input.actions ?? []).flatMap((action) =>
+      occasion: action.slot === "snack" ? "snack" : occasionAt(action.at) })) : []), notices: input.logNotices,
+    listMarks: (input.actions ?? []).flatMap((action) =>
     "name" in action ? [{ kind: action.kind, name: action.name }] : []) };
 }
 
@@ -348,8 +361,9 @@ async function scan(
   const logged = await resolveLoggedIdentities(input, deadlineAt);
   legacyActive ||= hasAvoid();
   if (!legacyActive && rules === null) return { hardRulesActive: false, complete: true, failing: [] };
-  const adviceText = withoutLogConfirmations(withoutListMarkConfirmations(input.text,
-    logged.listMarks ?? []), logged.items ?? [], input.evidence);
+  const adviceText = withoutLogConfirmations(withoutListMarkConfirmations(withoutPlanReports(input.text,
+    input.planReads ?? []),
+    logged.listMarks ?? []), logged.items ?? [], input.evidence, logged.notices ?? input.logNotices);
   if (!searching || adviceText !== input.text) {
     input = { ...input, text: adviceText };
     searching = startCatalogSearch(input, ports, deadlineAt, cache);
@@ -421,7 +435,8 @@ export function startReplyScan(
   input = { ...input, text: withoutShoppingConfirmations(input.text, turnActions) };
   const legacyActive = hasActiveHardRules(input.profile);
   // A scan that never finishes cannot prove a profile rule is absent either (owner ruling above).
-  const fallback: ReplyScan = { hardRulesActive: legacyActive || ports.profileRules !== undefined,
+  const fallback: ReplyScan = { hardRulesActive: legacyActive || ports.profileRules !== undefined
+      || ports.hasAvoidFoods !== undefined || Object.values(input.evidence).some((entry) => entry.onAvoidList),
     complete: false, failing: [] };
   return settleBy(scan(input, ports, deadlineAt), deadlineAt)
     .then((settled) => settled.ok ? settled.value : fallback);

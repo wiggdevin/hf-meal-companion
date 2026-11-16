@@ -8,6 +8,10 @@ import { withoutListMarkMirrors } from "@/lib/coach/list-mark-confirmation";
 import { claimsAction } from "@/lib/coach/actions";
 import { occasionAt } from "@/lib/meals/occasion";
 import { mergeFoodEvidence } from "@/lib/coach/food-evidence";
+import { projectLogText } from "@/lib/coach/log-confirmation";
+import { retainRequestedLogs } from "@/lib/coach/retain-logs";
+import { catalogReviewIntent } from "@/lib/coach/catalog-review";
+import { planReadsForRequest, withoutPlanReports } from "@/lib/coach/plan-report";
 import { shoppingItemNames, withoutShoppingMirrors } from "@/lib/coach/shopping-confirmation";
 import { hydrateNextActionChip } from "@/lib/coach/blocks/hydrate-next-action";
 import { hydrateQuickReplies } from "@/lib/coach/blocks/quick-replies";
@@ -140,29 +144,48 @@ export async function modelReply(
     : replyScan?.text === scanText ? replyScan.scan : scanReply(turn, kit, state, scanText, named).scan;
   const logItems = actions.flatMap((action) => action.kind === "log_meal"
     ? action.items.map((item) => ({ ...item, slot: action.slot, at: action.at,
-      occasion: occasionAt(action.at ?? (env.context?.day.date === action.date
+      occasion: action.slot === "snack" ? "snack" : occasionAt(action.at ?? (env.context?.day.date === action.date
         ? env.context.day.slots.find((slot) => slot.slot === action.slot)?.time : undefined)) })) : []);
-  const checked = await checkReplyLive({ text, adviceText: scanText ?? "", logItems,
+  const projected = projectLogText(scanText ?? "", logItems, evidence, logPolicyNotices);
+  if (scanText && text.startsWith(scanText)) text = projected.display + text.slice(scanText.length);
+  const planReads = state.planReads.length ? planReadsForRequest(state.planReads, req.text, turn.clock.date) : [];
+  let planExempt = false;
+  const adviceText = withoutPlanReports(projected.advice, planReads, () => { planExempt = true; });
+  const checked = await checkReplyLive({ text, adviceText, logItems, logNotices: logPolicyNotices,
+    planReads,
     named, draft, actions, evidence, profile }, scan);
-  const { suggestions, draftChecks, textChecks } = checked;
+  const { draftChecks, textChecks } = checked;
+  let { suggestions } = checked;
   let { content } = checked;
   logFallback(state, claimWithoutAction, checked.replaced);
   draft = checked.draft;
   actions = checked.actions;
+  if (checked.replaced && !groundingLate) {
+    const retained = retainRequestedLogs(req.text, state.actions, logItems, evidence);
+    if (retained.length) {
+      actions = retained;
+      suggestions = [];
+      const names = retained.flatMap((action) => action.kind === "log_meal" ? action.items.map((item) => item.name) : []);
+      const notices = logPolicyNotices.filter((notice) => names.some((name) =>
+        notice === `Off-plan: ${name}.` || notice.startsWith(`Not verified: ${name} (`)));
+      content = ["Your food record is ready. I left the additional advice out because I could not verify it against your food rules.",
+        ...notices].join(" ");
+    }
+  }
+  const retainedRecord = checked.replaced !== undefined && actions.some((action) => action.kind === "log_meal");
   if (content !== text) {
     // Catalog review shows the server's own membership/blocked flags, not eating advice. Keep
     // that requested control beside the warning; a re-ask still drops every meal/recipe block.
-    const catalogReview = checked.replaced?.incomplete === false
-      && !/\b(?:not|no|don't|do not)\b/i.test(req.text)
-      && /^\s*(?:please\s+)?(?:show|find|search|browse|look\s+up)\b[^.!?]*\b(?:catalog|decide\s+(?:whether|if)\s+to\s+(?:avoid|favou?r))\b[^.!?]*[.!?]?\s*$/i.test(req.text);
+    const catalogReview = checked.replaced?.incomplete === false && catalogReviewIntent(req.text) !== null;
     composed = [];
-    blocks = blocks.filter((b) => b.kind === "dietary_profile_proposal"
-      || (catalogReview && b.kind === "food_search"));
+    blocks = retainedRecord ? [] : blocks.filter((b) => b.kind === "dietary_profile_proposal"
+      || (catalogReview && b.kind === "food_search" && (b.intent === "eats" || b.intent === "avoid")
+        && catalogReviewIntent(req.text, b.query) === b.intent));
     // 2026-10-17 rerun item 2: a food held only because nothing checked it yet gets a way to be
     // checked (add it to Eats) instead of a dead end. It stays held in this reply; a food a rule
     // blocks, or one already on Eats or Avoid, is never offered.
     // A kept rule proposal holds the one content-block slot, so the chips could not show.
-    const held = checked.replaced?.by === "reply_scan" && blocks.length === 0
+    const held = !retainedRecord && checked.replaced?.by === "reply_scan" && blocks.length === 0
       ? checked.replaced.held ?? [] : [];
     const next = held.length > 0 ? reaskNextStep(held, accountFoodNames(env.context?.lists)) : null;
     const chips = next ? hydrateQuickReplies(newId(), next.options) : null;
@@ -233,6 +256,13 @@ export async function modelReply(
   // abort and late answer included, so a partial re-emit keeps earlier items and a poisoned item
   // is written out of the row as soon as the food list is known in full (review t3r4 WARN 4).
   const foods = accountFoodNames(env.context?.lists);
+  const scanResult = planExempt && scan ? await scan : null;
+  if (planExempt && scanResult && (scanResult.hardRulesActive || !scanResult.complete)) {
+    content += " That is what your saved plan says. Its foods were not re-checked against your current food rules.";
+  }
+  if (!checked.replaced && composed.length > 0 && state.suggestMessage && !content.includes(state.suggestMessage)) {
+    content = [content, state.suggestMessage].join(" ");
+  }
   const memory = nextMemory({ stored: intent.history.summary,
     emitted: step.kind === "final" && !groundingLate ? step.memory : undefined,
     accountFoodNames: foods.names, complete: foods.complete });
