@@ -22,6 +22,7 @@ import { cookieJar, createRequestClient } from "@/lib/supabase/server";
 import { createTestUsers, HAS_BRANCH, resetUser } from "../helpers/supabase";
 import { TEST_PROFILE } from "../helpers/constraint-profile";
 import { accountHeaderFromCookie } from "@/tests/helpers/account-header";
+import { isReask } from "@/lib/coach/reask";
 
 const when = HAS_BRANCH ? describe : describe.skip;
 
@@ -197,7 +198,7 @@ when("Phase 7 on a Supabase branch", () => {
     expect(await rows("coach_messages", "user_id", aId)).toBe(messagesAfterFirst);
   });
 
-  it("5. a dairy suggestion renders blocked and carries no draft", async () => {
+  it("5. a dairy suggestion is rejected without advice cards, actions or a draft", async () => {
     await resetUser(aId);
     const dairyRef = crypto.randomUUID();
     await users.admin.from("constraint_profiles").insert({
@@ -221,10 +222,16 @@ when("Phase 7 on a Supabase branch", () => {
           kcalPer100g: 60, prefStatus: "avoid" as const }],
       } });
 
-    expect(res.suggestions).toHaveLength(1);
-    expect(res.suggestions[0]).toMatchObject({ name: "yoghurt", verdict: "blocked" });
-    expect(res.suggestions[0].reason).toBeTruthy();
+    expect(isReask(res.messages.at(-1)!.content)).toBe(true);
+    expect(res.suggestions).toEqual([]);
+    expect(res.actions).toEqual([]);
     expect(res.draft).toBeNull();
+    const { data: assistant, error } = await users.admin.from("coach_messages").select("policy_checks")
+      .eq("user_id", aId).eq("id", res.messages.at(-1)!.id).single();
+    expect(error).toBeNull();
+    const checks = assistant?.policy_checks as { name?: string; verdict?: string; reason?: string | null }[];
+    const blocked = checks.find((check) => check.name === "yoghurt" && check.verdict === "blocked");
+    expect(blocked?.reason).toBeTruthy();
   });
 
   it("5b. a turn returns an action and writes no log_entries or plan_days rows", async () => {
