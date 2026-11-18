@@ -36,7 +36,6 @@ export default function PrivacyNotice({ deletionEnabled }: { deletionEnabled: bo
         <ul className={LIST}>
           <li>Your email address, used to sign you in</li>
           {DELETED_ITEMS.map((item) => <li key={item}>{item}</li>)}
-          <li>Feedback you send from Settings</li>
         </ul>
         <p className={CAPTION}>
           Some of it, such as your meals, is also kept on your phone so the app works offline.
@@ -77,7 +76,7 @@ export default function PrivacyNotice({ deletionEnabled }: { deletionEnabled: bo
         </ul>
       </Section>
 
-      <Section title="Get a copy of your data">
+      <Section title="Download your food log">
         <p className={BODY}>
           In Settings, under Data &amp; account, Export downloads your logged meals and your daily totals as spreadsheets.
         </p>
@@ -87,9 +86,8 @@ export default function PrivacyNotice({ deletionEnabled }: { deletionEnabled: bo
         {deletionEnabled ? (
           <p className={BODY}>
             In Settings, under Data &amp; account, Delete account removes your account and everything in it for good.
-            Backup copies of the database are not edited, so your data can stay in them after you delete your
-            account. To have it removed from backups too, send feedback from Settings before you delete. You can
-            download your data first.
+            Backup copies of the database and of your photos and voice notes are not edited, so your data can
+            stay in them after you delete your account. You can download your food log first.
           </p>
         ) : (
           <p className={BODY}>
@@ -105,7 +103,7 @@ export default function PrivacyNotice({ deletionEnabled }: { deletionEnabled: bo
         </p>
       </Section>
 
-      <Link href="/sign-in" className="self-center text-caption text-muted underline">Back to sign in</Link>
+      <Link href="/" className="self-center text-caption text-muted underline">Back to Sasha</Link>
     </main>
   );
 }

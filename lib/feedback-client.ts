@@ -37,6 +37,8 @@ let lastScreen: string | null = null;
 
 export function noteScreen(pathname: string | null): void {
   if (!pathname || pathname === "/settings" || pathname.startsWith("/settings/")) return;
+  // Public pages (privacy, sign-in) are not the app screen a tester is reporting on.
+  if (pathname === "/privacy" || pathname === "/sign-in" || pathname.startsWith("/auth/")) return;
   lastScreen = pathname;
 }
 

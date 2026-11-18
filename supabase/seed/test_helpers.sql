@@ -60,7 +60,7 @@ begin
     'care_points_ledger', 'care_inventory', 'care_equipped', 'care_purchase_receipts',
     'care_accolades', 'care_messages',
     'taste_chip_holds', 'taste_chip_receipts', 'taste_dislike_removals',
-    'food_signal_events', 'onboarding_events', 'coach_intent_events', 'client_timings',
+    'food_signal_events', 'onboarding_events', 'coach_intent_events', 'client_timings', 'feedback',
     'favorites_catalog_recipes', 'food_allergen_evidence', 'food_facets',
     'food_membership_ops', 'food_membership_revisions', 'food_note_authority',
     'food_world_condition_confirmations', 'user_allergen_checks', 'user_dietary_profiles',

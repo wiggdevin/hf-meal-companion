@@ -23,7 +23,7 @@ export const DELETED_ITEMS = [
   "Every meal, water and weight log, and your notes",
   "Your foods, food rules, recipes, plans and shopping lists",
   "Coach chats, photos and voice recordings",
-  "Your profile, targets, health connections and settings",
+  "Your profile, targets, health connections and settings, and feedback you sent",
 ];
 
 export const CONFIRM_WORD = "DELETE";

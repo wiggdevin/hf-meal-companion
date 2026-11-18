@@ -170,14 +170,11 @@ export default function SignInPage() {
         </div>
       </div>
 
-      {mode === "create" ? (
-        <p className="ground-muted ts m-0 text-center text-tiny text-graphite">
-          By creating an account you accept how this test version handles your data:{" "}
-          <Link href="/privacy" className="underline">Privacy</Link>
-        </p>
-      ) : null}
       <p className="ground-muted ts text-center text-tiny text-graphite">
-        Other accounts never see your data. How it is handled: <Link href="/privacy" className="underline">Privacy</Link>
+        {mode === "create"
+          ? "By creating an account you accept how this test version handles your data: "
+          : "Other accounts never see your data. How it is handled: "}
+        <Link href="/privacy" className="underline">Privacy</Link>
       </p>
     </main>
   );

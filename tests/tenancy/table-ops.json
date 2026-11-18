@@ -21,6 +21,7 @@
   "favorites_meal_items": { "ops": ["select", "insert", "update", "delete"], "owner": { "parent": "favorites_meals", "fk": "meal_id" }, "seed": "favorites_meal_items" },
   "favorites_meals": { "ops": ["select", "insert", "update", "delete"], "owner": "user_id", "seed": "favorites_meals" },
   "favorites_recipes": { "ops": ["select", "insert", "update", "delete"], "owner": "user_id", "seed": "favorites_recipes" },
+  "feedback": { "ops": [], "owner": "user_id", "seed": "feedback" },
   "food_allergen_evidence": { "ops": ["select"], "owner": "user_id", "seed": "food_allergen_evidence" },
   "food_facets": { "ops": [], "owner": "user_id", "seed": "food_facets" },
   "food_membership_ops": { "ops": [], "owner": "user_id", "seed": "food_membership_ops" },
