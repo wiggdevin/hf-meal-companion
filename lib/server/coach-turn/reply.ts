@@ -249,7 +249,9 @@ export async function modelReply(
       hasUncheckedLabelFood: draftChecks.some((c) => c.verdict === "unverified")
         || suggestions.some((c) => c.verdict === "unverified"),
       hasSuggestionsAvailable: !clarifying && recipeRefusals.length === 0
-        && (pickableSuggestions(suggestions, actions).length > 0 || blocks.some((b) => b.kind === "food_ideas")),
+        && (pickableSuggestions(suggestions, actions).length > 0
+          // A turn that logged a meal answered the ask; its idea cards are not a next pick.
+          || (blocks.some((b) => b.kind === "food_ideas") && !actions.some((a) => a.kind === "log_meal"))),
     });
     if (candidate) blocks = [...blocks, hydrateNextActionChip(newId(), candidate)];
   }

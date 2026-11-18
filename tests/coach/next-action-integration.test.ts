@@ -122,6 +122,40 @@ describe("runTurn — next-action chip (§6, slice 7)", () => {
     }));
   });
 
+  // Sol review 2026-11-18: an idea card built on a turn that logged the meal is not a next pick.
+  it("offers no pick_suggestion chip for idea cards on a turn that logged a meal", async () => {
+    const REF = "3f1b1a2c-0000-4000-8000-00000000001a";
+    const idea = { wish: "rice", slot: null, items: [{ name: "rice", foodRefId: REF,
+      catalogFoodRevisionId: 1, grams: 150, kcalPer100g: 130, proteinPer100g: 2.7,
+      carbsPer100g: 28, fatPer100g: 0.3, macros: { kcal: 195, protein: 4, carbs: 42, fat: 0 },
+      verdict: "allowed" as const }], totals: { kcal: 195, protein: 4, carbs: 42, fat: 0 },
+      target: { kcal: 195, protein: 4, carbs: 42, fat: 0 }, flagged: [], fitsTarget: true };
+    const generate = vi.fn()
+      .mockResolvedValueOnce({ kind: "tool", calls: [{ name: "compose_meal", args: { wish: "rice" } }] })
+      .mockResolvedValueOnce({
+        kind: "final", text: "Logged 150 g of rice.",
+        actions: [{ kind: "log_meal", date: "2026-09-11", slot: "meal-1",
+          items: [{ name: "rice", grams: 150 }] }],
+      });
+    const writes = { rows: [] as { table: string; row: unknown }[] };
+    const verifiedPorts = {
+      ...ports,
+      compose: async () => idea,
+      searchFoods: async () => [{
+        foodRefId: REF, name: "rice", brand: null,
+        kcalPer100g: 130, prefStatus: "eats" as const, allergenTags: [] as string[],
+      }],
+    };
+    await runTurn(db({}, writes), db({}, writes), "u1", { ...REQ, text: "log 150 g of rice" },
+      { generate: generate as never, ports: verifiedPorts as never, ...logged,
+        now: () => 0, newId: () => "id-1" });
+    const blocks = assistantBlocks(writes);
+    expect(blocks.some((b) => (b as { kind?: string }).kind === "food_ideas")).toBe(true);
+    expect(blocks).not.toContainEqual(expect.objectContaining({
+      kind: "next_action_chip", action: "pick_suggestion",
+    }));
+  });
+
   it("adds no chip when nothing in turn state is eligible", async () => {
     const generate = vi.fn().mockResolvedValueOnce({ kind: "final", text: "Sounds good." });
     const writes = { rows: [] as { table: string; row: unknown }[] };
