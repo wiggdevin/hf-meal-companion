@@ -16,6 +16,8 @@ import { MIC_OFF_COPY, MIC_UNAVAILABLE_COPY } from "@/components/DictateMic";
 import { onboardingDictationCopy, VOICE_RESTING_COPY } from "@/components/Onboarding/dock/useDockDictation";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }) }));
+// These cases read the guide's pose; the companion is off the UI, so turn it on here.
+vi.mock("@/lib/today/companion-ui", () => ({ COMPANION_UI_ENABLED: true }));
 vi.mock("@/lib/profile/onboarding-client", () => ({
   loadOnboardingSettings: async () => defaultSettings(),
   persistSkippedOnboarding: async () => defaultSettings(),

@@ -1,4 +1,4 @@
-// 2026-10-07 live QA: an onboarding-v2 account that tapped "Sprout, pick for me" was saved with
+// 2026-10-07 live QA: an onboarding-v2 account that tapped "Pick for me" was saved with
 // all 29 curated defaults as Eats, because the selection started with every default pre-marked
 // and the falling pile never showed those marks. The planner then built meals ("Tofu with ...")
 // from foods the person never chose.

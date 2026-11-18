@@ -210,7 +210,7 @@ function modeContent(mode: OnboardingDockMode, props: Props, reduce: boolean): R
     onMicTap={props.onMicTap} listening={props.listening} reduce={reduce} inputLabel={props.inputLabel}
     mic={{ active: props.micActive, busy: props.micBusy, seconds: props.micSeconds, disabled: props.micDisabled }} />;
   if (mode === "chips") return <ChipsContent chips={props.chips ?? []} onPick={props.onPick} reduce={reduce} />;
-  if (mode === "game") return <GameContent escapeLabel={props.escapeLabel ?? "Sprout, pick for me"}
+  if (mode === "game") return <GameContent escapeLabel={props.escapeLabel ?? "Pick for me"}
     onEscape={props.onEscape} reduce={reduce} />;
   return <ConfirmContent confirmLabel={props.confirmLabel ?? "That's me"} onConfirm={props.onConfirm}
     confirmStatus={props.confirmStatus} />;
