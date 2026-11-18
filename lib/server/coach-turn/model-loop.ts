@@ -83,8 +83,11 @@ function openRouterFallbackReady(): boolean {
   return openRouterConfigured() && openRouterAttested();
 }
 
-function fellBack(state: ModelState, to: string, generateStarted: number): void {
-  state.fallbackReason = "capacity";
+function fellBack(
+  state: ModelState, to: string, generateStarted: number,
+  reason: "capacity" | "failed" = "capacity",
+): void {
+  state.fallbackReason = reason;
   console.warn("coach model fell back", {
     from: state.modelId, to, reason: state.fallbackReason,
     after: `${Date.now() - generateStarted} ms`,
@@ -129,6 +132,16 @@ const STALL_FALLBACK_MS = 5_000;
 const stalledWithTime = (e: unknown, remainingMs: number, turnAborted: boolean) => !turnAborted
   && remainingMs >= STALL_FALLBACK_MS && e instanceof Error && /did not answer within/i.test(e.message);
 
+/**
+ * Weak-spot audit 2026-11-17 item 2: an OpenRouter key that is dead (401), out of credit (402),
+ * forbidden (403) or a retired route (404) took the whole coach down while capture, on the same
+ * failure, moved to Gemini (lib/ai/capture.ts worthGemini). Every OpenRouter model shares that key
+ * and that balance, so the only option worth trying is the Gemini pin, once.
+ */
+const OPENROUTER_KEY_OR_ROUTE = new Set([401, 402, 403, 404]);
+const openRouterKeyOrRouteFailure = (e: unknown, modelId: string) => isOpenRouterModelId(modelId)
+  && e instanceof ProviderHttpError && OPENROUTER_KEY_OR_ROUTE.has(e.status);
+
 /** One model step, with the T6 §5 capacity fallback (and, past it, T8's cross-provider retry);
  *  any other failure is 503 coach_unavailable. */
 async function nextStep(
@@ -154,10 +167,11 @@ async function nextStep(
     } catch (primaryFailure) {
       // Only a model out of CAPACITY is worth trying anything else: a schema refusal is ours and
       // a second model refuses the same reply for the same reason (Grok pass 1, MEDIUM 17).
+      const keyOrRoute = openRouterKeyOrRouteFailure(primaryFailure, state.modelId);
       if (kit.turnAbort.signal.aborted || remaining() <= 0 || isCallerCancellation(primaryFailure)
           || primaryFailure instanceof HttpError || primaryFailure instanceof SchemaRejection
           || primaryFailure instanceof CallRefused || state.modelId !== COACH_MODEL_ID
-          || !(isCapacityFailure(primaryFailure) || stalled(primaryFailure))) {
+          || !(keyOrRoute || isCapacityFailure(primaryFailure) || stalled(primaryFailure))) {
         throw primaryFailure;
       }
       const lastFailure: unknown = primaryFailure;
@@ -168,7 +182,13 @@ async function nextStep(
       // only WHICH model counts as "on it" changes.
       const openRouterIsPrimary = isOpenRouterModelId(state.modelId);
       const sameKeyModel = openRouterIsPrimary ? coachOpenRouterFallbackModel() : COACH_FALLBACK_MODEL_ID;
-      if (!openRouterIsPrimary && openRouterFallbackReady()) {
+      if (keyOrRoute) {
+        // Gemini needs its own attestation, which also covers a profile with health context
+        // (lib/ai/attestation.ts healthContextRefused reads the same flag for a Gemini model).
+        if (!geminiAttested()) throw primaryFailure;
+        fellBack(state, GEMINI_COACH, generateStarted, "failed");
+        generated = await call(state.modelId);
+      } else if (!openRouterIsPrimary && openRouterFallbackReady()) {
         // Live 2026-09-24 and 2026-10-02: the second Gemini model failed right after the first
         // (503, then a timeout that is not a capacity answer and so tried nothing else). With a
         // different provider configured, a Gemini capacity failure goes straight there.
