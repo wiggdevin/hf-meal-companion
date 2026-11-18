@@ -56,3 +56,40 @@ describe("a meal this turn planned is not scanned as an unknown food", () => {
       .toBeGreaterThan(0);
   });
 });
+
+const ALMOND = "00000000-0000-4000-8000-0000000000a3";
+const almondEvidence = { "Almond milk, unsweetened": { foodRefId: ALMOND, allergenTags: [], category: [],
+  onEatsList: true, onAvoidList: false } };
+const almondBreakfast = (title: string) => ({
+  actionId: "a2", kind: "set_slot_meal", from: "2026-11-18", through: "2026-11-18",
+  date: "2026-11-18", dates: ["2026-11-18"], slot: "meal-1", title, flagged: [],
+  items: [item("Almond milk, unsweetened", ALMOND)],
+}) as unknown as CoachAction;
+
+async function failingWith(text: string, actions: CoachAction[], ev: Record<string, unknown>) {
+  const scan = await startReplyScan({ userId: "u", text, named: [], evidence: ev as typeof evidence,
+    profile: { ...EMPTY_PROFILE, avoid_allergens: ["milk"] }, actions }, ports, Date.now() + 1000);
+  return scan.failing.map((f) => f.name.toLowerCase());
+}
+
+describe("Sol review 2026-11-18: the title exemption covers only the confirmation", () => {
+  it("does not accept a title that drops a food's identity word (almond milk titled Milk)", async () => {
+    expect((await failingWith("I set your breakfast to Milk.", [almondBreakfast("Milk")], almondEvidence))
+      .length).toBeGreaterThan(0);
+  });
+
+  it("still scans a later recommendation that repeats the title's words", async () => {
+    expect((await failingWith("I set your breakfast to Almond milk. Drink milk with every meal.",
+      [almondBreakfast("Almond milk")], almondEvidence)).length).toBeGreaterThan(0);
+  });
+
+  it("keeps the qualified title when the reply only confirms it", async () => {
+    expect(await failingWith("I set your breakfast to Almond milk.",
+      [almondBreakfast("Almond milk")], almondEvidence)).toEqual([]);
+  });
+
+  it("blocks the review's exact case: Milk title then a milk recommendation", async () => {
+    expect((await failingWith("I set your breakfast to Milk. Drink milk with every meal.",
+      [almondBreakfast("Milk")], almondEvidence)).length).toBeGreaterThan(0);
+  });
+});

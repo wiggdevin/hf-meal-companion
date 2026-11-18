@@ -13,6 +13,7 @@ import { localDateOf, rollUpDay } from "@/lib/health/daily";
 import type { ConstraintProfile } from "@/lib/policy/constraints";
 import type { CoachContext } from "@/lib/server/coach-context";
 import { buildDayContext } from "@/lib/server/day-context";
+import { RECIPE_IDEAS_INSTEAD } from "@/lib/recipe-pilot-copy";
 
 export type DirectBlockToolName = "show_chart" | "quick_replies";
 export type BlockHydrationContext = {
@@ -227,7 +228,7 @@ export function hydrateResolvedTool(
     return { block, data: block?.kind === "food_ideas" ? { ...foodIdeasAck(block),
       ...(typeof message === "string" && message.trim() ? { message } : {}),
       ...((args as { kind?: string }).kind === "recipe" ? {
-        notice: "Shared recipe discovery is unavailable. These are checked meal ideas instead, not complete recipes.",
+        notice: RECIPE_IDEAS_INSTEAD,
       } : {}) } : {
       ok: true, block: "food_ideas", ideas: [],
     } };

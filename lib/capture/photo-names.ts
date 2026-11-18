@@ -21,7 +21,9 @@ function stripCut(label: string): { label: string; cut: string[] } {
   const kept = tokens.filter((token, i) => {
     const word = token.toLowerCase();
     if (!CUT_WORDS.has(word)) return true;
-    if (word === "whole" && WHOLE_KEEPS.has((tokens[i + 1] ?? "").toLowerCase().replace(/-.*/, ""))) return true;
+    // Any later word, not only the next ("whole organic milk", "whole evaporated milk").
+    if (word === "whole" && tokens.slice(i + 1)
+      .some((t) => WHOLE_KEEPS.has(t.toLowerCase().replace(/-.*/, "").replace(/[^a-z]/g, "")))) return true;
     cut.push(word);
     return false;
   });

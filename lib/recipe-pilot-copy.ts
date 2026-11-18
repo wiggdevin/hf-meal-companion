@@ -6,3 +6,6 @@
 export const RECIPES_COMING_SOON = "Shared recipes are coming soon for your account.";
 export const RECIPES_AND_SHOPPING_COMING_SOON = "Shared recipes and Shopping are coming soon for your account.";
 export const SHOPPING_COMING_SOON = "Shopping is coming soon for your account.";
+
+/** Shown beside meal ideas when a recipe request got ideas instead of complete recipes. */
+export const RECIPE_IDEAS_INSTEAD = "Complete recipes are not ready here yet, so these are checked meal ideas instead.";

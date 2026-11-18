@@ -30,7 +30,8 @@ describe("photo item names keep the food, not its cut", () => {
   });
 
   it.each(["steamed broccoli", "scrambled eggs", "whole milk", "whole wheat bread",
-    "red bell pepper", "grilled chicken breast", "half and half"])(
+    "red bell pepper", "grilled chicken breast", "half and half", "whole organic milk",
+    "whole evaporated milk", "whole grain rice"])(
     "leaves %s unchanged", (label) => {
       const out = run(label);
       expect(out.items[0].label).toBe(label);

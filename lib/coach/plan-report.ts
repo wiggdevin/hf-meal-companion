@@ -103,6 +103,14 @@ const TITLE_FILLER = new Set(("and & with plus on over of a the side bowl plate 
   + "poached toasted cooked raw fresh plain").split(" "));
 
 /**
+ * Words before a food's head noun that do not change what the food is for a diet rule ("White rice",
+ * "Chicken breast, roasted"). Any other word before it ("Almond milk", "Turkey bacon", "Cauliflower
+ * rice") is part of the food's identity, so a title that drops it names a different food.
+ */
+const NON_IDENTITY = new Set(("white brown wild long-grain basmati jasmine lean boneless skinless "
+  + "large small medium fresh frozen organic baby extra virgin unsalted salted").split(" "));
+
+/**
  * Weak-spot audit 2026-11-17 item 6: the titles of meals this turn's `set_slot_meal` actions set
  * ("Grilled chicken and rice"), when every item grounded to an allowed food and every other word
  * of the title is one of those items' own words or filler. Such a title names the meal, not a
@@ -120,15 +128,31 @@ export function plannedMealTitles(actions: readonly { kind: string }[]): string[
     const words = (s: string) => key(s).split(/[^a-z0-9&'-]+/).filter(Boolean);
     const singular = (w: string) => w.replace(/(?:es|s)$/, "");
     const own = new Set(items.flatMap((item: { name: string }) => words(item.name)).flatMap((w) => [w, singular(w)]));
-    return words(title).every((w) => TITLE_FILLER.has(w) || own.has(w) || own.has(singular(w)))
+    const titleWords = words(title);
+    const inTitle = new Set(titleWords.flatMap((w) => [w, singular(w)]));
+    // Each item a title word comes from must keep its identity words: the words of its name (before
+    // the first comma) ahead of the first one the title uses, minus descriptors that keep the food (Sol review 2026-11-18).
+    const keepsIdentity = items.every((item: { name: string }) => {
+      const head = words(item.name.split(",")[0] ?? "");
+      const first = head.findIndex((w) => inTitle.has(w) || inTitle.has(singular(w)));
+      if (first < 0) return true;
+      // Words before the first one the title uses qualify it ("almond" milk); words after it
+      // name a cut or form ("chicken breast") and may drop.
+      return head.slice(0, first).every((w) => NON_IDENTITY.has(w) || TITLE_FILLER.has(w));
+    });
+    return keepsIdentity
+      && titleWords.every((w) => TITLE_FILLER.has(w) || own.has(w) || own.has(singular(w)))
       ? [title] : [];
   });
 }
 
-/** Removes each planned meal title (whole phrase, any case) from the text the scan reads. */
+/**
+ * Removes the first mention of each planned meal title (whole phrase, any case) from the text the
+ * scan reads: that mention is the action's confirmation. Any later mention is advice and is scanned.
+ */
 export function withoutPlannedMealTitles(text: string, titles: readonly string[]): string {
   return titles.reduce((out, title) => {
     const pattern = key(title).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "\\s+");
-    return out.replace(new RegExp(`(^|[^\\p{L}\\p{N}])${pattern}(?=$|[^\\p{L}\\p{N}])`, "giu"), "$1");
+    return out.replace(new RegExp(`(^|[^\\p{L}\\p{N}])${pattern}(?=$|[^\\p{L}\\p{N}])`, "iu"), "$1");
   }, text);
 }
