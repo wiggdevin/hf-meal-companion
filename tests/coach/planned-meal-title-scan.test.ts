@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import type { CoachAction } from "@/lib/coach/actions";
 import { startReplyScan } from "@/lib/server/reply-check";
+import { plannedMealTitles, withoutPlannedMealTitles } from "@/lib/coach/plan-report";
 import { EMPTY_PROFILE } from "@/lib/policy/constraints";
 
 const CHICKEN = "00000000-0000-4000-8000-0000000000a1";
@@ -91,5 +92,30 @@ describe("Sol review 2026-11-18: the title exemption covers only the confirmatio
   it("blocks the review's exact case: Milk title then a milk recommendation", async () => {
     expect((await failingWith("I set your breakfast to Milk. Drink milk with every meal.",
       [almondBreakfast("Milk")], almondEvidence)).length).toBeGreaterThan(0);
+  });
+});
+
+describe("audit round 2026-11-18: full-name identity and confirmation-only strip", () => {
+  const one = (name: string, title: string) => ({
+    actionId: "a3", kind: "set_slot_meal", from: "2026-11-18", through: "2026-11-18",
+    date: "2026-11-18", dates: ["2026-11-18"], slot: "meal-1", title, flagged: [],
+    items: [item(name, ALMOND)],
+  }) as unknown as CoachAction;
+
+  it.each([["Milk, cashew", "Milk"], ["Bread, gluten-free", "Bread"], ["Cream of rice", "Cream"],
+    ["Cheese, cheddar", "Cheese"]])("does not accept %s titled %s", (name, title) => {
+    expect(plannedMealTitles([one(name, title)])).toEqual([]);
+  });
+
+  it("accepts natural titles of the same foods", () => {
+    expect(plannedMealTitles([one("Milk, cashew", "Cashew milk")])).toEqual(["Cashew milk"]);
+    expect(plannedMealTitles([planned("Sautéed chicken and rice")])).toEqual(["Sautéed chicken and rice"]);
+  });
+
+  it("strips only the confirming sentence, even when advice comes first", () => {
+    expect(withoutPlannedMealTitles("Oat milk is fine. I set your breakfast to Oat milk.", ["Oat milk"]))
+      .toBe("Oat milk is fine. I set your breakfast to .");
+    expect(withoutPlannedMealTitles("I set your breakfast to Oat milk. Lunch is Oat milk too.", ["Oat milk"]))
+      .toBe("I set your breakfast to . Lunch is Oat milk too.");
   });
 });

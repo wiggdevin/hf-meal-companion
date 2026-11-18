@@ -198,8 +198,9 @@ async function nextStep(
         } catch (crossFailure) {
           // Grok audit round 5 (MED): an OpenRouter 400, 401 or 503 must not end a turn that the
           // same-key Gemini model can still answer.
-          const recoverableHttp = (crossFailure instanceof ProviderHttpError && [400, 401].includes(crossFailure.status))
-            || (crossFailure instanceof Error && /\bopenrouter (?:400|401)\b/i.test(crossFailure.message));
+          const recoverableHttp = (crossFailure instanceof ProviderHttpError
+            && (crossFailure.status === 400 || OPENROUTER_KEY_OR_ROUTE.has(crossFailure.status)))
+            || (crossFailure instanceof Error && /\bopenrouter (?:400|401|402|403|404)\b/i.test(crossFailure.message));
           if (kit.turnAbort.signal.aborted || remaining() <= 0 || isCallerCancellation(crossFailure)
             || crossFailure instanceof HttpError || crossFailure instanceof SchemaRejection
             || crossFailure instanceof CallRefused

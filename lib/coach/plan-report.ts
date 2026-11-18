@@ -103,12 +103,15 @@ const TITLE_FILLER = new Set(("and & with plus on over of a the side bowl plate 
   + "poached toasted cooked raw fresh plain").split(" "));
 
 /**
- * Words before a food's head noun that do not change what the food is for a diet rule ("White rice",
- * "Chicken breast, roasted"). Any other word before it ("Almond milk", "Turkey bacon", "Cauliflower
- * rice") is part of the food's identity, so a title that drops it names a different food.
+ * Words of a catalog name that do not change what the food is for a diet rule: colour and grain of
+ * a staple, cut or form of a meat, size, sweetening and how it was kept ("White rice, cooked",
+ * "Chicken breast, roasted"). Every other word of an item's name ("almond" milk, "Milk, cashew",
+ * "Bread, gluten-free", "Cream of rice") is part of its identity and must appear in the title.
  */
 const NON_IDENTITY = new Set(("white brown wild long-grain basmati jasmine lean boneless skinless "
-  + "large small medium fresh frozen organic baby extra virgin unsalted salted").split(" "));
+  + "large small medium fresh frozen organic baby extra virgin unsalted salted unsweetened sweetened "
+  + "breast breasts thigh thighs fillet fillets filet leg legs wing wings drumstick drumsticks loin "
+  + "tenderloin cutlet cutlets ground whole regular canned drained prepared").split(" "));
 
 /**
  * Weak-spot audit 2026-11-17 item 6: the titles of meals this turn's `set_slot_meal` actions set
@@ -125,34 +128,36 @@ export function plannedMealTitles(actions: readonly { kind: string }[]): string[
     const checked = items.every((item: { foodRefId?: unknown; verdict?: unknown; name?: unknown }) =>
       typeof item.foodRefId === "string" && item.verdict === "allowed" && typeof item.name === "string");
     if (!checked) return [];
-    const words = (s: string) => key(s).split(/[^a-z0-9&'-]+/).filter(Boolean);
+    const words = (s: string) => key(s).split(/[^\p{L}\p{N}&'-]+/u).filter(Boolean);
     const singular = (w: string) => w.replace(/(?:es|s)$/, "");
     const own = new Set(items.flatMap((item: { name: string }) => words(item.name)).flatMap((w) => [w, singular(w)]));
     const titleWords = words(title);
     const inTitle = new Set(titleWords.flatMap((w) => [w, singular(w)]));
-    // Each item a title word comes from must keep its identity words: the words of its name (before
-    // the first comma) ahead of the first one the title uses, minus descriptors that keep the food (Sol review 2026-11-18).
-    const keepsIdentity = items.every((item: { name: string }) => {
-      const head = words(item.name.split(",")[0] ?? "");
-      const first = head.findIndex((w) => inTitle.has(w) || inTitle.has(singular(w)));
-      if (first < 0) return true;
-      // Words before the first one the title uses qualify it ("almond" milk); words after it
-      // name a cut or form ("chicken breast") and may drop.
-      return head.slice(0, first).every((w) => NON_IDENTITY.has(w) || TITLE_FILLER.has(w));
-    });
+    // Sol, Carbon and DeepSeek reviews 2026-11-18: every identity word of every item's full name,
+    // both sides of a comma, must be in the title, so "Milk" never stands for "Milk, cashew".
+    const keepsIdentity = items.every((item: { name: string }) => words(item.name).every((w) =>
+      inTitle.has(w) || inTitle.has(singular(w)) || NON_IDENTITY.has(w) || TITLE_FILLER.has(w)));
     return keepsIdentity
       && titleWords.every((w) => TITLE_FILLER.has(w) || own.has(w) || own.has(singular(w)))
       ? [title] : [];
   });
 }
 
+/** A sentence that confirms a plan change ("I set your dinner to …", "Meal 2 is now …"). */
+const CONFIRMS = /\b(?:set|planned|put|added|changed|updated|swapped|moved|replaced|scheduled)\b|\bis now\b/i;
+
 /**
- * Removes the first mention of each planned meal title (whole phrase, any case) from the text the
- * scan reads: that mention is the action's confirmation. Any later mention is advice and is scanned.
+ * Removes each planned meal title (whole phrase, any case) from the first sentence that both names it
+ * and confirms a plan change: that mention is the action's confirmation. Every other mention,
+ * before or after it, is advice and is scanned (reviews 2026-11-18).
  */
 export function withoutPlannedMealTitles(text: string, titles: readonly string[]): string {
-  return titles.reduce((out, title) => {
+  const sentences = text.match(/[^.!?]+(?:[.!?]+|$)/g) ?? [text];
+  for (const title of titles) {
     const pattern = key(title).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "\\s+");
-    return out.replace(new RegExp(`(^|[^\\p{L}\\p{N}])${pattern}(?=$|[^\\p{L}\\p{N}])`, "iu"), "$1");
-  }, text);
+    const re = new RegExp(`(^|[^\\p{L}\\p{N}])${pattern}(?=$|[^\\p{L}\\p{N}])`, "iu");
+    const at = sentences.findIndex((sentence) => re.test(sentence) && CONFIRMS.test(sentence));
+    if (at >= 0) sentences[at] = sentences[at].replace(re, "$1");
+  }
+  return sentences.join("");
 }
