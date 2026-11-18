@@ -155,7 +155,8 @@ export function withoutPlannedMealTitles(text: string, titles: readonly string[]
   const sentences = text.match(/[^.!?]+(?:[.!?]+|$)/g) ?? [text];
   for (const title of titles) {
     const pattern = key(title).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "\\s+");
-    const re = new RegExp(`(^|[^\\p{L}\\p{N}])${pattern}(?=$|[^\\p{L}\\p{N}])`, "iu");
+    // The title must end its noun phrase: "Chicken" is not stripped out of "Chicken nuggets".
+    const re = new RegExp(`(^|[^\\p{L}\\p{N}])${pattern}(?=\\s*(?:$|[.,;:!?)]|(?:and|for|on|at|with|today|tonight|tomorrow|this|instead)\\b))`, "iu");
     const at = sentences.findIndex((sentence) => re.test(sentence) && CONFIRMS.test(sentence));
     if (at >= 0) sentences[at] = sentences[at].replace(re, "$1");
   }

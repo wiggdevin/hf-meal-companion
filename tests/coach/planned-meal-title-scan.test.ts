@@ -119,3 +119,14 @@ describe("audit round 2026-11-18: full-name identity and confirmation-only strip
       .toBe("I set your breakfast to . Lunch is Oat milk too.");
   });
 });
+
+describe("Grok audit 2026-11-18: a title is not stripped out of a longer dish name", () => {
+  it("keeps 'nuggets' when the title is Chicken", () => {
+    expect(withoutPlannedMealTitles("Chicken nuggets are an easy lunch. I set dinner to Chicken.", ["Chicken"]))
+      .toBe("Chicken nuggets are an easy lunch. I set dinner to .");
+    expect(withoutPlannedMealTitles("I set dinner to Chicken nuggets.", ["Chicken"]))
+      .toBe("I set dinner to Chicken nuggets.");
+    expect(withoutPlannedMealTitles("I set dinner to Chicken for tonight.", ["Chicken"]))
+      .toBe("I set dinner to  for tonight.");
+  });
+});
