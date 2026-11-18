@@ -3,124 +3,128 @@ version: "alpha"
 name: "Sasha Meal Companion"
 description: "Phone-first nutrition PWA for multiple accounts, each with a plan derived from that account's foods, preferences, and targets. Harvest (2026-10-01, from the owner's Premium Meal Card reference): an oat stone ground with a matte grain, ivory cards, matte charcoal meal cards with true-colour food photography and a sweeping photo curve, an olive primary with cream text and an inset bevel, beige trays, a cream Fraunces headline voice over Plus Jakarta Sans, and muted harvest macros (brick, plum, sage, wheat, slate). App-owned identity; never reuse elsewhere."
 colors:
-  primary: "#4F5343"
-  secondary: "#EAE5D9"
-  tertiary: "#5B7F99"
-  neutral: "#DCD7CB"
-  background: "#DCD7CB"
-  surface: "#F9F6EE"
-  text-primary: "#141413"
-  text-secondary: "#302F2B"
-  text-muted: "#4D4B45"
-  text-faint: "#6A685F"
-  border: "#CCC5B6"
-  accent: "#4F5343"
-  olive-deep: "#3A3D31"
-  olive-shell-top: "#565B49"
-  olive-shell-bottom: "#474B3C"
-  charcoal: "#1D1D1C"
-  charcoal-deep: "#141413"
-  ink-button-top: "#565B49"
-  ink-button-bottom: "#474B3C"
-  gauge-calories: "#E8662E"
-  gauge-calories-end: "#F09A6E"
-  gauge-protein: "#8C6CC8"
-  gauge-protein-end: "#BBA8E0"
-  gauge-carbs: "#86AC5C"
-  gauge-carbs-end: "#B2D08F"
-  gauge-fat: "#DCA22A"
-  gauge-fat-end: "#EDC867"
-  gauge-water: "#4E9CC4"
-  gauge-water-end: "#94C6DE"
-  yellow: "#DCA22A"
-  yellow-ink: "#745200"
-  yellow-wash: "#F1E8D4"
-  orange: "#E8662E"
-  orange-ink: "#9A3A10"
-  orange-wash: "#F2E2D4"
-  orange-warm: "#D4843E"
-  sage: "#74A050"
-  sage-ink: "#3E6022"
-  sage-wash: "#E4EADA"
-  field: "#FBF9F4"
-  red: "#C9352A"
-  red-ink: "#A42E22"
-  red-wash: "#EFDCD3"
-  on-olive: "#E2DCD0"
-  on-olive-muted: "#B1B2A9"
-  on-charcoal: "#141413"
-  on-charcoal-muted: "#4D4B45"
+  primary: "#111110"
+  secondary: "#E9E9E5"
+  tertiary: "#2F5BC4"
+  neutral: "#F2F2EF"
+  background: "#F2F2EF"
+  surface: "#FFFFFF"
+  text-primary: "#111110"
+  text-secondary: "#2E2E2B"
+  text-muted: "#575752"
+  text-faint: "#6B6B65"
+  border: "#E3E3DE"
+  accent: "#F2542D"
+  olive-deep: "#050505"
+  olive-shell-top: "#2A2A28"
+  olive-shell-bottom: "#111110"
+  charcoal: "#161615"
+  charcoal-deep: "#111110"
+  ink-button-top: "#2A2A28"
+  ink-button-bottom: "#111110"
+  gauge-calories: "#F2542D"
+  gauge-calories-end: "#F7906F"
+  gauge-protein: "#7B6CF6"
+  gauge-protein-end: "#B3AAFA"
+  gauge-carbs: "#34B37A"
+  gauge-carbs-end: "#8ED6B2"
+  gauge-fat: "#F2B527"
+  gauge-fat-end: "#F8D57A"
+  gauge-water: "#3B9BEA"
+  gauge-water-end: "#93C7F4"
+  yellow: "#F2B527"
+  yellow-ink: "#7A5300"
+  yellow-wash: "#FDF3DA"
+  orange: "#F2542D"
+  orange-ink: "#B3380F"
+  orange-wash: "#FDECE6"
+  orange-warm: "#F7906F"
+  sage: "#34B37A"
+  sage-ink: "#1D7148"
+  sage-wash: "#E5F4EB"
+  field: "#F7F7F5"
+  red: "#E5372B"
+  red-ink: "#B42318"
+  red-wash: "#FCE8E6"
+  on-olive: "#FFFFFF"
+  on-olive-muted: "#A3A39D"
+  on-charcoal: "#111110"
+  kcal-on-ink: "#F4673F"
+  protein-on-ink: "#A69CF8"
+  on-charcoal-muted: "#575752"
 typography:
   display-lg:
-    fontFamily: "Fraunces"
+    fontFamily: "Newsreader"
     fontSize: "64px"
     fontWeight: 400
     lineHeight: "64px"
-    letterSpacing: "-0.03em"
+    letterSpacing: "-0.025em"
   display-md:
-    fontFamily: "Fraunces"
+    fontFamily: "Newsreader"
     fontSize: "40px"
     fontWeight: 400
-    lineHeight: "42px"
-    letterSpacing: "-0.025em"
+    lineHeight: "44px"
+    letterSpacing: "-0.02em"
   heading-sm:
-    fontFamily: "Fraunces"
-    fontSize: "22px"
-    fontWeight: 600
-    lineHeight: "28px"
+    fontFamily: "Newsreader"
+    fontSize: "20px"
+    fontWeight: 500
+    lineHeight: "26px"
     letterSpacing: "-0.01em"
   numeral-xl:
-    fontFamily: "Plus Jakarta Sans"
+    fontFamily: "Geist"
     fontSize: "48px"
-    fontWeight: 700
+    fontWeight: 300
     lineHeight: "48px"
-    letterSpacing: "-0.035em"
+    letterSpacing: "-0.04em"
   numeral-lg:
-    fontFamily: "Plus Jakarta Sans"
+    fontFamily: "Geist"
     fontSize: "32px"
-    fontWeight: 700
+    fontWeight: 400
     lineHeight: "36px"
-    letterSpacing: "-0.025em"
+    letterSpacing: "-0.03em"
   numeral-md:
-    fontFamily: "Plus Jakarta Sans"
+    fontFamily: "Geist"
     fontSize: "24px"
-    fontWeight: 600
+    fontWeight: 500
     lineHeight: "28px"
-    letterSpacing: "-0.015em"
+    letterSpacing: "-0.02em"
   body-md:
-    fontFamily: "Plus Jakarta Sans"
+    fontFamily: "Geist"
     fontSize: "14px"
     fontWeight: 400
-    lineHeight: "23.8px"
+    lineHeight: "22px"
+    letterSpacing: "-0.005em"
   body-sm:
-    fontFamily: "Plus Jakarta Sans"
+    fontFamily: "Geist"
     fontSize: "12px"
     fontWeight: 400
-    lineHeight: "19.5px"
+    lineHeight: "18px"
   label-md:
-    fontFamily: "Plus Jakarta Sans"
+    fontFamily: "Geist"
     fontSize: "14px"
     fontWeight: 500
     lineHeight: "20px"
+    letterSpacing: "-0.005em"
   eyebrow:
-    fontFamily: "Plus Jakarta Sans"
+    fontFamily: "Geist"
     fontSize: "12px"
     fontWeight: 500
     lineHeight: "16px"
-    letterSpacing: "0.15em"
+    letterSpacing: "0.06em"
     textTransform: "uppercase"
   eyebrow-sm:
-    fontFamily: "Plus Jakarta Sans"
+    fontFamily: "Geist"
     fontSize: "10px"
-    fontWeight: 500
+    fontWeight: 600
     lineHeight: "14px"
-    letterSpacing: "0.2em"
+    letterSpacing: "0.08em"
     textTransform: "uppercase"
 rounded:
   sm: "12px"
   md: "16px"
   lg: "24px"
-  xl: "24px"
+  xl: "32px"
   full: "9999px"
 spacing:
   base: "4px"
@@ -129,12 +133,12 @@ spacing:
   md: "12px"
   lg: "16px"
   xl: "20px"
-  gap: "12px"
+  gap: "16px"
   card-padding: "20px"
   section-padding: "16px"
 components:
   button-primary:
-    textColor: "#E2DCD0"
+    textColor: "#FFFFFF"
     typography: "{typography.label-md}"
     rounded: "{rounded.full}"
     padding: "0 20px"
@@ -271,65 +275,63 @@ code by the test; each role shows its worst allowed surface.
 <!-- contrast-table:start -->
 | Role | Use | Worst allowed surface | Contrast |
 |---|---|---|---|
-| text-charcoal / text-text-primary | text (≥ 4.5) | oat ground | 12.84:1 |
-| text-graphite / text-text-secondary | text (≥ 4.5) | oat ground | 9.33:1 |
-| text-muted / text-text-muted / text-text-hint | text (≥ 4.5) | oat ground | 6.07:1 |
-| text-text-faint | text (≥ 4.5) | ivory card (.surface, sheets) | 5.08:1 |
-| text-alert / text-red-ink | text (≥ 4.5) | oat ground | 4.89:1 |
-| text-warning / text-amber / text-yellow-ink | text (≥ 4.5) | oat ground | 4.96:1 |
-| .kcal / .macro-ink-kcal (persimmon ink) | text (≥ 4.5) | oat ground | 4.90:1 |
-| text-sage-ink / .macro-ink-carbs | text (≥ 4.5) | oat ground | 5.04:1 |
-| text-plum / .macro-ink-protein | text (≥ 4.5) | oat ground | 5.30:1 |
-| text-primary (olive as text) | text (≥ 4.5) | oat ground | 5.52:1 |
-| section hue: body | text (≥ 4.5) | oat ground | 4.82:1 |
-| section hue: foods | text (≥ 4.5) | oat ground | 5.12:1 |
-| section hue: coach | text (≥ 4.5) | oat ground | 5.30:1 |
-| section hue: settings | text (≥ 4.5) | oat ground | 6.07:1 |
-| section hue: today | text (≥ 4.5) | oat ground | 5.52:1 |
-| text-icon (line icons) | icon (≥ 3) | oat ground | 4.96:1 |
-| text-on-primary / text-on-selected | text (≥ 4.5) | olive fill (primary) | 5.15:1 |
-| text-on-olive on the olive fill | text (≥ 4.5) | olive fill (primary) | 5.15:1 |
-| text-on-olive-muted (glyphs only) | icon (≥ 3) | olive fill (primary) | 3.28:1 |
-| .matte text-charcoal | text (≥ 4.5) | .olive-panel in .matte | 13.61:1 |
-| .matte text-graphite | text (≥ 4.5) | .olive-panel in .matte | 10.91:1 |
-| .matte text-muted | text (≥ 4.5) | .olive-panel in .matte | 7.59:1 |
-| .matte text-text-faint | text (≥ 4.5) | .olive-panel in .matte | 6.26:1 |
-| .matte text-on-olive | text (≥ 4.5) | .olive-panel in .matte | 11.04:1 |
-| .matte .kcal / .macro-ink-kcal | text (≥ 4.5) | charcoal matte | 4.84:1 |
-| .matte .olive-panel .kcal | text (≥ 4.5) | .olive-panel in .matte | 6.86:1 |
-| .matte .macro-ink-protein | text (≥ 4.5) | .olive-panel in .matte | 7.03:1 |
-| .matte .macro-ink-carbs | text (≥ 4.5) | .olive-panel in .matte | 5.79:1 |
-| .matte .macro-ink-fat | text (≥ 4.5) | .olive-panel in .matte | 6.64:1 |
-| .matte text-icon | icon (≥ 3) | .olive-panel in .matte | 8.40:1 |
-| plan glyph ink: breakfast | icon (≥ 3) | plan header glyph | 5.20:1 |
-| plan glyph ink: lunch | icon (≥ 3) | plan header glyph | 5.15:1 |
-| plan glyph ink: dinner | icon (≥ 3) | plan header glyph | 4.55:1 |
-| plan glyph ink: snack | icon (≥ 3) | plan header glyph | 5.01:1 |
-| plan glyph ink: other | icon (≥ 3) | plan header glyph | 5.16:1 |
-| notice title (info / success) | text (≥ 4.5) | notice info / success | 5.89:1 |
-| notice body (graphite) | text (≥ 4.5) | notice error | 10.11:1 |
-| notice mark (tone ink) | icon (≥ 3) | notice error | 5.30:1 |
-| notice title (attention) | text (≥ 4.5) | notice attention | 5.84:1 |
-| notice title (error) | text (≥ 4.5) | notice error | 5.30:1 |
-| notice title (neutral) | text (≥ 4.5) | notice neutral | 14.67:1 |
-| neutral tag (text-graphite) | text (≥ 4.5) | neutral tag on coach bubble | 7.01:1 |
-| .matte neutral tag | text (≥ 4.5) | neutral tag in the matte | 9.72:1 |
+| text-charcoal / text-text-primary | text (≥ 4.5) | .olive-panel on ivory | 15.26:1 |
+| text-graphite / text-text-secondary | text (≥ 4.5) | .olive-panel on ivory | 11.00:1 |
+| text-muted / text-text-muted / text-text-hint | text (≥ 4.5) | .olive-panel on ivory | 5.87:1 |
+| text-text-faint | text (≥ 4.5) | field | 5.00:1 |
+| text-alert / text-red-ink | text (≥ 4.5) | .olive-panel on ivory | 5.31:1 |
+| text-warning / text-amber / text-yellow-ink | text (≥ 4.5) | .olive-panel on ivory | 5.53:1 |
+| .kcal / .macro-ink-kcal (tomato ink) | text (≥ 4.5) | .olive-panel on ivory | 4.86:1 |
+| text-sage-ink / .macro-ink-carbs | text (≥ 4.5) | .olive-panel on ivory | 4.83:1 |
+| text-plum / .macro-ink-protein | text (≥ 4.5) | .olive-panel on ivory | 5.47:1 |
+| text-primary (ink as text) | text (≥ 4.5) | .olive-panel on ivory | 15.26:1 |
+| section hue: body | text (≥ 4.5) | .olive-panel on ivory | 5.77:1 |
+| section hue: foods | text (≥ 4.5) | .olive-panel on ivory | 4.86:1 |
+| section hue: coach | text (≥ 4.5) | .olive-panel on ivory | 5.47:1 |
+| section hue: settings | text (≥ 4.5) | .olive-panel on ivory | 8.81:1 |
+| section hue: today | text (≥ 4.5) | .olive-panel on ivory | 15.26:1 |
+| text-icon (line icons) | icon (≥ 3) | .olive-panel on ivory | 7.19:1 |
+| text-on-primary / text-on-selected | text (≥ 4.5) | ink fill (primary) | 14.38:1 |
+| text-on-olive on the olive fill | text (≥ 4.5) | ink fill (primary) | 14.38:1 |
+| text-on-olive-muted (glyphs only) | icon (≥ 3) | ink fill (primary) | 5.67:1 |
+| .matte text-charcoal | text (≥ 4.5) | .olive-panel in .matte | 16.28:1 |
+| .matte text-graphite | text (≥ 4.5) | .olive-panel in .matte | 12.77:1 |
+| .matte text-muted | text (≥ 4.5) | .olive-panel in .matte | 7.05:1 |
+| .matte text-text-faint | text (≥ 4.5) | .olive-panel in .matte | 5.01:1 |
+| .matte text-on-olive | text (≥ 4.5) | .olive-panel in .matte | 16.28:1 |
+| .matte .kcal / .macro-ink-kcal | text (≥ 4.5) | charcoal matte | 5.57:1 |
+| .matte .olive-panel .kcal | text (≥ 4.5) | .olive-panel in .matte | 7.11:1 |
+| .matte .macro-ink-protein | text (≥ 4.5) | .olive-panel in .matte | 6.77:1 |
+| .matte .macro-ink-carbs | text (≥ 4.5) | .olive-panel in .matte | 6.10:1 |
+| .matte .macro-ink-fat | text (≥ 4.5) | .olive-panel in .matte | 8.85:1 |
+| .matte text-icon | icon (≥ 3) | .olive-panel in .matte | 8.17:1 |
+| plan glyph ink: breakfast | icon (≥ 3) | plan header glyph | 5.61:1 |
+| plan glyph ink: lunch | icon (≥ 3) | plan header glyph | 4.51:1 |
+| plan glyph ink: dinner | icon (≥ 3) | plan header glyph | 9.93:1 |
+| plan glyph ink: snack | icon (≥ 3) | plan header glyph | 4.78:1 |
+| plan glyph ink: other | icon (≥ 3) | plan header glyph | 4.94:1 |
+| notice title (info / success) | text (≥ 4.5) | notice info / success | 5.27:1 |
+| notice body (graphite) | text (≥ 4.5) | notice neutral | 11.19:1 |
+| notice mark (tone ink) | icon (≥ 3) | notice info / success | 5.27:1 |
+| notice title (attention) | text (≥ 4.5) | notice attention | 6.20:1 |
+| notice title (error) | text (≥ 4.5) | notice error | 5.58:1 |
+| notice title (neutral) | text (≥ 4.5) | notice neutral | 15.52:1 |
+| neutral tag (text-graphite) | text (≥ 4.5) | neutral tag on coach bubble | 9.54:1 |
+| .matte neutral tag | text (≥ 4.5) | neutral tag in the matte | 11.28:1 |
 
 | Forbidden pair | On | Contrast | Instead |
 |---|---|---|---|
-| text-on-olive (cream) | .olive-panel on ivory | 1.10:1 | the Settings protein card bug: cream on a 7 % tint; use ink (`text-charcoal`) |
-| text-on-olive (cream) | ivory card | 1.24:1 | cream is for the olive fill and the matte only |
-| text-on-olive-muted | olive fill (primary) | 3.28:1 | 3.3:1 — glyphs only, never words |
-| text-on-primary | ivory card | 1.24:1 | `text-on-primary` needs the olive fill under it (`btn-primary`, `bg-primary`, a lens) |
-| text-on-primary | beige recess (.well) | 1.09:1 | `text-on-primary` on a well or pill track |
-| gauge carbs (.macro-carbs) as text | ivory card | 2.37:1 | gauge hues are fills and dots; text uses `.macro-ink-*` |
-| gauge fat (.macro-fat, text-yellow) as text | ivory card | 2.07:1 | use `text-yellow-ink` or `.macro-ink-fat` |
-| gauge protein (.macro-protein) as text | charcoal matte | 3.87:1 | 3.9:1 inside the meal card; `.macro-ink-protein` uses the lighter end |
-| gauge calories as text | ivory card | 3.00:1 | use `.kcal` |
-| slate (text-tertiary, text-signal) | ivory card | 3.87:1 | a data accent, not text |
-| warm orange rim (text-orange-warm) | ivory card | 2.66:1 | rims only |
-| text-text-faint | oat ground | 3.89:1 | faint is for ivory and field |
-| text-text-faint | beige recess (.well) | 4.45:1 | faint is for ivory and field |
+| text-on-olive (cream) | .olive-panel on ivory | 1.13:1 | the Settings protein card bug: cream on a 7 % tint; use ink (`text-charcoal`) |
+| text-on-olive (cream) | white card | 1.00:1 | cream is for the olive fill and the matte only |
+| text-on-primary | white card | 1.00:1 | `text-on-primary` needs the olive fill under it (`btn-primary`, `bg-primary`, a lens) |
+| text-on-primary | tray (.well) | 1.18:1 | `text-on-primary` on a well or pill track |
+| gauge carbs (.macro-carbs) as text | white card | 2.55:1 | gauge hues are fills and dots; text uses `.macro-ink-*` |
+| gauge fat (.macro-fat, text-yellow) as text | white card | 1.76:1 | use `text-yellow-ink` or `.macro-ink-fat` |
+| gauge protein (.macro-protein) as text | charcoal matte | 4.32:1 | 3.9:1 inside the meal card; `.macro-ink-protein` uses the lighter end |
+| gauge calories as text | white card | 3.30:1 | use `.kcal` |
+| warm orange rim (text-orange-warm) | white card | 2.19:1 | rims only |
+| white on tomato fill (text) | tomato fill (log button) | 3.45:1 | 3.45:1: white rides tomato only as a glyph or 24 px+ figure; labels on tomato are ink (5.47:1) |
+| text-text-faint | tray (.well) | 4.41:1 | faint is for the white card and field |
 <!-- contrast-table:end -->
 
 ## Typography

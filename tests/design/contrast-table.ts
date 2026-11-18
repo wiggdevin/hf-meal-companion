@@ -124,15 +124,15 @@ const bandsOf = (meal: Rgb) => ivory.map((shade) => over(meal, BAND_ALPHA, shade
 const bands = Object.values(MEALS).flatMap(bandsOf);
 
 export const SURFACES: Surface[] = [
-  { id: "oat ground", scope: "light", shades: [token("paper"), token("background")] },
-  { id: "ivory card (.surface, sheets)", scope: "light", shades: ivory },
+  { id: "porcelain ground", scope: "light", shades: [token("paper"), token("background")] },
+  { id: "white card (.surface, sheets)", scope: "light", shades: ivory },
   { id: "lifted card (CardFrame raised)", scope: "light", shades: gradient("card") },
   { id: "inset card (nested .surface, CardFrame recess)", scope: "light", shades: gradient("card-inset") },
-  { id: "beige recess (.well, trays)", scope: "light", shades: [...gradient("recess"), token("fog")] },
+  { id: "tray (.well, trays)", scope: "light", shades: [...gradient("recess"), token("fog")] },
   { id: "field", scope: "light", shades: [token("field")] },
   { id: "sage wash", scope: "light", shades: [token("sage-wash")] },
-  { id: "Dijon wash", scope: "light", shades: [token("yellow-wash")] },
-  { id: "persimmon wash", scope: "light", shades: [token("orange-wash")] },
+  { id: "amber wash", scope: "light", shades: [token("yellow-wash")] },
+  { id: "tomato wash", scope: "light", shades: [token("orange-wash")] },
   { id: "red wash", scope: "light", shades: [token("red-wash")] },
   { id: ".olive-panel on ivory", scope: "light",
     shades: Object.values(SECTIONS).flatMap((hue) => ivory.map((shade) => over(hue, PANEL_ALPHA, shade))) },
@@ -141,7 +141,7 @@ export const SURFACES: Surface[] = [
   { id: "plan header glyph", scope: "light",
     shades: Object.values(MEALS).flatMap((meal) => bandsOf(meal).map((band) => over(meal, GLYPH_ALPHA, band))) },
   { id: ".matte-reset tray", scope: "light", shades: gradient("recess") },
-  { id: "olive fill (primary)", scope: "olive", shades: [...gradient("ink"), token("primary")] },
+  { id: "ink fill (primary)", scope: "olive", shades: [...gradient("ink"), token("primary")] },
   { id: "charcoal matte", scope: "matte", shades: [...matte, token("charcoal")] },
   { id: "ink inset (a card inside CardFrame ink)", scope: "matte", shades: gradient("card-ink-inset") },
   { id: ".olive-panel in .matte", scope: "matte",
@@ -163,10 +163,10 @@ export const ROLES: Role[] = [
   { id: "text-text-faint", use: "text", color: token("text-faint"), scope: "light" },
   { id: "text-alert / text-red-ink", use: "text", color: token("alert"), scope: "light" },
   { id: "text-warning / text-amber / text-yellow-ink", use: "text", color: token("yellow-ink"), scope: "light" },
-  { id: ".kcal / .macro-ink-kcal (persimmon ink)", use: "text", color: token("orange-ink"), scope: "light" },
+  { id: ".kcal / .macro-ink-kcal (tomato ink)", use: "text", color: token("orange-ink"), scope: "light" },
   { id: "text-sage-ink / .macro-ink-carbs", use: "text", color: token("sage-ink"), scope: "light" },
   { id: "text-plum / .macro-ink-protein", use: "text", color: token("plum"), scope: "light" },
-  { id: "text-primary (olive as text)", use: "text", color: token("primary"), scope: "light" },
+  { id: "text-primary (ink as text)", use: "text", color: token("primary"), scope: "light" },
   ...sectionRoles("text"),
   { id: "text-icon (line icons)", use: "icon", color: token("icon"), scope: "light" },
   // On the olive fill
@@ -179,9 +179,9 @@ export const ROLES: Role[] = [
   { id: ".matte text-muted", use: "text", color: token("muted", MATTE), scope: "matte" },
   { id: ".matte text-text-faint", use: "text", color: token("text-faint", MATTE), scope: "matte" },
   { id: ".matte text-on-olive", use: "text", color: token("on-olive", MATTE), scope: "matte" },
-  { id: ".matte .kcal / .macro-ink-kcal", use: "text", color: token("gauge-calories"), scope: "matte" },
+  { id: ".matte .kcal / .macro-ink-kcal", use: "text", color: token("kcal-on-ink"), scope: "matte" },
   { id: ".matte .olive-panel .kcal", use: "text", color: token("gauge-calories-end"), scope: "matte" },
-  { id: ".matte .macro-ink-protein", use: "text", color: token("gauge-protein-end"), scope: "matte" },
+  { id: ".matte .macro-ink-protein", use: "text", color: token("protein-on-ink"), scope: "matte" },
   { id: ".matte .macro-ink-carbs", use: "text", color: token("gauge-carbs"), scope: "matte" },
   { id: ".matte .macro-ink-fat", use: "text", color: token("gauge-fat"), scope: "matte" },
   { id: ".matte text-icon", use: "icon", color: token("icon", MATTE), scope: "matte" },
@@ -189,7 +189,7 @@ export const ROLES: Role[] = [
 
 /** A light role that is only for some light surfaces (DESIGN.md §Colors: faint is for ivory). */
 const ONLY_ON: Record<string, string[]> = {
-  "text-text-faint": ["ivory card (.surface, sheets)", "field"],
+  "text-text-faint": ["white card (.surface, sheets)", "field"],
   ".matte .kcal / .macro-ink-kcal": ["charcoal matte", "ink inset (a card inside CardFrame ink)"],
   ".matte .olive-panel .kcal": [".olive-panel in .matte"],
 };
@@ -249,7 +249,7 @@ const BUBBLE_ALPHAS = Array.from(/--grad-bubble:([^;]*);/.exec(GLOBALS_CSS)![1]
 
 /**
  * The neutral Tag: graphite text on its own ink wash over whatever card it sits on. It carries the AI
- * label (components/ui/AiLabel.tsx) on ivory cards, beige trays, the field, the oat ground, the
+ * label (components/ui/AiLabel.tsx) on white cards, beige trays, the field, the oat ground, the
  * coach's tinted bubble (any section hue) and inside the matte, where both roles turn cream.
  */
 export function tagPairs(): Pair[] {
@@ -257,8 +257,8 @@ export function tagPairs(): Pair[] {
   const bubble = Object.values(SECTIONS).flatMap((hue) => BUBBLE_ALPHAS.flatMap((alpha) =>
     [...ivory, ...ground].map((shade) => over(hue, alpha, shade))));
   const light: [string, Rgb[]][] = [
-    ["ivory card", ivory], ["beige recess", [...gradient("recess"), token("fog")]], ["field", [token("field")]],
-    ["oat ground", ground], ["coach bubble", bubble],
+    ["white card", ivory], ["tray", [...gradient("recess"), token("fog")]], ["field", [token("field")]],
+    ["porcelain ground", ground], ["coach bubble", bubble],
   ];
   const wash = (ink: Rgb, shades: Rgb[]) => shades.map((shade) => over(ink, TAG_WASH, shade));
   return [
@@ -278,24 +278,22 @@ export function forbiddenPairs(): Pair[] {
   const rows: [string, string, Use, Rgb, Rgb[], string][] = [
     ["text-on-olive (cream)", ".olive-panel on ivory", "text", token("on-olive"), panel,
       "the Settings protein card bug: cream on a 7 % tint; use ink (`text-charcoal`)"],
-    ["text-on-olive (cream)", "ivory card", "text", token("on-olive"), ivory, "cream is for the olive fill and the matte only"],
-    ["text-on-olive-muted", "olive fill (primary)", "text", token("on-olive-muted"), gradient("ink"),
-      "3.3:1 — glyphs only, never words"],
-    ["text-on-primary", "ivory card", "text", token("on-primary"), ivory,
+    ["text-on-olive (cream)", "white card", "text", token("on-olive"), ivory, "cream is for the olive fill and the matte only"],
+    ["text-on-primary", "white card", "text", token("on-primary"), ivory,
       "`text-on-primary` needs the olive fill under it (`btn-primary`, `bg-primary`, a lens)"],
-    ["text-on-primary", "beige recess (.well)", "text", token("on-primary"), gradient("recess"),
+    ["text-on-primary", "tray (.well)", "text", token("on-primary"), gradient("recess"),
       "`text-on-primary` on a well or pill track"],
-    ["gauge carbs (.macro-carbs) as text", "ivory card", "text", token("gauge-carbs"), ivory,
+    ["gauge carbs (.macro-carbs) as text", "white card", "text", token("gauge-carbs"), ivory,
       "gauge hues are fills and dots; text uses `.macro-ink-*`"],
-    ["gauge fat (.macro-fat, text-yellow) as text", "ivory card", "text", token("gauge-fat"), ivory,
+    ["gauge fat (.macro-fat, text-yellow) as text", "white card", "text", token("gauge-fat"), ivory,
       "use `text-yellow-ink` or `.macro-ink-fat`"],
     ["gauge protein (.macro-protein) as text", "charcoal matte", "text", token("gauge-protein"), matte,
       "3.9:1 inside the meal card; `.macro-ink-protein` uses the lighter end"],
-    ["gauge calories as text", "ivory card", "text", token("gauge-calories"), ivory, "use `.kcal`"],
-    ["slate (text-tertiary, text-signal)", "ivory card", "text", token("tertiary"), ivory, "a data accent, not text"],
-    ["warm orange rim (text-orange-warm)", "ivory card", "text", token("orange-warm"), ivory, "rims only"],
-    ["text-text-faint", "oat ground", "text", token("text-faint"), [token("paper")], "faint is for ivory and field"],
-    ["text-text-faint", "beige recess (.well)", "text", token("text-faint"), [token("fog")], "faint is for ivory and field"],
+    ["gauge calories as text", "white card", "text", token("gauge-calories"), ivory, "use `.kcal`"],
+    ["warm orange rim (text-orange-warm)", "white card", "text", token("orange-warm"), ivory, "rims only"],
+    ["white on tomato fill (text)", "tomato fill (log button)", "text", WHITE, [token("accent"), token("gauge-calories")],
+      "3.45:1: white rides tomato only as a glyph or 24 px+ figure; labels on tomato are ink (5.47:1)"],
+    ["text-text-faint", "tray (.well)", "text", token("text-faint"), [token("fog")], "faint is for the white card and field"],
   ];
   return rows.map(([role, surface, use, color, shades, why]) =>
     ({ role, surface, use, ratio: worst(color, shades), allowed: false, why }));
