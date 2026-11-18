@@ -138,7 +138,8 @@ describe("a no-cook wish on a brand-new open account", () => {
       openPorts());
     expect(cards).toHaveLength(0);
     const { message } = JSON.parse(JSON.stringify(cards)) as { message?: string };
-    expect(message).toMatch(/name a food you eat as it is/i);
+    expect(message).toMatch(/name a food you eat just as it is/i);
+    expect(message).not.toMatch(/yogurt|fruit/i);
     expect(message).not.toMatch(/don't have an honest no-cook option/i);
   });
 });
