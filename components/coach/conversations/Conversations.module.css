@@ -57,9 +57,9 @@
   background: var(--grad-sheet);
   touch-action: pan-y;
 }
-/* The chat on screen now: the section hue, faintly. */
+/* The chat on screen now: an ink wash, faintly (never a hue: HF keeps teal for links and the logo). */
 .face[data-current="true"] {
-  background: linear-gradient(rgb(var(--section-rgb) / 0.08), rgb(var(--section-rgb) / 0.08)), var(--grad-sheet);
+  background: linear-gradient(rgb(var(--ink-rgb) / 0.05), rgb(var(--ink-rgb) / 0.05)), var(--grad-sheet);
 }
 
 .open {
@@ -76,7 +76,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 .open:disabled { opacity: 0.4; }
-/* The one picked in "Ask from history": the olive wash and an olive edge. */
+/* The one picked in "Ask from history": an ink wash and an ink edge. */
 .open[data-selected="true"] {
   background: rgb(var(--primary-rgb) / 0.1);
   box-shadow: inset 3px 0 0 rgb(var(--primary-rgb));

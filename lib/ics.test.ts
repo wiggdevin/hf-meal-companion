@@ -37,8 +37,8 @@ describe("generateMealPlanIcs", () => {
     expect(ics.trimEnd().endsWith("END:VCALENDAR")).toBe(true);
     expect(ics).toContain("VERSION:2.0");
     expect(ics).toContain("CALSCALE:GREGORIAN");
-    expect(ics).toContain("PRODID:-//Sasha//meal-plan//EN");
-    expect(ics).toContain("X-WR-CALNAME:Sasha Meals");
+    expect(ics).toContain("PRODID:-//High Frequency//meal-plan//EN");
+    expect(ics).toContain("X-WR-CALNAME:High Frequency Meals");
   });
 
   it("uses CRLF line endings exclusively", () => {

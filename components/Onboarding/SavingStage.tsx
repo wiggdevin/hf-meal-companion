@@ -20,7 +20,7 @@ export default function SavingStage({ title, step }: { title: string; step: stri
     initial={reduce ? false : { opacity: 0 }} animate={{ opacity: 1 }}
     transition={reduce ? INSTANT : SPRINGS.smooth}>
     {COMPANION_UI_ENABLED && <SproutGuide pose="thinking" line="Sprout is working on it." size={140} />}
-    <p className="m-0 text-center font-serif text-heading text-charcoal">{title}</p>
+    <p className="m-0 text-center font-display text-heading text-charcoal">{title}</p>
     <p className="m-0 text-center text-body text-graphite">{step}</p>
     <span className="mt-2 flex gap-1.5" aria-hidden="true">
       {[0, 1, 2].map((index) => <motion.span key={index}

@@ -218,7 +218,7 @@ describe("coach shell attachment state", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Attach photo" }));
 
-    expect(await screen.findByText("That is enough turns with Sasha for now. Try again in 2 minutes."))
+    expect(await screen.findByText("That is enough turns with High Frequency for now. Try again in 2 minutes."))
       .toBeTruthy();
   });
 });

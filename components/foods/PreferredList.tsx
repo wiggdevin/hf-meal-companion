@@ -37,7 +37,7 @@ export default function PreferredList({ foods, pilot, isStarred, renderRow, onAd
       meta={foods.length === 0 ? "Nothing here yet." : `${foods.length} ${foods.length === 1 ? "food" : "foods"}`}>
       {groups.map((group) => (
         <div key={group.aisle} className="flex min-w-0 flex-col" data-aisle={group.aisle}>
-          <h3 className="m-0 pt-2 text-overline text-muted">{group.label}</h3>
+          <h3 className="m-0 pt-2 text-overline uppercase text-muted">{group.label}</h3>
           <CappedList items={group.items} keyOf={(food) => food.id} divided label={`${group.label} foods`}
             render={renderRow} />
         </div>

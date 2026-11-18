@@ -21,9 +21,9 @@ describe("OnboardingDock", () => {
   });
 
   it("mic mode: one labelled answer field and a record control, nothing else", () => {
-    render(<OnboardingDock mode="mic" reduce={false} value="" placeholder="Tell Sasha" onMicTap={vi.fn()} />);
-    // Sol review: this is an answer to Sasha's question, not a search — no search/searchbox role.
-    screen.getByRole("textbox", { name: "Tell Sasha" });
+    render(<OnboardingDock mode="mic" reduce={false} value="" placeholder="Tell High Frequency" onMicTap={vi.fn()} />);
+    // Sol review: this is an answer to High Frequency's question, not a search — no search/searchbox role.
+    screen.getByRole("textbox", { name: "Tell High Frequency" });
     expect(screen.queryByRole("searchbox")).toBeNull();
     screen.getByRole("button", { name: "Record" });
     expect(screen.queryByRole("group")).toBeNull();

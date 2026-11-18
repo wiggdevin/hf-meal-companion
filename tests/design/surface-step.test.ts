@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { GROUNDS } from "@/lib/design/grounds";
-import { contrast, gradient, GLOBALS_CSS, hexToRgb, over, PANEL_ALPHA, ROOT, SECTIONS, type Rgb } from "./contrast-table";
+import { contrast, gradient, GLOBALS_CSS, hexToRgb, over, PANEL_ALPHA, ROOT, SECTIONS, token, type Rgb } from "./contrast-table";
 
 /**
  * The contrast step (UI makeover §3, DESIGN.md §Elevation): a surface on another surface differs
@@ -20,10 +20,12 @@ const INK_INSET = gradient("card-ink-inset");
 const worst = (top: Rgb[], under: Rgb[]) => Math.min(...top.flatMap((a) => under.map((b) => contrast(a, b))));
 
 describe("the contrast step between surfaces", () => {
-  it("the lifted card steps off every ground at every stop", () => {
+  it("the lifted card steps off every tinted ground at every stop; on pure white its hairline does it", () => {
     for (const ground of GROUNDS) {
+      if (ground.base.toLowerCase() === "#ffffff") continue; // white on white: the border carries the edge
       expect(worst(CARD, [hexToRgb(ground.base)]), ground.id).toBeGreaterThanOrEqual(STEP);
     }
+    expect(contrast(token("border"), hexToRgb("#ffffff"))).toBeGreaterThanOrEqual(1.2);
   });
 
   it("the inset steps off the card, and the card steps off the inset", () => {

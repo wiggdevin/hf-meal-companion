@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Button from "@/components/ui/Button";
+import CardFrame from "@/components/ui/CardFrame";
 import Notice from "@/components/ui/Notice";
 import { currentAccountOrNull, isCurrent } from "@/lib/device/account";
 import { readAccountItem, writeAccountItem } from "@/lib/device/account-storage";
@@ -56,8 +57,7 @@ export default function OpenWorldInvitation() {
   }
 
   return (
-    <section aria-label="Open food list" className="flex flex-col gap-3 rounded-2xl p-4 olive-panel">
-      <h2 className="font-display m-0 text-heading-sm leading-heading-sm text-charcoal">See more food ideas</h2>
+    <CardFrame as="section" tone="ink" size="lg" aria-label="Open food list" title="See more food ideas">
       <p className="m-0 text-caption text-charcoal">
         Your Favored foods rank first and anything on Avoid stays out. The open food list adds more
         foods to your day. You can turn it off in Settings.
@@ -67,6 +67,6 @@ export default function OpenWorldInvitation() {
         <Button variant="tertiary" disabled={busy} onClick={dismiss}>Not now</Button>
       </div>
       {message && <Notice tone="attention" title={message} />}
-    </section>
+    </CardFrame>
   );
 }

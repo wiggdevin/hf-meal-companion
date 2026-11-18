@@ -65,20 +65,20 @@ function coachScreen(coach: boolean): string {
 describe("the coach-unavailable card", () => {
   it("says so once, with no retry button to press in vain", () => {
     const markup = coachScreen(false);
-    expect(markup).toContain("Sasha is unavailable right now. Try again in a minute.");
+    expect(markup).toContain("High Frequency is unavailable right now. Try again in a minute.");
     expect(markup).toContain('role="status"');
     expect(markup).not.toContain("Retry loading");
   });
 
   it("gives way to the conversation once the coach is available", () => {
     const markup = coachScreen(true);
-    expect(markup).not.toContain("Sasha is unavailable right now");
+    expect(markup).not.toContain("High Frequency is unavailable right now");
     expect(markup).toContain("Loading your conversation…");
   });
 });
 
 /* The sentence `lib/server/coach-turn/model-loop.ts` sends when generation fails, verbatim. */
-const TURN_FAILED = "Sasha is unavailable right now. Try again in a minute.";
+const TURN_FAILED = "High Frequency is unavailable right now. Try again in a minute.";
 
 /** The notice CoachShell renders in its transcript footer after a failed turn. */
 function turnFailed(retryable = true): string {

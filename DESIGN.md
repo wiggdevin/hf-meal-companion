@@ -1,120 +1,124 @@
 ---
 version: "alpha"
-name: "Sasha Meal Companion"
-description: "Phone-first nutrition PWA for multiple accounts, each with a plan derived from that account's foods, preferences, and targets. Porcelain (2026-11-17, docs spec 2026-11-17-sasha-rebrand-spec): a cool porcelain ground with no grain, pure white cards with hairline edges, white meal cards with true-colour food photography, near-black ink for text and every action (ink pill buttons, ink dock), one tomato accent for calories and the brand mark, Newsreader for the one state sentence per screen over Geist with tabular figures, and fixed macro data hues (iris, mint, amber, sky). App-owned identity; never reuse elsewhere."
+name: "High Frequency Meal Companion"
+description: "Phone-first nutrition PWA for multiple accounts, each with a plan derived from that account's foods, preferences, and targets. High Frequency (2026-11-18): Devin's approved HF app mockup (brand v2, Patchwork H). Pure white and black grounds only, white cards with a neutral hairline and a very soft shadow, basalt black hero surfaces (the dock, the Today hero card), flat ink for every action, clay as the warm accent, teal only for the logo piece, the protein bar, small link text and focus rings, Archivo display over Inter with tabular figures and Instrument Serif italic as the accent word. No green, no purple, no brown, oat or beige."
 colors:
-  primary: "#111110"
-  secondary: "#E9E9E5"
-  tertiary: "#2F5BC4"
-  neutral: "#F2F2EF"
-  background: "#F2F2EF"
+  primary: "#141A19"
+  secondary: "#F2F2F0"
+  tertiary: "#1C716E"
+  neutral: "#FFFFFF"
+  background: "#FFFFFF"
   surface: "#FFFFFF"
-  text-primary: "#111110"
-  text-secondary: "#2E2E2B"
-  text-muted: "#575752"
-  text-faint: "#6B6B65"
-  border: "#E3E3DE"
-  accent: "#F2542D"
-  olive-deep: "#050505"
-  olive-shell-top: "#2A2A28"
-  olive-shell-bottom: "#111110"
-  charcoal: "#161615"
-  charcoal-deep: "#111110"
-  ink-button-top: "#2A2A28"
-  ink-button-bottom: "#111110"
-  gauge-calories: "#F2542D"
-  gauge-calories-end: "#F7906F"
-  gauge-protein: "#7B6CF6"
-  gauge-protein-end: "#B3AAFA"
-  gauge-carbs: "#34B37A"
-  gauge-carbs-end: "#8ED6B2"
-  gauge-fat: "#F2B527"
-  gauge-fat-end: "#F8D57A"
-  gauge-water: "#3B9BEA"
-  gauge-water-end: "#93C7F4"
-  yellow: "#F2B527"
-  yellow-ink: "#7A5300"
-  yellow-wash: "#FDF3DA"
-  orange: "#F2542D"
-  orange-ink: "#B3380F"
-  orange-wash: "#FDECE6"
-  orange-warm: "#F7906F"
-  sage: "#34B37A"
-  sage-ink: "#1D7148"
-  sage-wash: "#E5F4EB"
-  field: "#F7F7F5"
-  red: "#E5372B"
-  red-ink: "#B42318"
-  red-wash: "#FCE8E6"
+  text-primary: "#141A19"
+  text-secondary: "#3A403E"
+  text-muted: "#5B5F5B"
+  text-faint: "#6A6E6A"
+  border: "#E6E6E3"
+  accent: "#B5562F"
+  clay: "#B5562F"
+  clay-300: "#E3A383"
+  clay-100: "#F4E1D5"
+  link: "#1C716E"
+  olive-deep: "#0B0F0E"
+  olive-shell-top: "#141A19"
+  olive-shell-bottom: "#141A19"
+  charcoal: "#141A19"
+  charcoal-deep: "#0F1413"
+  ink-button-top: "#141A19"
+  ink-button-bottom: "#141A19"
+  gauge-calories: "#141A19"
+  gauge-calories-end: "#141A19"
+  gauge-protein: "#3DB8B4"
+  gauge-protein-end: "#72CCC7"
+  gauge-carbs: "#E3A383"
+  gauge-carbs-end: "#F0C7B0"
+  gauge-fat: "#9AA19C"
+  gauge-fat-end: "#C9CCC6"
+  gauge-water: "#5F86A3"
+  gauge-water-end: "#A9C2D3"
+  yellow: "#D9A23A"
+  yellow-ink: "#8A5A0B"
+  yellow-wash: "#FBF0D9"
+  orange: "#B5562F"
+  orange-ink: "#8E3F1F"
+  orange-wash: "#F4E1D5"
+  orange-warm: "#E3A383"
+  sage: "#141A19"
+  sage-ink: "#1C716E"
+  sage-wash: "#F2F2F0"
+  field: "#F6F6F4"
+  red: "#C4342B"
+  red-ink: "#B3261E"
+  red-wash: "#FBE9E7"
   on-olive: "#FFFFFF"
-  on-olive-muted: "#A3A39D"
-  on-charcoal: "#111110"
-  kcal-on-ink: "#F4673F"
-  protein-on-ink: "#A69CF8"
-  on-charcoal-muted: "#575752"
+  on-olive-muted: "#9AA19C"
+  on-charcoal: "#141A19"
+  kcal-on-ink: "#E3A383"
+  protein-on-ink: "#52C0BC"
+  on-charcoal-muted: "#5B5F5B"
 typography:
   display-lg:
-    fontFamily: "Newsreader"
+    fontFamily: "Archivo"
     fontSize: "64px"
-    fontWeight: 400
+    fontWeight: 600
     lineHeight: "64px"
-    letterSpacing: "-0.025em"
-  display-md:
-    fontFamily: "Newsreader"
-    fontSize: "40px"
-    fontWeight: 400
-    lineHeight: "44px"
-    letterSpacing: "-0.02em"
-  heading-sm:
-    fontFamily: "Newsreader"
-    fontSize: "20px"
-    fontWeight: 500
-    lineHeight: "26px"
-    letterSpacing: "-0.01em"
-  numeral-xl:
-    fontFamily: "Geist"
-    fontSize: "48px"
-    fontWeight: 300
-    lineHeight: "48px"
-    letterSpacing: "-0.04em"
-  numeral-lg:
-    fontFamily: "Geist"
-    fontSize: "32px"
-    fontWeight: 400
-    lineHeight: "36px"
     letterSpacing: "-0.03em"
+  display-md:
+    fontFamily: "Archivo"
+    fontSize: "40px"
+    fontWeight: 600
+    lineHeight: "44px"
+    letterSpacing: "-0.025em"
+  heading-sm:
+    fontFamily: "Archivo"
+    fontSize: "20px"
+    fontWeight: 600
+    lineHeight: "26px"
+    letterSpacing: "-0.015em"
+  numeral-xl:
+    fontFamily: "Archivo"
+    fontSize: "48px"
+    fontWeight: 600
+    lineHeight: "48px"
+    letterSpacing: "-0.03em"
+  numeral-lg:
+    fontFamily: "Archivo"
+    fontSize: "32px"
+    fontWeight: 600
+    lineHeight: "36px"
+    letterSpacing: "-0.025em"
   numeral-md:
-    fontFamily: "Geist"
+    fontFamily: "Archivo"
     fontSize: "24px"
-    fontWeight: 500
+    fontWeight: 600
     lineHeight: "28px"
-    letterSpacing: "-0.02em"
+    letterSpacing: "-0.015em"
   body-md:
-    fontFamily: "Geist"
+    fontFamily: "Inter"
     fontSize: "14px"
     fontWeight: 400
     lineHeight: "22px"
     letterSpacing: "-0.005em"
   body-sm:
-    fontFamily: "Geist"
+    fontFamily: "Inter"
     fontSize: "12px"
     fontWeight: 400
     lineHeight: "18px"
   label-md:
-    fontFamily: "Geist"
+    fontFamily: "Inter"
     fontSize: "14px"
     fontWeight: 500
     lineHeight: "20px"
     letterSpacing: "-0.005em"
   eyebrow:
-    fontFamily: "Geist"
+    fontFamily: "Inter"
     fontSize: "12px"
-    fontWeight: 500
+    fontWeight: 600
     lineHeight: "16px"
-    letterSpacing: "0.06em"
+    letterSpacing: "0.12em"
     textTransform: "uppercase"
   eyebrow-sm:
-    fontFamily: "Geist"
+    fontFamily: "Inter"
     fontSize: "10px"
     fontWeight: 600
     lineHeight: "14px"
@@ -156,91 +160,89 @@ components:
 ---
 ## Overview
 
-Brand (2026-11-17, Porcelain): the Steam bowl retired. The mark is an ink tile with a white Newsreader italic "s" and a tomato diamond; the wordmark is "Sasha" in Newsreader 500, outlined to paths, with the same diamond. Earlier (2026-10-10) the logo was **Steam**: an olive bowl with a geometric S rising as steam and a persimmon diamond. The logo system, brand book (voice, imagery, iconography), named motion moments and the 31 ship rules live in `docs/design/brand/`; logo files in `public/brand/`.
+**High Frequency (2026-11-18, current).** The app is High Frequency Meal Companion, built from Devin's
+approved HF mockup (`/Users/zero-suminc./projects/clients/high-frequency-app/high-frequency-refined/client-facing/brand-v2/`,
+`app/png/*.png`, `app/app.css`). The tagline is "Fuel for the work." The look is a white page, white
+premium cards with a hairline, one black hero object per screen, and food photography as the only
+large colour. It is a 390 px phone app first.
 
-**Porcelain (2026-11-17, current).** A white-and-ink clinical-luxury system with one warm accent:
-a cool porcelain ground (`#F2F2EF`) with no grain, white cards and white meal cards with an 8 % ink
-hairline, near-black ink (`#111110`) for text and for every action (ink pill buttons, the ink dock
-with a white active-tab capsule), food photography as the only large colour, and tomato (`#F2542D`)
-reserved for calories, the brand mark and the log action. Newsreader carries the one state sentence
-per screen; Geist carries everything else and every number, with tabular figures. Macro hues are
-fixed data colours (protein iris, carbs mint, fat amber, water sky), used as fills and dots, never as
-headings. Token names are unchanged from Harvest; only their values moved. The Harvest prose below
-is history: where it names oat, olive, charcoal meal cards, beige trays or Fraunces, read Porcelain's
-ground, ink, white card, inset tray and Newsreader.
+- **Pages are pure white `#FFFFFF` or pure black `#000000`**, never a tint: no grey, oat, porcelain,
+  beige or brown ground. Settings › Background offers exactly these two (§Techniques, Grounds).
+- **Black is for hero surfaces:** the dock, the Today hero card (`CardFrame tone="ink"`), the meal
+  card's macro panel and the hero area of a sheet. The matte is basalt `#1C2220 → #141917`, flat.
+- **Cards on white are white** with an `#E6E6E3` hairline and a soft shadow; recessed tiles are
+  `#F2F2F0`.
+- **Ink `#141A19` is the action colour:** text, primary buttons (ink pills) and the active-tab capsule.
+  On a black page the primary pill turns bone `#F2EDE4` with ink text.
+- **Teal is the logo and the protein hue.** Fills and dots use `#3DB8B4`. Teal *text* is `#1C716E` on
+  white (`text-link`, `--color-link`) and `#52C0BC` on black. Teal never washes a whole surface.
+- **Clay `#B5562F`** (clay-300 `#E3A383`, clay-100 `#F4E1D5`) is the single warm accent: calorie
+  figures (`.kcal`, ink `#8E3F1F` on white, `#E3A383` on black), the carbs bar, the logo's second
+  stroke, an accent mark. **Bone `#F2EDE4`** is the light content on black. **Ash `#9AA19C`** is fat
+  and muted content on black.
+- **Macro hues are fixed data colours:** calories ink (bone on black), protein teal, carbs clay-300,
+  fat ash, water slate blue `#5F86A3`. Fills and dots, never headings. **No green and no purple
+  anywhere**; warning is amber ink `#8A5A0B`, danger is `#B3261E`.
+- **Type:** Archivo (display and every numeral, tight tracking, tabular figures), Inter (body,
+  labels), Instrument Serif italic (a rare accent, `.font-accent`). Loaded with `next/font/local` from
+  `app/fonts/`; the CSS variable names (`--font-display-face`, `--font-text-face`,
+  `--font-accent-face`) are unchanged.
+- **Mark:** the Patchwork H (`public/brand/hf-*.svg`, `components/brand/HfLogo.tsx`): ink, teal and
+  clay strokes on light; bone, teal and clay on dark. The coach mark is the HF monogram
+  (`components/coach/SashaMark.tsx`, name kept). App icons and the favicon come from the HF set.
 
-Meal Companion looks like a good restaurant menu, not a cockpit (the "Harvest" theme, 2026-10-01,
-branch `feat/nutrition-look`, from the owner's Premium Meal Card reference: "use this as inspiration").
-It follows "Fresh" (the same day's first pass) and replaces "Motion" (black ground, liquid glass,
-phosphor glow). An oat stone ground with a faint matte grain, ivory cards, and one hero object — the
-meal card — in matte charcoal with true-colour food photography, a cream serif title, an olive macro
-panel and a beige tray. Olive is the only action colour. Nothing glows. (The Day card's glowing macro
-spheres, the one exception from 2026-10-01, were retired on 2026-10-05 for the ledger.)
+Token names are unchanged from Harvest and Porcelain; only their values moved (`paper`, `fog`,
+`graphite`, `charcoal`, `muted`, `tangerine`, `plum`, `amber`...). The older prose below is history:
+where it names oat, olive, ivory, beige trays, cream, Fraunces, Newsreader, Geist or Plus Jakarta
+Sans, read the High Frequency white ground, ink, white card, recess tile, bone-on-black and Archivo
+and Inter.
 
 - **Composition cues:** Layout: single column, phone-first · Content width: 390 px with 16 px gutters ·
-  Framing: ivory cards and charcoal meal cards on an oat ground · Grid: 4 px rhythm.
-
-**Bold (2026-10-19, the owner's pick in the UI makeover: "Bold & modern").** The same Harvest family,
-turned up: darker ink, brighter cards on a slightly deeper ground, firmer card drops and crisper
-hairlines, punchier macro and status hues, bigger figures (the `numeral-*` roles) and an ink hero
-card (`CardFrame tone="ink"`). Everything moved through tokens and roles; no component changed a
-class to get it. Every contrast pair was recomputed and none was loosened (§Contrast).
+  Framing: white cards and black hero surfaces on a white ground · Grid: 4 px rhythm.
 
 ## Colors
 
-Ground oat `#DCD7CB` with a static matte grain (3 %). Cards ivory `#FEFDF9 → #F9F6EE`; trays and wells
-beige `#EAE5D9`. Text on light is warm ink (Bold, 2026-10-19: one step darker): `#141413` primary,
-`#302F2B` secondary, `#4D4B45` muted (≥ 6:1 on the ground), `#6A685F` faint (on ivory only). Line
-icons `#5A5851`. Hairlines are ink at 12–16 % (a card's edge 14 %, a nested card's 16 %).
+Ground white `#FFFFFF` (or black `#000000`, §Techniques). Cards white with an `#E6E6E3` hairline;
+recessed tiles, trays, wells and insets `#F2F2F0`; fields `#F6F6F4`. Text on light is ink: `#141A19`
+primary, `#3A403E` secondary, `#5B5F5B` muted, `#6A6E6A` faint (on a white card or field only).
+Hairlines are ink at 10 %.
 
-**Matte charcoal** `#1D1D1C` (with the same grain) is for the meal card, the dock and the ink hero card
-(`CardFrame tone="ink"`, §Elevation). Inside it, text is cream: `#F7F3EA` titles, `#E2DCD0` values,
-`#BAB8B0` body, `#C2C2B8` labels — the `.matte`
-scope in `app/globals.css` remaps the text tokens so components keep their class names.
+**Matte black** (basalt `#1C2220 → #141917`, flat, no grain) is for the dock, the Today hero card
+(`CardFrame tone="ink"`), the meal card's macro panel and a sheet's hero area (§Elevation). Inside it,
+text is bone `#F2EDE4` for titles and values, `#D9D4CA` secondary, `#9AA19C` muted; the `.matte` scope
+in `app/globals.css` remaps the text tokens so components keep their class names. A hairline on it is
+white at 12 %.
 
-**Primary** olive `#4F5343` (`--grad-ink` `#565B49 → #474B3C`) with cream `#E2DCD0` content and the
-reference's inset bevel (white 10 % above, black 20 % below): every main action, the dock's active
-lens, chosen chips, the user's chat bubble and the eaten tick. Secondary actions are pills with a faint
-ink tint and a hairline (§Buttons); tertiary actions are beige. Slate `#5B7F99` is a data accent only.
+**Primary** ink `#141A19` (`--grad-ink`, flat) with white content: every main action, the dock's
+active capsule, chosen chips and the user's chat bubble. Secondary actions are pills with a faint ink
+tint and a hairline (§Buttons); tertiary actions are recess. On a black ground the primary fill turns
+bone with ink text (`html[data-ground="black"]`); the black hero surfaces keep their ink fill there.
 
-**Section hue** (`--section-rgb`, from `components/SectionHue.tsx`): Today olive `#4F5343`, Body
-slate-teal `#3F5F65`, Foods brick `#86423A`, Coach plum `#5E4888`, Settings stone `#4D4B45` (each a step
-deeper in Bold, so it holds 4.5:1 on the deeper oat). It colours
-section headings, the eaten tint and the coach's bubble tint.
+**Teal** `#3DB8B4` (fill and dot; protein), link text `#1C716E` on white and `#52C0BC` on black.
+**Clay** `#B5562F` (300 `#E3A383`, 100 `#F4E1D5`, ink `#8E3F1F`) is the accent and the calorie figure.
+**Danger** `#B3261E` (wash `#FBE9E7`) is alerts, errors and live only. **Amber** `#D9A23A` (ink
+`#8A5A0B`, wash `#FBF0D9`) marks pending and "needs a look". No green, no purple, no brown.
 
-Gauges, fixed per macro, in the same hue families and punchier since Bold (2026-10-19): **calories**
-persimmon `#E8662E → #F09A6E`, **protein** plum `#8C6CC8 → #BBA8E0`, **carbs** sage `#86AC5C → #B2D08F`,
-**fat** Dijon `#DCA22A → #EDC867`, **water** slate `#4E9CC4 → #94C6DE`. A gauge hue is for arcs, bars
-and dots; small text stays ink or cream.
+**Section hue** (`--section-rgb`, from `components/SectionHue.tsx`) colours section headings, the eaten
+tint and the coach's bubble tint; every hue is ink, teal ink, clay ink or slate.
 
-**Calorie figures are persimmon** (2026-10-03, owner request: "make the calories a specific colour, keep
-the same colour rules throughout the app … that orange-red and a little more bold so they stand out").
-Every calorie *number* carries the shared `.kcal` class (`app/globals.css`) and one weight step more
-than its line (semibold for Jakarta figures; Bold: the meal card's calorie figure is the display numeral, 600): persimmon ink
-`#9A3A10` on ivory, oat and beige (≥ 4.5:1), persimmon base `#E8662E` inside the `.matte` charcoal
-scope (≈ 4.8:1 on `#1D1D1C`; `.matte-reset` trays go back to the ink). This is a deliberate exception
-to "small text stays ink or cream". The "kcal" unit stays muted, a row that is over its target keeps
-the alert red, and the macro gauges keep their own gauge colours. Lines that print "537 kcal · …"
-wrap the number with `components/ui/KcalText.tsx`.
+Gauges, fixed per macro: **calories** ink (bone on black), **protein** teal `#3DB8B4 → #72CCC7`,
+**carbs** clay-300 `#E3A383 → #F0C7B0`, **fat** ash `#9AA19C → #C9CCC6`, **water** slate blue
+`#5F86A3 → #A9C2D3`. A gauge hue is for arcs, bars and dots; small text stays ink or white.
 
-**Yellow, orange, red** (2026-10-01, the owner asked for all three; values from the Gemini 3.8 audit,
-text shades checked ≥ 4.5:1 on ivory). Each has a base (fills, arcs, dots), an ink shade for text and a
-12 % wash for a tinted surface:
-- **Dijon yellow** `#DCA22A` / ink `#745200` / wash `#F1E8D4`: fat, streaks and wins, pending and
-  "needs a look" notes (the warning role).
-- **Persimmon orange** `#E8662E` / ink `#9A3A10` / wash `#F2E2D4`: calories and energy, training-day
-  marks.
-- **Warm orange** `#D4843E` (2026-10-03, the owner asked for an orange accent "muted, in the same palette"):
-  thin rims only, e.g. the food search results tray's 1 px border; never body text on ivory.
-- **Sage green** `#74A050` / ink `#3E6022` / wash `#E4EADA`: source tags (USDA) and other quiet
-  "verified" marks. **Field** `#FBF9F4`: the soft off-white of text fields and trays inside a card.
-- **Pomegranate red** `#C9352A` / ink `#A42E22` / wash `#EFDCD3`: alerts, errors, destructive actions,
-  today's date in the calendars. Alert text is the red ink `#A42E22`.
-Never more than one of the three in a single control; they mark meaning, not decoration.
-Where they show today: the Training tag beside the day's name (orange wash and ink; Rest is neutral),
-the "needs a look" notice (`.notice-attention`, yellow wash, ink text, ink mark), the Week stat bars
-(calories persimmon, protein plum), the week dots (missed red, partial Dijon) and the calorie
-share in an open meal (persimmon).
+**Calorie figures are clay.** Every calorie *number* carries the shared `.kcal` class
+(`app/globals.css`) and one weight step more than its line: clay ink `#8E3F1F` on white, recess and
+fields (at least 4.5:1), clay-300 `#E3A383` inside the `.matte` black scope (`.matte-reset` trays go
+back to the ink). The "kcal" unit stays muted, a row over its target keeps the danger red, and the
+macro gauges keep their own gauge colours. Lines that print "537 kcal ..." wrap the number with
+`components/ui/KcalText.tsx`.
+
+**Roles for components** (token names are what a component writes): page `bg-paper`; black hero
+`.matte` / `CardFrame tone="ink"`; card `.surface` / `CardFrame`; card hairline `border-hairline`;
+recessed tile `bg-fog` / `.well`; primary button `.btn-primary`; light pill on dark `.btn-primary` inside `.matte` (bone with ink text), `.btn-secondary` for the quiet one; teal link text `text-link`; clay accent `text-orange-ink`
+(`.kcal`); muted text `text-muted`.
+
+Never more than one accent in a single control; they mark meaning, not decoration.
 
 Every colour a component uses is a token (`app/design-tokens.css` exported from this file, role
 colours and recipes in `app/globals.css`); ESLint rejects a hex or tinted `rgb()` literal in `app/` or
@@ -248,37 +250,27 @@ colours and recipes in `app/globals.css`); ESLint rejects a hex or tinted `rgb()
 
 ### Contrast
 
-**The rule (2026-10-04, after the Settings protein card's explanation was unreadable: cream
-`text-on-olive` on a 7 % tint over ivory, 1.07:1).** Every text role meets WCAG 2.2 AA on every
-surface it may sit on: **≥ 4.5:1 for body and small text**, **≥ 3:1 for large text (≥ 24 px, or
-≥ 18.66 px at 700) and for icons**. `tests/design/contrast.test.ts` computes each pair from the token
-hex values (`app/design-tokens.css`, `app/globals.css`, including the `.matte` / `.matte-reset`
-remaps, the section hues, gradient stops and tint alphas), so a token edit that breaks a pair fails
-CI. `tests/design/contrast-scan.test.ts` rejects the class combinations that draw a forbidden pair.
+**The rule (2026-10-04, kept).** Every text role meets WCAG 2.2 AA on every surface it may sit on:
+**≥ 4.5:1 for body and small text**, **≥ 3:1 for large text (≥ 24 px, or ≥ 18.66 px at 700) and for
+icons**. `tests/design/contrast.test.ts` computes each pair from the token hex values
+(`app/design-tokens.css`, `app/globals.css`, including the `.matte` / `.matte-reset` remaps, the
+section hues, gradient stops and tint alphas), so a token edit that breaks a pair fails CI.
+`tests/design/contrast-scan.test.ts` rejects the class combinations that draw a forbidden pair.
 
-- **Light surfaces take ink.** Oat, ivory, beige, field, the four washes, `.olive-panel` (a 7 %
-  section tint; it sits on a card, never the bare ground), `.well`, `.surface`, `.notice` and
-  `.matte-reset` trays: `text-charcoal`, `text-graphite`, `text-muted`, and the ink shades
-  (`text-alert`, `text-warning`, `.kcal`, `text-sage-ink`, `text-plum`). `text-text-faint` is for
-  ivory and field only.
-- **Cream is for the olive fill and the matte.** `text-on-primary` / `text-on-selected` only with an
-  olive fill under them (`btn-primary`, `bg-primary`, `chip-on`, a lens). `text-on-olive` is never
-  written in a component: inside `.matte`, `text-charcoal` already turns cream.
-- **Gauge hues are fills, not text.** `.macro-*`, `text-gauge-*`, `text-yellow`, `text-sage`,
-  slate and the warm orange rim draw arcs, bars, dots and rims. A macro figure as text uses
-  `.macro-ink-kcal|protein|carbs|fat` (the ink shade on light, the gauge hue or its lighter end in
-  the matte).
-- Token moves this pass made to pass the table: Dijon ink `#8A6512 → #7A5A10` (it was 3.9:1 on oat
-  and 4.4:1 on its own wash), coach plum `#6A5A86 → #665682` (4.48:1 on oat), Body slate-teal
-  `#4A6B70 → #44646A` (4.2:1 on oat); calorie figures in a section panel inside the matte take the
-  lighter persimmon.
-- Bold (2026-10-19) recomputed every pair: the inks darkened (charcoal `#141413`, graphite `#302F2B`,
-  muted `#4D4B45`, Dijon `#745200`, persimmon `#9A3A10`, sage `#3E6022`, red `#A42E22`, plum
-  `#5E4888`), so each still clears 4.5:1 on the deeper oat; the matte cream brightened. Faint stays
-  `#6A685F` so it still fails on oat and beige (it is for ivory and field only), and the punchier
-  gauge hues still fail as small text, so the forbidden list stays true. A card inside an ink card
-  (`--grad-card-ink-inset`) steps down into the charcoal, which keeps the persimmon figure above
-  4.5:1 there.
+- **Light surfaces take ink.** White cards, recess, field, the washes, `.well`, `.surface`, `.notice`
+  and `.matte-reset` trays: `text-charcoal`, `text-graphite`, `text-muted`, and the ink shades
+  (`text-alert`, `text-warning`, `.kcal`, `text-link`). `text-text-faint` is for a white card and
+  field only.
+- **Bone is for the matte.** `text-on-primary` / `text-on-selected` only with an ink fill under them
+  (`btn-primary`, `bg-primary`, `chip-on`, a lens). `text-on-olive` is never written in a component:
+  inside `.matte`, `text-charcoal` already turns bone.
+- **Gauge hues are fills, not text.** `.macro-*`, `text-gauge-*`, `text-yellow` and the warm clay rim
+  draw arcs, bars, dots and rims. A macro figure as text uses `.macro-ink-kcal|protein|carbs|fat` (the
+  ink shade on light, the gauge hue or its lighter end in the matte). Teal and slate blue fail as
+  small text on white, so the forbidden list stays true.
+- **The HF recolour (2026-11-18)** moved every pair at once: teal text on white is the darker
+  `#1C716E` (5.6:1), clay figures are `#8E3F1F`, and the recess `#F2F2F0` keeps the card/inset step
+  at least 1.2:1 against white (`tests/design/surface-step.test.ts`).
 
 The table below is generated (`npx tsx tests/design/print-contrast-table.ts`) and checked against the
 code by the test; each role shows its worst allowed surface.
@@ -286,86 +278,84 @@ code by the test; each role shows its worst allowed surface.
 <!-- contrast-table:start -->
 | Role | Use | Worst allowed surface | Contrast |
 |---|---|---|---|
-| text-charcoal / text-text-primary | text (≥ 4.5) | .olive-panel on ivory | 15.26:1 |
-| text-graphite / text-text-secondary | text (≥ 4.5) | .olive-panel on ivory | 11.00:1 |
-| text-muted / text-text-muted / text-text-hint | text (≥ 4.5) | .olive-panel on ivory | 5.87:1 |
-| text-text-faint | text (≥ 4.5) | field | 5.00:1 |
-| text-alert / text-red-ink | text (≥ 4.5) | .olive-panel on ivory | 5.31:1 |
-| text-warning / text-amber / text-yellow-ink | text (≥ 4.5) | .olive-panel on ivory | 5.53:1 |
-| .kcal / .macro-ink-kcal (tomato ink) | text (≥ 4.5) | .olive-panel on ivory | 4.86:1 |
-| text-sage-ink / .macro-ink-carbs | text (≥ 4.5) | .olive-panel on ivory | 4.83:1 |
-| text-plum / .macro-ink-protein | text (≥ 4.5) | .olive-panel on ivory | 5.47:1 |
-| text-primary (ink as text) | text (≥ 4.5) | .olive-panel on ivory | 15.26:1 |
-| section hue: body | text (≥ 4.5) | .olive-panel on ivory | 5.77:1 |
-| section hue: foods | text (≥ 4.5) | .olive-panel on ivory | 4.86:1 |
-| section hue: coach | text (≥ 4.5) | .olive-panel on ivory | 5.47:1 |
-| section hue: settings | text (≥ 4.5) | .olive-panel on ivory | 8.81:1 |
-| section hue: today | text (≥ 4.5) | .olive-panel on ivory | 15.26:1 |
-| text-icon (line icons) | icon (≥ 3) | .olive-panel on ivory | 7.19:1 |
-| text-on-primary / text-on-selected | text (≥ 4.5) | ink fill (primary) | 14.38:1 |
-| text-on-olive on the olive fill | text (≥ 4.5) | ink fill (primary) | 14.38:1 |
-| text-on-olive-muted (glyphs only) | icon (≥ 3) | ink fill (primary) | 5.67:1 |
-| .matte text-charcoal | text (≥ 4.5) | .olive-panel in .matte | 16.28:1 |
-| .matte text-graphite | text (≥ 4.5) | .olive-panel in .matte | 12.77:1 |
-| .matte text-muted | text (≥ 4.5) | .olive-panel in .matte | 7.05:1 |
-| .matte text-text-faint | text (≥ 4.5) | .olive-panel in .matte | 5.01:1 |
-| .matte text-on-olive | text (≥ 4.5) | .olive-panel in .matte | 16.28:1 |
-| .matte .kcal / .macro-ink-kcal | text (≥ 4.5) | charcoal matte | 5.57:1 |
-| .matte .olive-panel .kcal | text (≥ 4.5) | .olive-panel in .matte | 7.11:1 |
-| .matte .macro-ink-protein | text (≥ 4.5) | .olive-panel in .matte | 6.77:1 |
-| .matte .macro-ink-carbs | text (≥ 4.5) | .olive-panel in .matte | 6.10:1 |
-| .matte .macro-ink-fat | text (≥ 4.5) | .olive-panel in .matte | 8.85:1 |
-| .matte text-icon | icon (≥ 3) | .olive-panel in .matte | 8.17:1 |
-| plan glyph ink: breakfast | icon (≥ 3) | plan header glyph | 5.61:1 |
-| plan glyph ink: lunch | icon (≥ 3) | plan header glyph | 4.51:1 |
-| plan glyph ink: dinner | icon (≥ 3) | plan header glyph | 9.93:1 |
-| plan glyph ink: snack | icon (≥ 3) | plan header glyph | 4.78:1 |
-| plan glyph ink: other | icon (≥ 3) | plan header glyph | 4.94:1 |
-| notice title (info / success) | text (≥ 4.5) | notice info / success | 5.27:1 |
-| notice body (graphite) | text (≥ 4.5) | notice neutral | 11.19:1 |
-| notice mark (tone ink) | icon (≥ 3) | notice info / success | 5.27:1 |
-| notice title (attention) | text (≥ 4.5) | notice attention | 6.20:1 |
+| text-charcoal / text-text-primary | text (≥ 4.5) | tomato wash | 13.91:1 |
+| text-graphite / text-text-secondary | text (≥ 4.5) | tomato wash | 8.36:1 |
+| text-muted / text-text-muted / text-text-hint | text (≥ 4.5) | tomato wash | 5.13:1 |
+| text-text-faint | text (≥ 4.5) | field | 4.79:1 |
+| text-alert / text-red-ink | text (≥ 4.5) | tomato wash | 5.16:1 |
+| text-warning / text-amber / text-yellow-ink | text (≥ 4.5) | tomato wash | 4.67:1 |
+| .kcal / .macro-ink-kcal (tomato ink) | text (≥ 4.5) | tomato wash | 5.75:1 |
+| text-sage-ink / .macro-ink-carbs | text (≥ 4.5) | tomato wash | 4.56:1 |
+| text-plum / .macro-ink-protein | text (≥ 4.5) | tomato wash | 4.56:1 |
+| text-primary (ink as text) | text (≥ 4.5) | tomato wash | 13.91:1 |
+| section hue: body | text (≥ 4.5) | tomato wash | 13.91:1 |
+| section hue: foods | text (≥ 4.5) | tomato wash | 13.91:1 |
+| section hue: coach | text (≥ 4.5) | tomato wash | 13.91:1 |
+| section hue: settings | text (≥ 4.5) | tomato wash | 8.36:1 |
+| section hue: today | text (≥ 4.5) | tomato wash | 13.91:1 |
+| text-icon (line icons) | icon (≥ 3) | tomato wash | 7.04:1 |
+| text-on-primary / text-on-selected | text (≥ 4.5) | ink fill (primary) | 17.62:1 |
+| text-on-olive on the olive fill | text (≥ 4.5) | ink fill (primary) | 17.62:1 |
+| text-on-olive-muted (glyphs only) | icon (≥ 3) | ink fill (primary) | 6.67:1 |
+| .matte text-charcoal | text (≥ 4.5) | .olive-panel in .matte | 13.53:1 |
+| .matte text-graphite | text (≥ 4.5) | .olive-panel in .matte | 10.69:1 |
+| .matte text-muted | text (≥ 4.5) | .olive-panel in .matte | 5.98:1 |
+| .matte text-text-faint | text (≥ 4.5) | .olive-panel in .matte | 4.89:1 |
+| .matte text-on-olive | text (≥ 4.5) | .olive-panel in .matte | 13.53:1 |
+| .matte .kcal / .macro-ink-kcal | text (≥ 4.5) | charcoal matte | 7.57:1 |
+| .matte .olive-panel .kcal | text (≥ 4.5) | .olive-panel in .matte | 7.39:1 |
+| .matte .macro-ink-protein | text (≥ 4.5) | .olive-panel in .matte | 7.23:1 |
+| .matte .macro-ink-carbs | text (≥ 4.5) | .olive-panel in .matte | 7.39:1 |
+| .matte .macro-ink-fat | text (≥ 4.5) | .olive-panel in .matte | 5.98:1 |
+| .matte text-icon | icon (≥ 3) | .olive-panel in .matte | 9.72:1 |
+| plan glyph ink: breakfast | icon (≥ 3) | plan header glyph | 4.71:1 |
+| plan glyph ink: lunch | icon (≥ 3) | plan header glyph | 4.67:1 |
+| plan glyph ink: dinner | icon (≥ 3) | plan header glyph | 9.64:1 |
+| plan glyph ink: snack | icon (≥ 3) | plan header glyph | 4.15:1 |
+| plan glyph ink: other | icon (≥ 3) | plan header glyph | 4.28:1 |
+| notice title (info / success) | text (≥ 4.5) | notice info / success | 5.15:1 |
+| notice body (graphite) | text (≥ 4.5) | notice error | 9.03:1 |
+| notice mark (tone ink) | icon (≥ 3) | notice info / success | 5.15:1 |
+| notice title (attention) | text (≥ 4.5) | notice attention | 5.23:1 |
 | notice title (error) | text (≥ 4.5) | notice error | 5.58:1 |
-| notice title (neutral) | text (≥ 4.5) | notice neutral | 15.52:1 |
-| armed danger label | text (≥ 4.5) | btn-danger armed | 6.57:1 |
-| neutral tag (text-graphite) | text (≥ 4.5) | neutral tag on coach bubble | 9.54:1 |
-| .matte neutral tag | text (≥ 4.5) | neutral tag in the matte | 11.28:1 |
+| notice title (neutral) | text (≥ 4.5) | notice neutral | 15.72:1 |
+| armed danger label | text (≥ 4.5) | btn-danger armed | 6.54:1 |
+| neutral tag (text-graphite) | text (≥ 4.5) | neutral tag on coach bubble | 8.08:1 |
+| .matte neutral tag | text (≥ 4.5) | neutral tag in the matte | 9.35:1 |
 
 | Forbidden pair | On | Contrast | Instead |
 |---|---|---|---|
-| text-on-olive (cream) | .olive-panel on ivory | 1.13:1 | the Settings protein card bug: cream on a 7 % tint; use ink (`text-charcoal`) |
+| text-on-olive (cream) | .olive-panel on ivory | 1.14:1 | the Settings protein card bug: cream on a 7 % tint; use ink (`text-charcoal`) |
 | text-on-olive (cream) | white card | 1.00:1 | cream is for the olive fill and the matte only |
 | text-on-primary | white card | 1.00:1 | `text-on-primary` needs the olive fill under it (`btn-primary`, `bg-primary`, a lens) |
-| text-on-primary | tray (.well) | 1.18:1 | `text-on-primary` on a well or pill track |
-| gauge carbs (.macro-carbs) as text | white card | 2.55:1 | gauge hues are fills and dots; text uses `.macro-ink-*` |
-| gauge fat (.macro-fat, text-yellow) as text | white card | 1.76:1 | use `text-yellow-ink` or `.macro-ink-fat` |
-| gauge protein (.macro-protein) as text | charcoal matte | 4.32:1 | 3.9:1 inside the meal card; `.macro-ink-protein` uses the lighter end |
-| gauge calories as text | white card | 3.30:1 | use `.kcal` |
-| warm orange rim (text-orange-warm) | white card | 2.19:1 | rims only |
-| white on tomato fill (text) | tomato fill (log button) | 3.45:1 | 3.45:1: white rides tomato only as a glyph or 24 px+ figure; labels on tomato are ink (5.47:1) |
-| text-text-faint | tray (.well) | 4.41:1 | faint is for the white card and field |
+| text-on-primary | tray (.well) | 1.12:1 | `text-on-primary` on a well or pill track |
+| gauge carbs (.macro-carbs) as text | white card | 2.06:1 | gauge hues are fills and dots; text uses `.macro-ink-*` |
+| gauge fat (.macro-fat, text-yellow) as text | white card | 2.55:1 | use `text-yellow-ink` or `.macro-ink-fat` |
+| gauge protein (.macro-protein) as text | white card | 2.33:1 | teal is a fill and a dot on white; teal text is `text-link` (the darker teal) |
+| gauge water (.macro-water) as text | white card | 3.74:1 | slate blue is a fill; water text is ink |
+| warm orange rim (text-orange-warm) | white card | 2.06:1 | rims only |
+| white on clay or teal fill (text) | clay-300 / teal fill (macro bars) | 2.14:1 | labels on a clay-300 or teal fill are ink |
+| text-text-faint | hairline fill | 4.14:1 | faint is for the white card and field |
 <!-- contrast-table:end -->
 
 ## Typography
 
-**Fraunces** (2026-10-01, replacing Playfair Display, whose hairlines broke up at 20–28 px on a phone)
-is the headline voice: a warm soft serif with optical sizing, so the 64 px numeral and a 20 px card title
-each get the right cut. Screen titles, section headings and meal titles; 400 for
-display, 600 for headings (Bold: a card title is 22 px at 600). **Plus Jakarta Sans** (replacing Manrope) carries everything else: body 400
-with a generous 1.7 line height, labels and buttons 500, figures 600 with tabular numerals. Eyebrows
-are tracked capitals: 10–12 px, weight 500, 0.15–0.2 em, uppercase (slot chip, spec labels, kcal
-unit), kept to labels that are truly small; field labels and stat names are sentence case. Both
-families are self-hosted through `next/font` in `app/layout.tsx`. **Seven steps and no others in components**
+**Archivo** at weight 600 with tight tracking is the display voice and every numeral: screen titles,
+section headings, meal titles and the big figures (tabular figures kept, `.numeral`). **Inter** carries
+everything else: body 400 with a generous line height, labels and buttons 500. **Instrument Serif**
+italic is a rare accent (`.font-accent`): one phrase, never a heading system. Eyebrows are tracked
+capitals: 10-12 px, weight 500, 0.15-0.2 em, uppercase, kept to labels that are truly small. All three
+families are self-hosted through `next/font/local` in `app/layout.tsx` (`--font-display-face`,
+`--font-text-face`, `--font-accent-face`). **Seven steps and no others in components**
 (tests/design/scale.test.ts): 12 · 14 · 16 · 20 · 28 · 40 · 64. Tabular numerals in gauges and totals.
 These are the literal steps a component may write; the roles carry their own sizes (`text-title` 22,
 `text-heading` 32).
 
-**Display numerals (Bold, 2026-10-19).** Calorie and stat figures are big and bold: `numeral-xl`
-48 px / 700 / -0.035 em (the lead figure of a screen: calories left), `numeral-lg` 32 px / 700 (a
-card's stat), `numeral-md` 24 px / 600 (a figure in a row or an inset). Use the utility with the
-`.numeral` class (the text face, tabular figures): `numeral text-numeral-xl kcal`. The unit beside it
-stays caption-size and muted ("kcal left"). A figure never stands for missing data: no reading is "—",
-never 0.
+**Display numerals.** Calorie and stat figures are big and bold: `numeral-xl` 48 px / 700 / -0.035 em
+(the lead figure of a screen: calories left), `numeral-lg` 32 px / 700 (a card's stat), `numeral-md`
+24 px / 600 (a figure in a row or an inset). Use the utility with the `.numeral` class (display face,
+tabular figures): `numeral text-numeral-xl kcal`. The unit beside it stays caption-size and muted
+("kcal left"). A figure never stands for missing data: no reading is "-", never 0.
 
 ## Layout
 
@@ -438,21 +428,19 @@ the inset bevel (`--bevel`). Trays inside a card are beige. Sheets are ivory wit
 over a charcoal scrim at 45 %. The dock is matte charcoal at 94 % with a light blur.
 
 ### Techniques
-- **Ground:** `.harvest-ground`, pure CSS and still: oat with a soft lighter wash at the top and a
-  3 % fractal-noise grain (`--grain`, an inline SVG). No video, no WebGL.
-- **Grounds (selectable):** Settings › Background offers four, Oat (default), Sage, Clay and Mist
-  (`lib/design/grounds.ts`; the same values are written in `app/globals.css` as `html[data-ground]`).
-  A ground moves only the bare page: its base (`--color-paper`, `--color-background`), the top wash and
-  the lower-corner shade. Cards, the matte meal card, the dock and every text role stay as they are.
-  The choice is kept on the phone for the account and sets `<html data-ground>` and the browser
-  chrome colour (`themeColorFor`). Each ground passes the same contrast table as Oat
-  (`tests/design/grounds.test.ts`); a new ground must too. Bold (2026-10-19) moved each a step deeper
-  (Oat `#DCD7CB`, Sage `#DCE1D0`, Clay `#E4D7CB`, Mist `#D9DEDD`) so the brighter cards stand off it.
-- **Dark-friendly, not a dark theme:** there is no dark mode and no dark ground. Every ground is
-  light because the bare page carries ink text; a charcoal ground would need a second set of page
-  roles. The dark surfaces are the matte family — the meal card, the dock, toasts and the ink hero
-  card — and every card role is checked on every ground and inside the matte.
-- **Matte grain:** the same grain at 3 % over the meal card and the dock (`.matte::before`).
+- **Ground:** `.harvest-ground`, pure CSS and still: flat white (`--color-paper`), no grain, no wash.
+- **Grounds (selectable):** Settings › Background offers two, White `#FFFFFF` (default) and Black
+  `#000000` (`lib/design/grounds.ts`; the same values are written in `app/globals.css` as
+  `html[data-ground]`). A ground moves the bare page and its text roles only: its base
+  (`--color-paper`, `--color-background`) and the browser chrome colour (`themeColorFor`). On Black the
+  bare-page text roles turn white and grey and the primary button turns white; light surfaces on it
+  (cards, sheets, fields, notices) reset the roles to ink. Cards, the matte hero surfaces and the dock
+  keep their colours. A stored choice from the four-ground era still reads (`toGroundId`: oat, sage and
+  clay are White; mist is Black). The choice is kept on the phone for the account and sets
+  `<html data-ground>`. Both grounds pass the contrast table (`tests/design/grounds.test.ts`).
+- **Black ground, light surfaces:** the Black ground is a text-role remap on the bare page only
+  (`html[data-ground="black"]`); every card role is checked on White, on Black and inside the matte.
+- **Matte surface:** flat black, no grain (`.matte::before` is kept and drawn at 0 opacity).
 - **Gauge:** the arc alone on an ink-6 % track, gradient arc with round caps, no glow.
 - **Today calendar:** the Day card's calendar face: a seven-day strip under the day's heading, then the
   ledger, a charcoal tab with the calories left that opens to protein, carbs and fat. Double-tap the

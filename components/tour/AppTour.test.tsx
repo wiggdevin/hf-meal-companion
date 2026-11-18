@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * "How Sasha works" (owner, 2026-10-08): five steps with Back / Next, Skip on every step, Escape,
+ * "How High Frequency works" (owner, 2026-10-08): five steps with Back / Next, Skip on every step, Escape,
  * focus kept inside and handed back, and reduced motion drawing still frames that never move.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -18,19 +18,19 @@ function renderTour(reduced: "always" | "never" = "always") {
 }
 /** The step the sheet is on, as the live line announces it ("Step 2 of 5: Your meal card"). */
 const title = () => document.querySelector("[aria-live='polite']")?.textContent?.replace(/^Step \d+ of \d+: /, "");
-const next = () => fireEvent.click(screen.getByRole("button", { name: /^(Next|Start using Sasha)$/ }));
+const next = () => fireEvent.click(screen.getByRole("button", { name: /^(Next|Start using High Frequency)$/ }));
 
 describe("AppTour", () => {
   it("walks the five steps forward and back, then finishes", () => {
     const { onClose } = renderTour();
-    expect(screen.getByRole("dialog", { name: "Meet Sasha" })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Meet High Frequency" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
     next();
     expect(title()).toBe("Your meal card");
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
-    expect(title()).toBe("Meet Sasha");
+    expect(title()).toBe("Meet High Frequency");
     for (const step of TOUR_STEPS.slice(1)) { next(); expect(title()).toBe(step.title); }
-    expect(screen.getByText(`Step ${TOUR_STEPS.length} of ${TOUR_STEPS.length}: Ask Sasha anything`)).toBeTruthy();
+    expect(screen.getByText(`Step ${TOUR_STEPS.length} of ${TOUR_STEPS.length}: Ask High Frequency anything`)).toBeTruthy();
     next();
     expect(onClose).toHaveBeenCalledWith("done");
   }, 15_000);
@@ -60,7 +60,7 @@ describe("AppTour", () => {
     expect(screen.getByText("Swipe left: Clear, then Delete.")).toBeTruthy();
     expect(screen.getByText(/15-minute steps/)).toBeTruthy();
     next();
-    expect(screen.getByText(/Plan with Sasha and Log what you ate/)).toBeTruthy();
+    expect(screen.getByText(/Plan with High Frequency and Log what you ate/)).toBeTruthy();
   });
 
   it("offers Skip on every step, and Escape closes", () => {
@@ -80,7 +80,7 @@ describe("AppTour", () => {
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "ArrowRight" });
     expect(title()).toBe("Your meal card");
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "ArrowLeft" });
-    expect(title()).toBe("Meet Sasha");
+    expect(title()).toBe("Meet High Frequency");
   });
 
   it("takes focus, keeps Tab inside, and gives focus back on close", () => {

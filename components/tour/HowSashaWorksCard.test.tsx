@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-/** Settings › "How Sasha works": closed by default, opens the shared tour overview on tap. */
+/** Settings › "How High Frequency works": closed by default, opens the shared tour overview on tap. */
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import HowSashaWorksCard from "./HowSashaWorksCard";
@@ -16,6 +16,6 @@ describe("HowSashaWorksCard", () => {
   it("renders open, with the tour overview dialog, after a tap on its trigger", () => {
     render(<HowSashaWorksCard />);
     fireEvent.click(screen.getByRole("button", { name: "Show me how it works" }));
-    expect(screen.getByRole("dialog", { name: "Meet Sasha" })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Meet High Frequency" })).toBeTruthy();
   });
 });

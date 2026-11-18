@@ -36,7 +36,7 @@ export default function ShoppingLineCard({ line, selected = true, showBought = t
       failureMessage: (cause) => cause instanceof Error ? cause.message : "Could not save this item." }); }
     finally { setBusy(false); }
   }
-  return <article className="olive-panel flex flex-col gap-3 p-3">
+  return <article className="flex flex-col gap-3 rounded-2xl border border-hairline p-3">
     <div className="flex items-start justify-between gap-2">
       <div><strong className="block">{line.name}</strong>
         <span className="ground-muted text-sm">{line.origin === "manual" ? CATEGORY_LABEL.manual : CATEGORY_LABEL[line.category]}</span></div>

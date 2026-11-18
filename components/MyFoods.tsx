@@ -39,18 +39,17 @@ const ROLE_DOT: Record<FoodRole, string> = {
 /** .section-title sets its own weight and tracking (unlayered), so the card-title values win with `!`. */
 const SECTION_TITLE = "section-title m-0 text-title font-semibold! tracking-heading-sm!";
 const SECTION_COUNT = "ground-muted text-tiny font-normal"; // colour from .ground-muted: it sits on the bare ground
-const ROW_TITLE = "text-body font-medium";
+const ROW_TITLE = "text-body font-semibold";
 const ROW_META = "text-tiny font-normal text-muted";
 /** A category card's padding left and right of its rows; its footer row runs edge to edge. */
 const CARD_INSET = "px-4";
 
+/** The row's square icon tile (HF mockup: a recessed 40 px tile) holding the macro group's dot. */
 function Dot({ role }: { role: FoodRole }) {
   return (
-    <span
-      aria-hidden="true"
-      className="shrink-0"
-      style={{ width: 10, height: 10, borderRadius: 9999, background: ROLE_DOT[role] }}
-    />
+    <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-fog">
+      <span style={{ width: 10, height: 10, borderRadius: 9999, background: ROLE_DOT[role] }} />
+    </span>
   );
 }
 
@@ -59,7 +58,7 @@ function meta(food: Food): string {
   return kcalPer100Label(food);
 }
 
-/* DESIGN.md Iconography: linear, currentColor, inline SVG. Filled olive when starred. */
+/* DESIGN.md Iconography: linear, currentColor, inline SVG. Filled clay when starred. */
 function StarGlyph({ filled }: { filled: boolean }) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"}
@@ -200,7 +199,7 @@ function FoodRow({ food, last, editing, onOpen, onRemove, renderStatus, describe
     {/* A tap on a swiped-open row closes it, as on iOS; the next tap opens the food. */}
     <button type="button" onClick={revealed && !editing ? () => setRevealed(false) : onOpen}
       aria-label={`Edit ${food.name}`} aria-describedby={describe && hasStatus ? statusId : undefined}
-      className={`tap flex min-w-0 flex-1 items-center gap-3 px-2.5 py-3 text-left ${styles.face}`}>
+      className={`tap flex min-w-0 flex-1 items-center gap-3 px-1 py-3 text-left ${styles.face}`}>
       <Dot role={food.role} />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className={`truncate ${ROW_TITLE} ${avoid ? "line-through" : ""}`}>
@@ -226,7 +225,7 @@ function FoodRow({ food, last, editing, onOpen, onRemove, renderStatus, describe
       {removeCopy(food).text}
     </button>}
     </div>
-    {hasStatus && <div id={statusId} className="px-2.5 pb-2">{status}</div>}
+    {hasStatus && <div id={statusId} className="px-1 pb-2">{status}</div>}
     </div>
   );
 }

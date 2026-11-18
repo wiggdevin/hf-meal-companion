@@ -27,14 +27,14 @@ function renderChrome(pathname: string, capabilities: AppCapabilities = ON): str
 function expectChrome(markup: string): void {
   expect(markup).toContain('aria-label="Primary"');
   expect(
-    markup.includes('href="/coach"') || markup.includes('aria-label="Ask Sasha"'),
+    markup.includes('href="/coach"') || markup.includes('aria-label="Ask High Frequency"'),
   ).toBe(true);
-  expect(markup).not.toContain('aria-label="Open Sasha"');
+  expect(markup).not.toContain('aria-label="Open High Frequency"');
 }
 
 function expectNoChrome(markup: string): void {
   expect(markup).not.toContain('aria-label="Primary"');
-  expect(markup).not.toContain('aria-label="Open Sasha"');
+  expect(markup).not.toContain('aria-label="Open High Frequency"');
 }
 
 describe("AppChrome route allowlist", () => {
@@ -48,10 +48,10 @@ describe("AppChrome route allowlist", () => {
     (pathname) => expectNoChrome(renderChrome(pathname)),
   );
 
-  it("keeps Sasha's bubble in the fixed dock when coach is off", () => {
+  it("keeps High Frequency's bubble in the fixed dock when coach is off", () => {
     const markup = renderChrome("/foods", { ...ON, coach: false });
     expect(markup).toContain('aria-label="Primary"');
     expect(markup).toContain('data-dock-assistant="true"');
-    expect(markup).toContain('aria-label="Ask Sasha"');
+    expect(markup).toContain('aria-label="Ask High Frequency"');
   });
 });

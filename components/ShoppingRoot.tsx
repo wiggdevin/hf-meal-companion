@@ -505,7 +505,7 @@ export default function ShoppingRoot() {
     });
   } }} />;
   return <div className="flex flex-col gap-4">
-    <h1 className="m-0 text-xl font-semibold">Shopping</h1>
+    <h1 className="m-0 text-title font-semibold">Shopping</h1>
     {error && <Notice tone="error" title={error} action={{ label: "Retry", onClick: () => {
       void update().catch((cause) => setError(cause instanceof Error ? cause.message : "Shopping could not refresh."));
     } }} />}

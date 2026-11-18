@@ -1,6 +1,7 @@
-/* The floating dock (DESIGN.md Cards and Surfaces › Dock). Two ink bodies: the four-tab capsule and
-   the assistant bubble, lifted on the float shadow. The nav carries the global `matte` scope, so text
-   roles inside read white; the active tab is a white capsule with an ink icon and label. */
+/* The floating dock (DESIGN.md Cards and Surfaces › Dock), High Frequency brand. Two basalt bodies: the
+   four-tab capsule and the assistant bubble, each with a bone hairline and the float shadow. The nav
+   carries the global `matte` scope, so text roles inside read bone; tabs are outline icons in muted
+   ash, and the active tab is a bone capsule with an ink icon and label (no colour fill). */
 
 .dock {
   transform: translateY(calc(-1 * var(--dock-lift, 0px)));
@@ -13,7 +14,7 @@
   /* farthest-side fits the tint ellipse to each body's own shape: dense in the middle, clear at the rim. */
   background: var(--grad-matte);
   backdrop-filter: blur(12px);
-  box-shadow: inset 0 1px 0 rgb(var(--ink-rgb) / 0.08), var(--shadow-float);
+  box-shadow: inset 0 0 0 1px rgb(var(--ink-rgb) / 0.1), var(--shadow-float);
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
@@ -31,27 +32,27 @@
   inset: 0;
   z-index: 0;
   border-radius: inherit;
-  background: radial-gradient(90px 64px at var(--lx, 50%) var(--ly, 0%), rgb(var(--cream-rgb) / 0.08), transparent 72%);
+  background: radial-gradient(90px 64px at var(--lx, 50%) var(--ly, 0%), rgb(var(--ink-rgb) / 0.08), transparent 72%);
   opacity: var(--lo, 0);
   transition: opacity 320ms ease;
   pointer-events: none;
 }
 
 .tab {
-  color: rgb(var(--cream-rgb) / 0.6);
+  color: var(--color-text-muted);
   transition: color 150ms ease;
 }
 
 .tab:hover { color: var(--color-charcoal); }
 
-/* The selection capsule (DESIGN.md: the dock's active tab is a white capsule on the ink body). */
+/* The selection capsule (DESIGN.md: the dock's active tab is a bone capsule on the basalt body). */
 .lens {
   position: absolute;
   left: 0;
   z-index: 1;
   height: 52px;
   border-radius: 9999px;
-  background: rgb(var(--cream-rgb));
+  background: var(--color-charcoal);
   box-shadow: 0 1px 2px rgb(var(--charcoal-deep-rgb) / 0.25);
   transform-origin: center;
   will-change: transform, width;
@@ -70,19 +71,18 @@
 
 .assistant[data-current="true"]:not([data-open]) {
   box-shadow:
-    inset 0 1px 1px rgb(var(--ink-rgb) / 0.1),
-    inset 0 0 0 1.5px color-mix(in srgb, var(--color-sage) 55%, transparent),
-    0 20px 40px -18px rgb(var(--on-olive-rgb) / 0.6);
+    inset 0 0 0 1.5px rgb(var(--ink-rgb) / 0.5),
+    var(--shadow-float);
 }
 
-/* The charcoal composer the bubble becomes (DESIGN.md: a thin olive → sage → wheat rim). */
+/* The basalt composer the bubble becomes (DESIGN.md: a thin bone hairline rim). */
 .composerSkin {
   position: absolute;
   inset: 0;
   z-index: 0;
   border-radius: inherit;
   background: var(--grad-matte);
-  box-shadow: inset 0 1px 1px rgb(var(--ink-rgb) / 0.1), 0 20px 40px -18px rgb(var(--on-olive-rgb) / 0.6);
+  box-shadow: var(--shadow-float);
   pointer-events: none;
 }
 
@@ -92,16 +92,14 @@
   inset: 0;
   padding: 1.5px;
   border-radius: inherit;
-  background: var(--grad-coach-composer-rim);
+  background: rgb(var(--ink-rgb) / 0.22);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
-  opacity: 0.9;
 }
 
 .assistant:focus-within .composerSkin {
-  box-shadow: inset 0 1px 1px rgb(var(--ink-rgb) / 0.1), 0 20px 40px -18px rgb(var(--on-olive-rgb) / 0.6),
-    0 0 0 3px color-mix(in srgb, var(--color-sage) 25%, transparent);
+  box-shadow: var(--shadow-float), 0 0 0 3px rgb(var(--ink-rgb) / 0.18);
 }
 
 .assistant form {
@@ -119,8 +117,8 @@
   opacity: 0.58;
 }
 
-/* Record at rest is a bare glyph (it saves the room a second circle would take); Send keeps the
-   olive fill and Stop keeps its red. Each glyph swap pops in on the house press spring. */
+/* Record at rest is a bare glyph (it saves the room a second circle would take); Send is the bone
+   pill with ink text and Stop keeps its red. Each glyph swap pops in on the house press spring. */
 .micButton [data-composer-main][aria-pressed="false"] {
   color: var(--color-text-secondary) !important;
   background: transparent !important;
@@ -149,8 +147,8 @@
   height: 52px;
   border-radius: 16px;
   color: var(--color-text-secondary);
-  background: rgb(var(--ink-rgb) / 0.05);
-  box-shadow: inset 0 1px 1px rgb(var(--ink-rgb) / 0.08), inset 0 0 0 1px rgb(var(--ink-rgb) / 0.06);
+  background: rgb(var(--ink-rgb) / 0.06);
+  box-shadow: inset 0 0 0 1px rgb(var(--ink-rgb) / 0.08);
   transition: color 150ms ease;
 }
 

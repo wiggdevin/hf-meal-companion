@@ -31,7 +31,7 @@ export default function PageTitle({ eyebrow, title, trailing, back }: {
         {back.label}
       </Link>}
       {eyebrow && <p className="m-0 text-overline uppercase text-muted">{eyebrow}</p>}
-      <h1 className="m-0 font-display text-heading font-normal leading-[34px] tracking-[-0.01em] text-charcoal">{title}</h1>
+      <h1 className="m-0 font-display text-heading font-bold leading-[34px] tracking-[-0.01em] text-charcoal">{title}</h1>
     </div>
     {trailing && <div className="flex shrink-0 items-center gap-2">{trailing}</div>}
   </header>;

@@ -52,6 +52,7 @@ import { lockBodyScroll } from "@/lib/dom/scroll-lock";
 import { keyBelongsTo, nextTrapFocus } from "@/lib/dom/sheet-a11y";
 import Notice from "@/components/ui/Notice";
 import Button from "@/components/ui/Button";
+import HfLogo from "@/components/brand/HfLogo";
 
 const STEPS = ["Body", "Activity", "Goal", "Dietary preferences", "Foods", "Your plan"] as const;
 const BODY_FIELDS = new Set(["sex", "birth year", "height", "weight"]);
@@ -573,6 +574,7 @@ export default function OnboardingFlow({
         <div className="surface flex flex-1 flex-col gap-5 p-4"
           style={{ background: "var(--color-surface)" }}>
           <header className="flex flex-col gap-3">
+            <HfLogo variant="horizontal" tone="light" height={24} />
             <div className="-mr-1 -mt-1 flex items-center justify-between gap-3">
               <p className="m-0 uppercase text-overline text-text-faint">
                 Step {cuisine.position} of {cuisine.total(STEPS.length)}

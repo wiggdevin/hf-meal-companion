@@ -218,12 +218,12 @@ describe("ConversationalOnboarding", () => {
   });
 
   it("draws no companion while COMPANION_UI_ENABLED is off: no mascot, no guide line, no"
-    + " Sprout in the copy, and the greeting still reads as Sasha", () => {
+    + " Sprout in the copy, and the greeting still reads as High Frequency", () => {
     const { container } = render(<ConversationalOnboarding />);
-    screen.getByText(/Hey\. I’m Sasha\./);
+    screen.getByText(/Hey\. I’m High Frequency\./);
     expect(container.querySelector("[data-pose]")).toBeNull();
     expect(container.querySelector("[data-sprout-guide-size]")).toBeNull();
-    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("img:not([data-hf-logo])")).toBeNull();
     expect(container.textContent ?? "").not.toMatch(/Sprout/);
   });
 
@@ -238,7 +238,7 @@ describe("ConversationalOnboarding", () => {
     screen.getByText(/What’s your main goal right now\?/);
     expect(screen.queryByRole("progressbar")).toBeNull();
     // Live QA 2026-10-07: the dock is a working text composer, never an empty box.
-    screen.getByRole("textbox", { name: "Tell Sasha" });
+    screen.getByRole("textbox", { name: "Tell High Frequency" });
   });
 
   it("never renders the dock as an empty box on any beat: each beat's dock has a real control,"
@@ -265,7 +265,7 @@ describe("ConversationalOnboarding", () => {
 
   it("a typed answer moves the flow forward with no tap (read on the phone, no model call)", async () => {
     render(<ConversationalOnboarding />);
-    const box = screen.getByRole("textbox", { name: "Tell Sasha" });
+    const box = screen.getByRole("textbox", { name: "Tell High Frequency" });
     fireEvent.change(box, { target: { value: "lose fat, 34 years old" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     // goal and age are read; the facts beat asks the next question.
@@ -275,7 +275,7 @@ describe("ConversationalOnboarding", () => {
     // While a question is open, a bare typed number answers it in its own US unit.
     fireEvent.click(screen.getByRole("button", { name: "Female" }));
     await screen.findByLabelText("Height");
-    fireEvent.change(screen.getByRole("textbox", { name: "Tell Sasha" }), { target: { value: "5 10" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Tell High Frequency" }), { target: { value: "5 10" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByLabelText("Weight");
     expect(screen.getByTestId("facts-recap").textContent).toMatch(/5\u203210\u2033/);
@@ -284,7 +284,7 @@ describe("ConversationalOnboarding", () => {
   it("a typed health or allergy detail is never read: it opens the safety card, and the facts"
     + " questions follow it", async () => {
     render(<ConversationalOnboarding />);
-    fireEvent.change(screen.getByRole("textbox", { name: "Tell Sasha" }), { target: { value: "I have a peanut allergy" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Tell High Frequency" }), { target: { value: "I have a peanut allergy" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByTestId("safety-round");
     screen.getByText(/health or allergy detail/);
@@ -685,7 +685,7 @@ describe("ConversationalOnboarding", () => {
     await screen.findByText("How old are you?");
     // A bare weight-looking number while age is asked is not an age; the fast path reads it as a
     // ghost guess at most, which must not be drafted.
-    fireEvent.change(screen.getByRole("textbox", { name: "Tell Sasha" }), { target: { value: "I weigh 170" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Tell High Frequency" }), { target: { value: "I weigh 170" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await vi.waitFor(async () => {
       const draft = await loadOnboardingDraft();

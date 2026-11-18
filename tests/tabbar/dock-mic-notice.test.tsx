@@ -37,7 +37,7 @@ afterEach(() => {
   speech.handlers.length = 0;
 });
 
-const field = () => screen.getByRole("searchbox", { name: "Ask Sasha" }) as HTMLTextAreaElement;
+const field = () => screen.getByRole("searchbox", { name: "Ask High Frequency" }) as HTMLTextAreaElement;
 
 describe("the dock's mic notice and dictation lock", () => {
   it("shows a denied-permission notice as a status line", () => {

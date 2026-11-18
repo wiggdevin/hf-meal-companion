@@ -7,11 +7,11 @@ import { browserClient } from "@/lib/supabase/client";
 /** The Today header's profile avatar: the account initial in a glass circle. Opens settings for now;
     a quick-preferences popover replaces the link later. */
 export default function HeaderAvatar() {
-  const [initial, setInitial] = useState("S");
+  const [initial, setInitial] = useState("H");
 
   useEffect(() => {
     let live = true;
-    // The initial is decoration: a missing session or client keeps the "S" fallback.
+    // The initial is decoration: a missing session or client keeps the "H" fallback.
     void Promise.resolve().then(() => browserClient().auth.getSession()).then(({ data }) => {
       const first = data.session?.user.email?.trim().charAt(0);
       if (live && first) setInitial(first.toUpperCase());

@@ -13,14 +13,15 @@
 
 import Thinking from "@/components/ui/Thinking";
 import { workingCopy } from "@/components/WorkingLine";
+import bubble from "@/components/CoachMessage.module.css";
 
 export const DRAFT_CHECKING_COPY = "Checking this answer";
 
 export default function CoachDraftBubble({ draft }: { draft: string }) {
   const writing = draft.trim() !== "";
   return <div className="flex justify-start">
-    <span className="shell flex max-w-[82%] flex-col gap-2 rounded-[16px] px-4 py-3"
-      style={{ background: "var(--grad-bubble)" }} data-draft={writing ? "true" : undefined}>
+    <span className={`${bubble.theirs} flex max-w-[82%] flex-col gap-2 px-4 py-3`}
+      data-draft={writing ? "true" : undefined}>
       {writing && <span aria-hidden="true"
         className="m-0 whitespace-pre-wrap break-words text-caption font-normal leading-label-md text-muted">
         {draft}

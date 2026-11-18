@@ -1,11 +1,11 @@
 /**
  * The chosen background, kept on the phone per account (`smc:u:<id>:ground`). It is a display
- * preference, so it is not synced and has no server column; a new phone starts on Oat.
+ * preference, so it is not synced and has no server column; a new phone starts on White. A stored four-ground id still reads (oat, sage, clay: White; mist: Black).
  */
 import { type AccountHandle } from "@/lib/device/account";
 import { readAccountItem, writeAccountItem } from "@/lib/device/account-storage";
 import { GROUND_DEVICE_KEY } from "./ground-boot";
-import { DEFAULT_GROUND, isGroundId, type GroundId } from "./grounds";
+import { DEFAULT_GROUND, toGroundId, type GroundId } from "./grounds";
 import { themeColorFor } from "./theme-color";
 
 const NAME = "ground";
@@ -13,7 +13,7 @@ export const GROUND_EVENT = "ground-changed";
 
 export function readGround(h: AccountHandle): GroundId {
   const raw = readAccountItem(h, NAME);
-  return isGroundId(raw) ? raw : DEFAULT_GROUND;
+  return toGroundId(raw) ?? DEFAULT_GROUND;
 }
 
 export function saveGround(h: AccountHandle, id: GroundId): void {
@@ -34,5 +34,5 @@ export function applyGround(id: GroundId): void {
 export function currentGround(): GroundId {
   if (typeof document === "undefined") return DEFAULT_GROUND;
   const raw = document.documentElement.dataset.ground;
-  return isGroundId(raw) ? raw : DEFAULT_GROUND;
+  return toGroundId(raw) ?? DEFAULT_GROUND;
 }

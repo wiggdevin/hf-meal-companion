@@ -6,7 +6,7 @@
  * background becomes shaded or dark. That way we don't have to go inside the chat field every time
  * and then try to get out of it and figure out where we were").
  *
- * An ivory E2 card rises from the dock over a charcoal scrim, showing the account's current chat
+ * A white E2 card (ink text on either ground) rises from the dock over a charcoal scrim, showing the account's current chat
  * (components/coach/CoachConversation) with the assistant header and its scope chip. The dock stays the
  * composer. Nothing navigates: the page underneath keeps its scroll and state, made inert while the
  * card is up (inert-outside.ts), with its scroll held by `overflow: hidden` on <body> (never
@@ -78,7 +78,7 @@ export default function ChatOverlay({ scope, dock, onClose, onOpenFull }: {
       exit={{ opacity: 0, transition: reduce ? INSTANT : { ...fade("base", false), delay: 0.1 } }}
       transition={fade("base", reduce)} />
     {/* The card stops above the dock as tall as it is now (its text grows; --dock-height, TabBar). */}
-    <motion.section className={styles.card}
+    <motion.section className={`${styles.card} matte-reset`}
       style={{ bottom: "calc(var(--safe-bottom) + var(--dock-height, 64px) + 24px + var(--dock-lift, 0px))" }}
       initial={reduce ? { opacity: 0 } : { opacity: 0, y: 32, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}

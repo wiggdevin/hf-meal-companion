@@ -8,8 +8,9 @@ import { SignInCodeForm } from "@/components/SignInCodeForm";
 import { PasswordSignInForm } from "@/components/PasswordSignInForm";
 import { verifyOtpCode } from "@/app/sign-in/otp";
 import { callbackErrorText } from "@/app/auth/callback/errors";
-import { APP_NAME, ASSISTANT_EXPANSION } from "@/lib/brand";
+import { APP_TAGLINE } from "@/lib/brand";
 import Button from "@/components/ui/Button";
+import HfLogo from "@/components/brand/HfLogo";
 
 type Stage = "idle" | "sending" | "sent" | "error";
 type Mode = "link" | "password" | "create";
@@ -137,7 +138,7 @@ export default function SignInPage() {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col justify-center gap-6 px-5 text-charcoal">
+    <main className="flex min-h-dvh flex-col justify-center gap-7 px-5 py-8 text-charcoal">
       <SignInHeading creating={mode === "create"} />
       <DeletedNotice />
 
@@ -181,12 +182,16 @@ export default function SignInPage() {
 }
 
 function SignInHeading({ creating }: { creating: boolean }) {
+  // The mockup's greeting pair: Instrument Serif italic for the lead words, heavy Archivo for the last.
+  const [lead, last] = creating ? ["Create your", "account."] : ["Welcome", "back."];
   return (
-    <div className="flex flex-col gap-2">
-      <p className="ground-muted text-tiny uppercase tracking-[0.08em]">{APP_NAME}</p>
-      <p className="ground-muted text-tiny">{ASSISTANT_EXPANSION}</p>
-      <h1 className="ground text-display font-light leading-none tracking-tight">
-        {creating ? "Create your account." : "Welcome back."}
+    <div className="flex flex-col gap-3">
+      <HfLogo variant="horizontal" tone="auto" height={36} />
+      <p className="ground-muted mt-8 text-overline font-semibold uppercase tracking-[0.18em]">{APP_TAGLINE}</p>
+      <h1 className="ground m-0 flex flex-col text-display-md leading-[0.95] tracking-display-md">
+        <span className="font-accent text-display-md font-normal leading-[1] tracking-normal">{lead}</span>
+        {" "}
+        <span className="font-display text-display-md">{last}</span>
       </h1>
       <p className="ground-muted text-caption font-normal">
         {creating

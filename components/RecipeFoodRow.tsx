@@ -11,7 +11,7 @@ export default function RecipeFoodRow({ hit, onPick }: {
       <span className="pill-in flex items-center gap-3 rounded-[16px] px-3.5 py-3">
         <span
           aria-hidden="true"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] olive-panel text-tiny tracking-[0.04em] text-charcoal"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-fog text-tiny tracking-[0.04em] text-charcoal"
         >
           {hit.source === "mine" ? "MINE" : "USDA"}
         </span>

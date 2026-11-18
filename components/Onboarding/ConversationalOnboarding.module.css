@@ -1,6 +1,6 @@
-/* Onboarding v2 shell (lane L2, 2026-10-07; VISUAL-SPEC.md §1). Porcelain (2026-11-18): full-bleed
-   on the light porcelain ground with ink text, the same ground as every other screen — no header,
-   no progress bar, no companion (lib/today/companion-ui.ts). DESIGN.md
+/* Onboarding v2 shell (lane L2, 2026-10-07; VISUAL-SPEC.md §1). High Frequency (2026-11-18): full-bleed
+   on the white or black ground, ink or bone text, with the Patchwork H and a thin progress line on
+   top, no companion (lib/today/companion-ui.ts). DESIGN.md
    licenses an internally-scrolling surface for a redesigned onboarding that is its own overlay
    (§Layout, "one scroller per screen"); this is that one scroller. All colour comes from tokens
    already declared in app/globals.css / app/design-tokens.css. */
@@ -47,6 +47,40 @@
     color-mix(in srgb, var(--color-gauge-calories) 8%, transparent) 0%, transparent 70%);
 }
 
+/* High Frequency: the shell's one header row, the Patchwork H and a thin ink progress line on the
+   white or black ground. It sits above the scroller, never over it. */
+.top {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 390px;
+  margin: 0 auto;
+  padding: calc(14px + var(--safe-top)) 16px 4px;
+}
+.track {
+  position: relative;
+  flex: 1 1 auto;
+  height: 4px;
+  border-radius: 9999px;
+  overflow: hidden;
+  background: rgb(var(--ink-rgb) / 0.1);
+}
+.fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: rgb(var(--ink-rgb));
+  transform-origin: left center;
+  transition: transform 420ms var(--ease-spring-smooth, ease);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fill { transition: none; }
+}
+
 .scroller {
   position: relative;
   z-index: 1;
@@ -84,7 +118,7 @@
   gap: 16px;
   /* Sol round 3: without --safe-top, Sprout could start under an iPhone's status area
      (viewport-fit: cover). */
-  padding: calc(24px + var(--safe-top)) 16px 44px;
+  padding: 16px 16px 44px;
 }
 
 .guide {

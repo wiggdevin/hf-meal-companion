@@ -10,6 +10,7 @@
  * Third round: readiness joins the sparkline set — Oura stores it, the roll-up and the view carry
  * it, and nothing showed it (Sol audit, T11b finding 3).
  */
+import BodyWeightHero from "@/components/BodyWeightHero";
 import HealthMetricCard from "@/components/HealthMetricCard";
 import { Button, EmptyState } from "@/components/ui";
 import ProfileReadAlert from "@/components/ProfileReadAlert";
@@ -47,13 +48,12 @@ export function daysWithData(points: (number | null)[]): number {
 
 export { lastSeen } from "@/lib/health/last-seen";
 
-/* DESIGN.md's fixed per-macro gauge colours, by token rather than by literal: calories orange,
-   protein blue, carbs olive, fat gold. They belong to the four macro cards and are never
-   reassigned; the heart and readiness series are not macros, so they stroke in the neutral
-   secondary text token (split audit, finding 1 — a fifth and sixth use of the macro palette read
-   as a macro). */
-const GAUGE = { calories: "var(--color-gauge-calories)", protein: "var(--color-gauge-protein)",
-  carbs: "var(--color-gauge-carbs)", fat: "var(--color-gauge-fat)" };
+/* The High Frequency chart colours, by token rather than by literal: ink (the calorie gauge: bone
+   inside the matte hero), clay for the warm series, water slate for movement. Teal is the protein
+   bar's colour and is never drawn here. The heart and readiness series are not macros, so they
+   stroke in the neutral secondary text token (split audit, finding 1). */
+const SERIES = { weight: "var(--color-gauge-calories)", sleep: "var(--color-clay)",
+  steps: "var(--color-gauge-water)", energy: "var(--color-gauge-carbs)" };
 const NEUTRAL_STROKE = "var(--color-text-secondary)";
 const MUTED = "text-tiny font-normal text-muted";
 
@@ -79,14 +79,14 @@ export function bodyMetricSeries(
   return [
     spec("Weight", days.map((d) => d.body_mass_kg === null ? null
       : Math.round((weightUnit === "lb" ? kgToLb(d.body_mass_kg) : d.body_mass_kg) * 10) / 10),
-    GAUGE.protein, weightUnit, (value) => value === null ? "—"
+    SERIES.weight, weightUnit, (value) => value === null ? "—"
       : formatWeight(weightUnit === "lb" ? lbToKg(value) : value, weightUnit)),
     /* Body's h:mm sleep reading — not the generic `formatMetric`, which would print raw minutes
        with a spurious tenths digit. */
-    spec("Sleep", days.map((d) => d.sleep_minutes), GAUGE.carbs, "min",
+    spec("Sleep", days.map((d) => d.sleep_minutes), SERIES.sleep, "min",
       (value) => (value === null ? "—" : sleepText(value))),
-    spec("Steps", days.map((d) => d.steps), GAUGE.fat, "steps"),
-    spec("Device active energy estimate", days.map((d) => d.active_kcal), GAUGE.calories, "kcal"),
+    spec("Steps", days.map((d) => d.steps), SERIES.steps, "steps"),
+    spec("Device active energy estimate", days.map((d) => d.active_kcal), SERIES.energy, "kcal"),
     /* T11b: RHR and HRV. A row cached by a build from before T11b has no key at all, and
        undefined would reach the gauge as NaN (same reasoning as T11a's provenance repair). */
     spec("Resting heart rate", days.map((d) => d.resting_heart_rate ?? null), NEUTRAL_STROKE, "bpm"),
@@ -122,14 +122,22 @@ function MovementPanel({ context }: { context?: ActivityContextV1 }) {
   );
 }
 
-function MetricCards({ series }: { series: MetricCardSpec[] }) {
+/** The weigh-in leads as the black hero once it has a reading; every other series is a white card. */
+function MetricCards({ series, weightUnit }: { series: MetricCardSpec[]; weightUnit: WeightUnit }) {
+  const hero = series.find((card) => card.key === "Weight" && daysWithData(card.points) > 0);
+  const rest = series.filter((card) => card !== hero);
   return (
-    <div className="grid grid-cols-2 gap-3">
-      {series.map((card) => (
-        <HealthMetricCard key={card.key} eyebrow={card.eyebrow} value={card.value}
-          points={card.points} stroke={card.stroke} footnote={card.footnote} />
-      ))}
-    </div>
+    <>
+      {hero && <BodyWeightHero value={hero.value} points={hero.points} stroke={hero.stroke}
+        footnote={hero.footnote} unit={weightUnit} />}
+      <h2 className="m-0 px-1 pt-2 font-display text-heading-sm font-semibold text-charcoal">This week</h2>
+      <div className="grid grid-cols-2 gap-3 [&>.shell]:h-full [&>.shell>.surface]:h-full">
+        {rest.map((card) => (
+          <HealthMetricCard key={card.key} eyebrow={card.eyebrow} value={card.value}
+            points={card.points} stroke={card.stroke} footnote={card.footnote} />
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -215,7 +223,7 @@ export default function BodyDashboard({ response, chart, fetchedAt, offline, onO
           body="Connect a source, or log a weight, and the last seven days appear here."
           action={<Button onClick={onOpenSources}>Connect health sources</Button>} />
       ) : (
-        <MetricCards series={bodyMetricSeries(chart, weightUnit)} />
+        <MetricCards series={bodyMetricSeries(chart, weightUnit)} weightUnit={weightUnit} />
       )}
       {/* Design §8.1/§8.2: the trend line belongs on `/body`, after the metric cards, and it is
           drawn from the stored series the body response now carries. The component keeps its own

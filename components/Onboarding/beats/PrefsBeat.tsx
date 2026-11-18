@@ -92,7 +92,7 @@ export default function PrefsBeat({ question, helper, inputLabel, placeholder, t
     ? `Got it: ${reading.ids.slice(0, max ?? reading.ids.length).map(labelFor).join(" · ")}` : null;
 
   return <form aria-labelledby={questionId} onSubmit={submit} className="flex w-full flex-col gap-3">
-    <p id={questionId} className="m-0 font-serif text-heading-sm text-charcoal">{question}</p>
+    <p id={questionId} className="m-0 font-display text-[28px] leading-[1.1] tracking-display-md text-charcoal">{question}</p>
     <p className="m-0 text-caption text-graphite">{helper}</p>
     {!listOpen && <div className="flex min-w-0 flex-col gap-1">
       <label htmlFor={inputId} className="text-caption text-graphite">{inputLabel}</label>

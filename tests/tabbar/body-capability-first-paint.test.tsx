@@ -1,5 +1,5 @@
 /**
- * The dock reserves all four capsule destinations and the Sasha bubble on every render. Body
+ * The dock reserves all four capsule destinations and the High Frequency bubble on every render. Body
  * capability can change the page's content, but it must never change dock geometry during hydration.
  */
 import { describe, expect, it, vi } from "vitest";
@@ -11,7 +11,7 @@ vi.mock("next/navigation", () => ({ usePathname: vi.fn(() => "/"), useRouter: ()
 const LINKS = ['href="/"', 'href="/body"', 'href="/foods"', 'href="/settings"'];
 
 describe("TabBar's first render stays geometry-stable", () => {
-  it("always renders the four fixed destinations and the Sasha bubble", () => {
+  it("always renders the four fixed destinations and the High Frequency bubble", () => {
     const markup = renderToStaticMarkup(<TabBar />);
     for (const href of LINKS) expect(markup).toContain(href);
     expect(markup.match(/<a /g)).toHaveLength(4);

@@ -41,7 +41,7 @@ import DayCard from "@/components/today/DayCard";
 import DuplicateEntryCard from "@/components/today/DuplicateEntryCard";
 import { nextMeal } from "@/lib/today/board";
 import { todayPageTitle } from "@/lib/today/page-title";
-import PageTitle from "@/components/ui/PageTitle";
+import TodayHeader from "@/components/today/TodayHeader";
 import DayNutrients from "@/components/DayNutrients";
 import InstallPrompt from "@/components/InstallPrompt";
 import Notice from "@/components/ui/Notice";
@@ -969,6 +969,7 @@ export default function Today() {
 
   // The page title carries the viewed date now (the Day card no longer does).
   const { title, eyebrow } = todayPageTitle(viewedDate, todayIso);
+  const greetingFor = (minutes: number) => minutes < 0 ? undefined : minutes < 720 ? "Good morning," : minutes < 1080 ? "Good afternoon," : "Good evening,";
 
   return (
     <MotionConfig reducedMotion="user">
@@ -976,7 +977,7 @@ export default function Today() {
         className="mx-auto flex w-full max-w-md flex-col gap-5 px-4"
         style={{ paddingTop: "calc(var(--safe-top) + 20px)" }}
       >
-        <PageTitle eyebrow={eyebrow} title={title}
+        <TodayHeader eyebrow={eyebrow} title={title} greeting={isToday ? greetingFor(nowM) : undefined}
           back={isToday ? undefined : { href: "/", label: "Back to today",
             onClick: (event) => { event.preventDefault(); selectDate(todayIso); } }}
           trailing={<>
@@ -990,7 +991,7 @@ export default function Today() {
             />
             {/* Interim way into the Week screen until the week's charts (W4) link to it. */}
             <Link href="/week" aria-label="Open the Week screen"
-              className="tap flex h-11 items-center rounded-full px-3 text-caption font-medium text-graphite">
+              className="tap flex h-11 items-center rounded-full border-hairline border px-4 text-caption font-semibold text-charcoal">
               Week
             </Link>
             <HeaderAvatar />

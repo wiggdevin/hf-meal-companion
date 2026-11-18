@@ -7,6 +7,7 @@ import Button from "@/components/ui/Button";
 import SproutGuide, { type OnboardingPose } from "@/components/Onboarding/SproutGuide";
 import { COMPANION_UI_ENABLED } from "@/lib/today/companion-ui";
 import { APP_NAME } from "@/lib/brand";
+import HfLogo from "@/components/brand/HfLogo";
 import OnboardingDock, { type OnboardingDockMode } from "@/components/Onboarding/dock/OnboardingDock";
 import { useDockDictation } from "@/components/Onboarding/dock/useDockDictation";
 import WeekBeat from "@/components/Onboarding/beats/WeekBeat";
@@ -209,6 +210,13 @@ function flagsWithPractices(current: readonly string[], practices: readonly Prac
 }
 
 type PlanBeat = (typeof PLAN_ORDER)[number];
+
+/** Where each beat sits on the shell's thin progress line (the under-18 stop shares the facts' place). */
+const PROGRESS_ORDER: readonly OnboardingBeat[] = ["opener", "facts", ...PLAN_ORDER];
+function beatProgress(beat: OnboardingBeat): number {
+  const index = PROGRESS_ORDER.indexOf(beat === "minor" ? "facts" : beat);
+  return Math.max(0, index) / (PROGRESS_ORDER.length - 1);
+}
 
 /** Noon UTC on a local YYYY-MM-DD, the derivation's own date convention. */
 function noonUtc(day: string): Date {
@@ -1220,6 +1228,14 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
         every other screen; no `.matte` scope. §3: a soft backdrop so the stage is never an empty
         field; it quiets to one glow for the reward beat. */}
     <div className={styles.backdrop} data-reward={beat === "reward" || undefined} aria-hidden="true" />
+    {/* High Frequency: the Patchwork H and one thin ink line that fills as the beats go by. */}
+    <header className={styles.top} data-testid="onboarding-top">
+      <HfLogo variant="monogram" tone="auto" height={28} decorative />
+      <span className={styles.track} aria-hidden="true">
+        <span className={styles.fill}
+          style={{ transform: `scaleX(${0.06 + 0.94 * beatProgress(beat)})` }} />
+      </span>
+    </header>
     {/* ui-ux-buddy NIT: `.guide`'s `layout="position"` projects inside this scrolling ancestor —
         `layoutScroll` keeps that projection correct if the account has scrolled mid-transition,
         instead of animating from a stale offset. */}

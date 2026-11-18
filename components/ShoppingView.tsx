@@ -130,7 +130,7 @@ export default function ShoppingView({ period, lines, pantry = [], initialDraft,
   const planLines = lines.filter((line) => line.origin === "plan");
   const windowed = monthly && purchaseWindows.length > 0;
   return <div ref={topRef} className="flex flex-col gap-4" aria-label="Shopping">
-    {heading && <h1 className="m-0 text-xl font-semibold">Shopping</h1>}
+    {heading && <h1 className="m-0 text-title font-semibold">Shopping</h1>}
     {buildSlot === undefined ? <BuildListSlot periodId={period?.id ?? null} /> : buildSlot}
     {switcher}
     <ShoppingList title={period ? dateRange(period) : "This week"} lines={lines}
@@ -173,7 +173,7 @@ export default function ShoppingView({ period, lines, pantry = [], initialDraft,
       ? "Tick plan items off week by week above; the list covers the full period."
       : "Buy amounts and ticks cover the whole month. Week-by-week amounts aren't ready yet."}</p>}
     <section className="shell" aria-label="Pick from your foods"><div className="surface flex flex-col gap-3 p-4">
-      <h2 className="m-0 text-lg font-semibold">Pick from your foods</h2>
+      <h2 className="m-0 text-title font-semibold">Pick from your foods</h2>
       <PickList lines={lines}
         onAdd={async (names) => { await actions.addItems(names); setPreview(null); }}
         onRemove={async (line) => { await actions.removeLine(line); setPreview(null); }} />

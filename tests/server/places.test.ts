@@ -51,7 +51,7 @@ async function refusal(promise: Promise<unknown>): Promise<HttpError> {
 
 describe("the User-Agent", () => {
   it("names the app and its production address", () => {
-    expect(placesUserAgent(ENV)).toMatch(/^[A-Za-z]+\/1\.0 \(\+https:\/\/meals\.example\.app\)$/);
+    expect(placesUserAgent(ENV)).toMatch(/^[A-Za-z ]+\/1\.0 \(\+https:\/\/meals\.example\.app\)$/);
     expect(placesUserAgent({ VERCEL_PROJECT_PRODUCTION_URL: "https://meals.example.app/" }))
       .toBe(placesUserAgent(ENV));
   });

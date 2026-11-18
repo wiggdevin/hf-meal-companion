@@ -149,7 +149,7 @@ function roleCounts(choices: readonly Starter[], marks: Record<string, StarterMa
 
 function Instruction({ choices, marks }: { choices: readonly Starter[]; marks: Record<string, StarterMark> }) {
   return <div className="flex w-full flex-col gap-1">
-    <p className="m-0 font-serif text-heading-sm text-charcoal">Tap the foods you love</p>
+    <p className="m-0 font-display text-[28px] leading-[1.1] tracking-display-md text-charcoal">Tap the foods you love</p>
     <p className="m-0 text-caption text-graphite" aria-live="polite">
       {roleCounts(choices, marks).map(({ role, loved }, index) => <span key={role}>
         {index > 0 && " · "}{ROLE_NAME[role]} {Math.min(loved, PER_ROLE)}/{PER_ROLE}

@@ -7,6 +7,7 @@ import Tag from "@/components/ui/Tag";
 import { PROCESSORS } from "@/components/settings/ProcessorsSection";
 import { DELETED_ITEMS } from "@/components/settings/DeleteAccountCard";
 import { APP_NAME } from "@/lib/brand";
+import HfLogo from "@/components/brand/HfLogo";
 
 const BODY = "m-0 text-body font-normal text-charcoal [text-wrap:pretty]";
 const LIST = "m-0 flex list-disc flex-col gap-1.5 pl-5 text-body font-normal text-charcoal";
@@ -22,6 +23,7 @@ export default function PrivacyNotice({ deletionEnabled }: { deletionEnabled: bo
   return (
     <main className="mx-auto flex w-full max-w-md flex-col gap-5 px-4 pb-10"
       style={{ paddingTop: "calc(var(--safe-top) + 20px)" }}>
+      <HfLogo variant="horizontal" tone="auto" height={28} />
       <PageTitle eyebrow={APP_NAME} title="Privacy" />
       <div className="flex flex-col gap-2">
         <Tag tone="yellow" className="self-start">Test version</Tag>

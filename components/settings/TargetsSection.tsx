@@ -89,7 +89,7 @@ export default function TargetsSection({
         <ActivityMismatchPrompt />
         <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
           <legend className={`mb-2.5 ${FIELD_LABEL}`}>Training days</legend>
-          {/* One row, a week at a glance: every day is a pill, chosen days fill olive (2026-10-01:
+          {/* One row, a week at a glance: every day is a pill, chosen days fill ink (2026-10-01:
               unchosen days were bare text on the card). */}
           <div className="grid grid-cols-7 gap-1.5">
             {WEEKDAYS.map((day, value) => {

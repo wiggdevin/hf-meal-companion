@@ -305,11 +305,15 @@ function ModalSheet({
           : { opacity: 0, scale: POP_FROM, transition: { ...SPRINGS.smooth, visualDuration: 0.24, opacity: { duration: 0.16 } } }}
         transition={reduceMotion ? { duration: 0.16 } : { ...SPRINGS.snappy, opacity: { duration: 0.18 } }}
       >
+        {/* The grab handle: a quiet ink pill that says "this is a sheet". Decorative; the close
+            button and Escape stay the ways out. */}
+        <span aria-hidden="true" data-sheet-handle=""
+          className="-mb-2 -mt-1 mx-auto h-1 w-10 shrink-0 rounded-full bg-[rgb(var(--ink-rgb)/0.16)]" />
         <div className="flex min-w-0 shrink-0 items-start justify-between gap-3">
           {header ?? <div className="flex min-w-0 flex-col gap-1 pt-1">
             {/* Screen and sheet titles speak in the display face (DESIGN.md §Typography; Kimi K1). */}
             <h2
-              className="m-0 break-words font-display text-heading font-light tracking-display-md leading-[1.1] [text-wrap:balance]"
+              className="m-0 break-words font-display text-heading tracking-display-md leading-[1.05] [text-wrap:balance]"
             >
               {title}
             </h2>

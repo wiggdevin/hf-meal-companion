@@ -2,7 +2,7 @@
 /**
  * The one ask-box surface. The dock's assistant ask field (components/dock/AssistantField.tsx) and
  * every meal-card panel's AI box (components/plan/PlanComposer.tsx) draw from these pieces, so the
- * charcoal composer skin, its olive rim and focus ring, the cream text, the light under the finger
+ * basalt composer skin, its bone hairline rim and focus ring, the bone text, the light under the finger
  * and the springs a control pops in on stay one thing. Styles live in TabBar.module.css only.
  */
 import { forwardRef, type FormEvent, type ReactNode } from "react";

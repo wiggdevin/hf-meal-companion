@@ -85,7 +85,7 @@ export default function ShoppingControls({ draft, onChange, onPreview, busy = fa
     }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
   }
   return <section className="shell"><div className="surface flex flex-col gap-4 p-4">
-    <h2 className="m-0 text-lg font-semibold">Plan this shop</h2>
+    <h2 className="m-0 text-title font-semibold">Plan this shop</h2>
     <div className="grid grid-cols-3 gap-2" role="group" aria-label="Period">
       {(["7 days", "Custom", "Month"] as const).map((value) => <Button key={value} className="min-w-0 px-2"
         aria-pressed={period === value} variant={period === value ? "primary" : "quiet"}

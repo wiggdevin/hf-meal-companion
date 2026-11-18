@@ -251,7 +251,7 @@ describe("nextChatState", () => {
   it("disables the composer offline with the stated copy", () => {
     const offline = nextChatState(initialChatState("t1"), { type: "connection", online: false });
     expect(offline.composerDisabled).toBe(true);
-    expect(COMPOSER_OFFLINE_COPY).toBe("Sasha needs a connection");
+    expect(COMPOSER_OFFLINE_COPY).toBe("High Frequency needs a connection");
   });
 
   it("clears the offline notice and enables the composer on reconnect", () => {

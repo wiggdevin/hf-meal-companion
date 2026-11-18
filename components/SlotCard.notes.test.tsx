@@ -44,7 +44,7 @@ describe("an empty generated slot shows why it is empty (U28)", () => {
     expect(line.className).toContain("text-caption");
     expect(line.className).toContain("text-muted");
     expect(line.closest("[data-fold]")).toBeTruthy(); // it folds in, never a cut
-    expect(screen.getByRole("button", { name: variant === "focus" ? "Plan with Sasha" : "Plan" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: variant === "focus" ? "Plan with High Frequency" : "Plan" })).toBeTruthy();
   });
 
   it("hides the reason while a flow is open in the card, and shows nothing without one", () => {

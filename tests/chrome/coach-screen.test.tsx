@@ -40,8 +40,8 @@ function renderCoach(): void {
 
 it("shows the unavailable state without mounting chat when coach is off", () => {
   renderCoach();
-  expect(screen.getByRole("heading", { name: "Sasha" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "High Frequency" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
-  expect(screen.getByRole("status").textContent).toContain("Sasha is unavailable right now");
+  expect(screen.getByRole("status").textContent).toContain("High Frequency is unavailable right now");
   expect(screen.queryByText("Loading your conversation…")).toBeNull();
 });

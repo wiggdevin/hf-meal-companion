@@ -180,7 +180,7 @@ export const ROLES: Role[] = [
   { id: ".matte text-text-faint", use: "text", color: token("text-faint", MATTE), scope: "matte" },
   { id: ".matte text-on-olive", use: "text", color: token("on-olive", MATTE), scope: "matte" },
   { id: ".matte .kcal / .macro-ink-kcal", use: "text", color: token("kcal-on-ink"), scope: "matte" },
-  { id: ".matte .olive-panel .kcal", use: "text", color: token("gauge-calories-end"), scope: "matte" },
+  { id: ".matte .olive-panel .kcal", use: "text", color: token("kcal-on-ink"), scope: "matte" },
   { id: ".matte .macro-ink-protein", use: "text", color: token("protein-on-ink"), scope: "matte" },
   { id: ".matte .macro-ink-carbs", use: "text", color: token("gauge-carbs"), scope: "matte" },
   { id: ".matte .macro-ink-fat", use: "text", color: token("gauge-fat"), scope: "matte" },
@@ -291,13 +291,13 @@ export function forbiddenPairs(): Pair[] {
       "gauge hues are fills and dots; text uses `.macro-ink-*`"],
     ["gauge fat (.macro-fat, text-yellow) as text", "white card", "text", token("gauge-fat"), ivory,
       "use `text-yellow-ink` or `.macro-ink-fat`"],
-    ["gauge protein (.macro-protein) as text", "charcoal matte", "text", token("gauge-protein"), matte,
-      "3.9:1 inside the meal card; `.macro-ink-protein` uses the lighter end"],
-    ["gauge calories as text", "white card", "text", token("gauge-calories"), ivory, "use `.kcal`"],
+    ["gauge protein (.macro-protein) as text", "white card", "text", token("gauge-protein"), ivory,
+      "teal is a fill and a dot on white; teal text is `text-link` (the darker teal)"],
+    ["gauge water (.macro-water) as text", "white card", "text", token("gauge-water"), ivory, "slate blue is a fill; water text is ink"],
     ["warm orange rim (text-orange-warm)", "white card", "text", token("orange-warm"), ivory, "rims only"],
-    ["white on tomato fill (text)", "tomato fill (log button)", "text", WHITE, [token("accent"), token("gauge-calories")],
-      "3.45:1: white rides tomato only as a glyph or 24 px+ figure; labels on tomato are ink (5.47:1)"],
-    ["text-text-faint", "tray (.well)", "text", token("text-faint"), [token("fog")], "faint is for the white card and field"],
+    ["white on clay or teal fill (text)", "clay-300 / teal fill (macro bars)", "text", WHITE, [token("orange-warm"), token("gauge-protein")],
+      "labels on a clay-300 or teal fill are ink"],
+    ["text-text-faint", "hairline fill", "text", token("text-faint"), [token("border")], "faint is for the white card and field"],
   ];
   return rows.map(([role, surface, use, color, shades, why]) =>
     ({ role, surface, use, ratio: worst(color, shades), allowed: false, why }));

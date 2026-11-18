@@ -51,7 +51,7 @@ describe("SlotCard completion colors", () => {
       canSwap onToggleEaten={() => {}} onOpenSwap={() => {}}
       onPlanWithCoach={() => {}} onLogWhatYouAte={() => {}} />);
     expect(markup).toContain("Nothing planned yet.");
-    expect(markup).toContain("Plan with Sasha");
+    expect(markup).toContain("Plan with High Frequency");
     expect(markup).toContain("Log what you ate");
     expect(markup).not.toContain("Mark eaten, Lunch");
     expect(markup).not.toContain("Swap Lunch");

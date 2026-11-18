@@ -99,7 +99,7 @@ describe("the phone's Retry", () => {
   it("keeps the failed turn's messageId so the retry replays it", () => {
     const sent = nextChatState(initialChatState(null), { type: "send", messageId: MESSAGE, text: "hi" });
     const failed = nextChatState(sent, { type: "error", status: 503, code: "timeout",
-      message: "Sasha did not answer in time. Try again.", messageId: MESSAGE });
+      message: "High Frequency did not answer in time. Try again.", messageId: MESSAGE });
     expect(failed.retryable).toBe(true);
     expect(failed.pendingMessageId).toBe(MESSAGE);
   });

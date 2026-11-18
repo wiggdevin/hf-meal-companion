@@ -69,7 +69,7 @@ afterEach(() => {
 });
 
 describe("coach shell lifecycle", () => {
-  it("sends a query submitted from the selected Sasha dock field", async () => {
+  it("sends a query submitted from the selected High Frequency dock field", async () => {
     mocks.postTurn.mockReturnValue(new Promise(() => {}));
     vi.spyOn(crypto, "randomUUID").mockReturnValue("3f1b1a2c-0000-4000-8000-000000000009");
     render(<CoachShell userId="user-1" threadId={null}
@@ -294,7 +294,7 @@ describe("coach shell lifecycle", () => {
 
     sendViaDock("Hello");
 
-    expect(await view.findByText(/No connection to Sasha/, {}, SLOW)).not.toBeNull();
+    expect(await view.findByText(/No connection to High Frequency/, {}, SLOW)).not.toBeNull();
   });
 
   it("confirms a sent message only after the server accepts it", async () => {
@@ -336,7 +336,7 @@ describe("coach shell lifecycle", () => {
 
     sendViaDock("Hello");
 
-    expect(await view.findByText("Could not confirm this message was sent. No connection to Sasha.")).not.toBeNull();
+    expect(await view.findByText("Could not confirm this message was sent. No connection to High Frequency.")).not.toBeNull();
     expect(view.getAllByRole("alert")).toHaveLength(1);
     expect(view.getByText(/This reply may have saved/)).not.toBeNull();
     expect(view.container.querySelector('[data-feedback-state="failed"]')).toBeNull();

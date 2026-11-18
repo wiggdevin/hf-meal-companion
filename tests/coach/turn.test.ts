@@ -193,7 +193,7 @@ describe("turnStepSchema", () => {
 /**
  * T4: the union is the validation, the flat schema is what leaves the process. A real coach turn
  * used to hand `turnStepSchema` to the adapter, `toGeminiSchema` threw on its `oneOf`, and every
- * Sasha turn answered 503 coach_unavailable without a provider call.
+ * High Frequency turn answered 503 coach_unavailable without a provider call.
  */
 describe("the wire form of a turn step", () => {
   it("lowers to one object Gemini's responseSchema can carry", () => {
