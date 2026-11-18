@@ -237,6 +237,10 @@ export function noticePairs(): Pair[] {
     { role: "notice body (graphite)", surface: `notice ${tone}`, use: "text" as const,
       ratio: contrast(token("graphite"), wash), allowed: true },
     { role: "notice mark (tone ink)", surface: `notice ${tone}`, use: "icon" as const, ratio: contrast(ink, wash), allowed: true },
+  ]).concat([
+    // The armed danger button (globals.css .btn-danger[data-armed]): white label on the red-ink fill.
+    { role: "armed danger label", surface: "btn-danger armed", use: "text" as const,
+      ratio: contrast(token("surface"), token("red-ink")), allowed: true },
   ]);
 }
 

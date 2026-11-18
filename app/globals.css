@@ -236,6 +236,7 @@
   --color-icon: #b8b8b2;
   --color-hairline: rgba(255, 255, 255, 0.12);
   --ink-rgb: 255 255 255;
+  --primary-rgb: 255 255 255; /* caret and focus ring stay visible on the charcoal */
   color: var(--color-charcoal);
 }
 .matte-reset,
@@ -253,6 +254,7 @@
   --color-icon: #4a4a46;
   --color-hairline: rgba(17, 17, 16, 0.1);
   --ink-rgb: 17 17 16;
+  --primary-rgb: 17 17 16;
   color: var(--color-charcoal);
 }
 /* The matte grain over a charcoal surface. */
@@ -733,14 +735,14 @@ button.well:disabled {
     background: color-mix(in srgb, var(--color-red-wash) 70%, transparent);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-red) 28%, transparent);
   }
-  .btn-danger[data-armed="true"] { background: var(--color-red); color: var(--color-surface); box-shadow: none; }
+  .btn-danger[data-armed="true"] { background: var(--color-red-ink); color: var(--color-surface); box-shadow: none; }
   @media (hover: hover) {
     .btn-primary:hover:not(:disabled) { background: linear-gradient(180deg, #1c1c1a 0%, #050505 100%); }
     .btn-secondary:hover:not(:disabled) { background: rgb(var(--ink-rgb) / 0.07); }
     .btn-tertiary:hover:not(:disabled) { background: #e3e3de; }
     .matte .btn-tertiary:hover:not(:disabled) { background: rgb(var(--ink-rgb) / 0.12); }
     .btn-ghost:hover:not(:disabled) { background: rgb(var(--ink-rgb) / 0.06); }
-    .btn-danger:hover:not(:disabled) { background: var(--color-red-wash); }
+    .btn-danger:not([data-armed="true"]):hover:not(:disabled) { background: var(--color-red-wash); }
   }
 
   /* Outcome, in the button itself. Label, dots, confirmation and error share one grid cell, so the

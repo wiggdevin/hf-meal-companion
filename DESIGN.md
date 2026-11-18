@@ -327,6 +327,7 @@ code by the test; each role shows its worst allowed surface.
 | notice title (attention) | text (≥ 4.5) | notice attention | 6.20:1 |
 | notice title (error) | text (≥ 4.5) | notice error | 5.58:1 |
 | notice title (neutral) | text (≥ 4.5) | notice neutral | 15.52:1 |
+| armed danger label | text (≥ 4.5) | btn-danger armed | 6.57:1 |
 | neutral tag (text-graphite) | text (≥ 4.5) | neutral tag on coach bubble | 9.54:1 |
 | .matte neutral tag | text (≥ 4.5) | neutral tag in the matte | 11.28:1 |
 
