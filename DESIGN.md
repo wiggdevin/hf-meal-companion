@@ -1,7 +1,7 @@
 ---
 version: "alpha"
 name: "Sasha Meal Companion"
-description: "Phone-first nutrition PWA for multiple accounts, each with a plan derived from that account's foods, preferences, and targets. Harvest (2026-10-01, from the owner's Premium Meal Card reference): an oat stone ground with a matte grain, ivory cards, matte charcoal meal cards with true-colour food photography and a sweeping photo curve, an olive primary with cream text and an inset bevel, beige trays, a cream Fraunces headline voice over Plus Jakarta Sans, and muted harvest macros (brick, plum, sage, wheat, slate). App-owned identity; never reuse elsewhere."
+description: "Phone-first nutrition PWA for multiple accounts, each with a plan derived from that account's foods, preferences, and targets. Porcelain (2026-11-17, docs spec 2026-11-17-sasha-rebrand-spec): a cool porcelain ground with no grain, pure white cards with hairline edges, white meal cards with true-colour food photography, near-black ink for text and every action (ink pill buttons, ink dock), one tomato accent for calories and the brand mark, Newsreader for the one state sentence per screen over Geist with tabular figures, and fixed macro data hues (iris, mint, amber, sky). App-owned identity; never reuse elsewhere."
 colors:
   primary: "#111110"
   secondary: "#E9E9E5"
@@ -156,7 +156,18 @@ components:
 ---
 ## Overview
 
-Brand (2026-10-10): the logo is **Steam**: an olive bowl with a geometric S rising as steam and a persimmon diamond. The logo system, brand book (voice, imagery, iconography), named motion moments and the 31 ship rules live in `docs/design/brand/`; logo files in `public/brand/`.
+Brand (2026-11-17, Porcelain): the Steam bowl retired. The mark is an ink tile with a white Newsreader italic "s" and a tomato diamond; the wordmark is "Sasha" in Newsreader 500, outlined to paths, with the same diamond. Earlier (2026-10-10) the logo was **Steam**: an olive bowl with a geometric S rising as steam and a persimmon diamond. The logo system, brand book (voice, imagery, iconography), named motion moments and the 31 ship rules live in `docs/design/brand/`; logo files in `public/brand/`.
+
+**Porcelain (2026-11-17, current).** A white-and-ink clinical-luxury system with one warm accent:
+a cool porcelain ground (`#F2F2EF`) with no grain, white cards and white meal cards with an 8 % ink
+hairline, near-black ink (`#111110`) for text and for every action (ink pill buttons, the ink dock
+with a white active-tab capsule), food photography as the only large colour, and tomato (`#F2542D`)
+reserved for calories, the brand mark and the log action. Newsreader carries the one state sentence
+per screen; Geist carries everything else and every number, with tabular figures. Macro hues are
+fixed data colours (protein iris, carbs mint, fat amber, water sky), used as fills and dots, never as
+headings. Token names are unchanged from Harvest; only their values moved. The Harvest prose below
+is history: where it names oat, olive, charcoal meal cards, beige trays or Fraunces, read Porcelain's
+ground, ink, white card, inset tray and Newsreader.
 
 Meal Companion looks like a good restaurant menu, not a cockpit (the "Harvest" theme, 2026-10-01,
 branch `feat/nutrition-look`, from the owner's Premium Meal Card reference: "use this as inspiration").
@@ -569,7 +580,7 @@ search, this is AI").
   Swipe left uncovers Delete; the row's "…" opens Rename, Clear messages and Delete in a row under
   it. Delete and Clear ask twice inside the button ("Delete" → "Delete for good"); there is no undo,
   because the server keeps no deleted chat.
-- **Meal card (Harvest, 2026-10-01):** matte charcoal, 32 px radius, the deep drop.
+- **Meal card (Porcelain, 2026-11-17):** white card, 32 px radius, an 8 % ink hairline and the soft card shadow, no `.matte` scope; the tray is the light inset. (Harvest, 2026-10-01: matte charcoal with the deep drop.)
   - Meal cards v3 (2026-10-08, `docs/design/meal-cards-v2.md`): the slot chip leads with a word —
     `Next · 12:30 PM`, `Now · …` on the focus card (a cream chip), `Eaten · …` once ticked off
     (charcoal with a cream rim), else the slot's own name (`Meal 3 · …`), never a bare number. No macro
