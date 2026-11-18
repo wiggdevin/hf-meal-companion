@@ -352,7 +352,7 @@ export default function SlotCard({
       {...cardProps} data-after-dark-meal="true"
       data-card-density={compact ? "compact" : "featured"}>
       {editSurface}
-      <div className={`${surfaceClass} flex flex-col gap-0 matte matte-grain ${dark.mealSurface}`}>
+      <div className={`${surfaceClass} flex flex-col gap-0 ${dark.mealSurface}`}>
         {/* Every size change inside springs in its own box (the hero here, the macro panel and the
             tray in theirs), so the card's own height is plain layout and follows them in the same
             frame. A second spring around them all chased their moving total and lagged, then caught

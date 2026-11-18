@@ -1,12 +1,12 @@
-/* The meal card's nutrition (DESIGN.md Cards and Surfaces › Meal card): on the charcoal card, between
-   the title and the beige tray. */
+/* The meal card's nutrition (DESIGN.md Cards and Surfaces › Meal card): on the white card, between
+   the title and the inset tray. */
 .divider {
   position: relative;
   z-index: 2;
   padding: 0 16px;
 }
 
-/* The reference's olive spec panel. */
+/* The ink spec panel. */
 .panel {
   margin-top: 10px;
   display: flex;
@@ -15,7 +15,7 @@
   padding: 10px 6px;
   border-radius: 16px;
   background: var(--color-primary);
-  box-shadow: var(--bevel), 0 10px 20px -12px rgb(var(--charcoal-deep-rgb) / .6);
+  box-shadow: var(--bevel);
 }
 
 .specs {

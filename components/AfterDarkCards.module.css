@@ -1,8 +1,7 @@
-/* The Harvest meal card (DESIGN.md Cards and Surfaces › Meal card), after the Premium Meal Card
-   reference: matte charcoal with a 3 % grain, true-colour food photography with a sweeping curve,
-   a cream Fraunces title, the olive spec panel (components/ui/MealNutritionDivider) and a beige tray.
-   The surface carries the global `matte` scope, so the text roles inside read cream; the tray carries
-   `matte-reset`, so they read ink again. */
+/* The Porcelain meal card (DESIGN.md Cards and Surfaces › Meal card): a white card with an 8 % ink
+   hairline, true-colour food photography with a sweeping curve, an ink Newsreader title, the ink spec
+   panel (components/ui/MealNutritionDivider) and a light inset tray. No `matte` scope: every text role
+   inside reads ink. */
 
 .mealSurface.mealSurface {
   /* How far a compact card's tray rises over the foot of its photo: its own corner radius. */
@@ -14,19 +13,17 @@
   pointer-events: none;
   border-radius: 32px;
   overflow: clip; /* clip, not hidden: a hidden box can be scrolled by focus and shift the card */
-  background: var(--grad-matte);
-  /* Bold (2026-10-19): a cream hairline at 8 % (the `.matte` scope's ink), so the charcoal card stands
-     clear of whatever sits behind it. */
-  border: 1px solid rgb(var(--ink-rgb) / .08);
-  box-shadow: var(--bevel), var(--shadow-hero);
+  background: var(--grad-card);
+  /* Porcelain: an 8 % ink hairline and the soft card shadow; the white card stands on the ground. */
+  border: 1px solid var(--hairline-card);
+  box-shadow: var(--shadow-card);
 }
 
 .hero {
   position: relative;
   display: flex;
   align-items: flex-end;
-  /* The photo fills the top 120 px; the title and calories sit under it on charcoal (v3: smaller;
-     the 2026-10-19 sweep: smaller again). */
+  /* The photo fills the top 120 px; the title and calories sit under it on white. */
   padding: 130px 16px 2px;
   isolation: isolate;
 }
@@ -67,18 +64,17 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: 20px;
-  /* The meal title role (lib/design/meal-type.ts MEAL_TITLE.hero): Fraunces 500, the 20 px step in v3. */
+  /* The meal title role (lib/design/meal-type.ts MEAL_TITLE.hero): Newsreader 500, the 20 px step. */
   font-weight: 500;
   line-height: 1.05;
-  letter-spacing: -.025em;
-  /* Cream: the `.matte` scope's primary text role. */
+  letter-spacing: -.015em;
   color: var(--color-text-primary);
   overflow-wrap: anywhere;
 }
 
 /* The calorie count is the card's one big figure (Bold, 2026-10-19): the display numeral
    (`numeral text-numeral-md`, set by MealCalories), the unit in tracked capitals under it. Its colour
-   is the shared `.kcal` (persimmon on charcoal, owner 2026-10-03). */
+   is the shared `.kcal` (tomato ink on white). */
 
 .heroTime {
   position: absolute;
@@ -87,7 +83,7 @@
   z-index: 2;
 }
 
-/* The reference's "Chef's Choice" chip: olive, bevelled, tracked capitals. */
+/* The time chip on the photo: white glass, tracked capitals in ink. */
 .slotPill {
   display: inline-flex;
   align-items: center;
@@ -95,8 +91,8 @@
   padding: 0 12px;
   gap: 6px;
   border-radius: 9999px;
-  background: rgb(var(--primary-rgb) / .92);
-  box-shadow: var(--bevel), 0 6px 14px -8px rgb(var(--charcoal-deep-rgb) / .6);
+  background: rgb(var(--cream-rgb) / .92);
+  box-shadow: 0 4px 12px -6px rgb(var(--charcoal-deep-rgb) / .35);
   backdrop-filter: blur(8px);
   color: var(--color-text-secondary);
   /* The eyebrow role: nothing on a card is under 12 px (KIT §14). */
@@ -122,22 +118,21 @@
   color: var(--color-text-secondary);
 }
 
-/* The focus card's chip is the one cream object on the photo, so "Next" reads before anything else. */
+/* The focus card's chip is the one ink object on the photo, so "Next" reads before anything else. */
 .slotPillFocus {
-  /* Cream: the `.matte` scope's ink channel, so the chip is the scope's own primary text colour. */
-  background: rgb(var(--ink-rgb) / .94);
+  background: rgb(var(--charcoal-deep-rgb) / .92);
   box-shadow: 0 6px 14px -8px rgb(var(--charcoal-deep-rgb) / .6);
 }
 .slotPillFocus .slotPillStatus,
 .slotPillFocus .slotPillTime,
 .slotPillFocus .slotPillDot {
-  color: var(--color-charcoal-deep);
+  color: var(--color-on-primary);
 }
 
-/* Eaten: the chip goes charcoal with a cream rim; the photo and the words keep their full colour. */
+/* Eaten: the chip stays white with an ink rim; the photo and the words keep their full colour. */
 .slotPillEaten {
-  background: rgb(var(--charcoal-deep-rgb) / .86);
-  box-shadow: inset 0 0 0 1px rgb(var(--ink-rgb) / .28);
+  background: rgb(var(--cream-rgb) / .96);
+  box-shadow: inset 0 0 0 1px rgb(var(--ink-rgb) / .16);
 }
 
 /* The figures beside the title: calories, and on a compact card the protein under them. */
@@ -157,7 +152,7 @@
   font-size: 14px;
   font-weight: 600;
   line-height: 1;
-  color: var(--color-on-primary);
+  color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
 }
 /* The macro dots in their gauge hues (dots, never text: DESIGN.md §Colors). */
@@ -184,7 +179,7 @@
   margin-left: 6px;
 }
 
-/* The beige tray: the reference's bottom bar, its upper corners curved alike (2026-10-01: a curve on
+/* The inset tray: the card's bottom bar, its upper corners curved alike (2026-10-01: a curve on
    the left and a square corner on the right read as a mistake). It holds one face at a time
    (components/MealCardTray.tsx): the card's detail, or a flow the card started, which takes the
    detail's place inside the card (2026-10-04, owner: "one card with what's currently selected at the
@@ -195,8 +190,8 @@
   margin-top: 12px;
   border-top-left-radius: 24px;
   border-top-right-radius: 24px;
-  background: var(--grad-recess);
-  box-shadow: 0 -10px 30px rgb(var(--charcoal-deep-rgb) / .15);
+  background: var(--grad-card-inset);
+  box-shadow: inset 0 1px 0 var(--hairline-card);
   /* The strip's solid eaten zone follows the tray's curved corners (v3 review). */
   overflow: clip;
   /* The compact tray rises over the photo's foot; the gap and the corners change on the container
@@ -226,7 +221,7 @@
   margin-block: 16px;
 }
 
-/* Inside the beige tray the recessed meter tray lifts to ivory. */
+/* Inside the inset tray the recessed meter tray lifts to white. */
 .details :global(.meal-detail-tray) {
   background: var(--grad-card);
 }
@@ -253,7 +248,7 @@
 /* Compact (other collapsed meals, and every card with a flow open): the photo fills the card's whole
    left side, its upper-right corner swept; the title, calories and the macro split sit beside it. The
    tray rises 24 px over the photo's foot, so its curved corner closes over the food rather than over
-   a band of charcoal (U9, 2026-10-04, owner: the image "used to take up more space and fill the
+   a band of white (U9, 2026-10-04, owner: the image "used to take up more space and fill the
    bottom section"). */
 .compact .hero {
   min-height: 108px;
@@ -359,7 +354,7 @@
 }
 
 /* Meal cards v3: the strip is one thin row of three equal zones — eaten | swap | details — each its
-   whole third as the tap target (44 px tall), told apart by tone on the beige tray, never pills. */
+   whole third as the tap target (44 px tall), told apart by tone on the inset tray, never pills. */
 .strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -421,7 +416,7 @@
   border-radius: 12px;
 }
 
-/* The favorite heart: a small charcoal disc on the photo's upper right, its 44 px target around it. */
+/* The favorite heart: a small ink disc on the photo's upper right, its 44 px target around it. */
 .heart {
   position: absolute;
   top: 10px;
@@ -434,8 +429,8 @@
   justify-content: center;
   border-radius: 9999px;
   background: rgb(var(--charcoal-deep-rgb) / .72);
-  box-shadow: inset 0 0 0 1px rgb(var(--ink-rgb) / .22);
-  color: var(--color-text-primary);
+  box-shadow: inset 0 0 0 1px rgb(var(--cream-rgb) / .22);
+  color: var(--color-on-primary);
   backdrop-filter: blur(6px);
 }
 .heart::before {
