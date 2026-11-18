@@ -20,6 +20,8 @@ vi.mock("@/components/today/care/sound", () => ({
   play: vi.fn(), unlockAudio: vi.fn(), readMuted: () => true, silence: vi.fn(), writeMuted: vi.fn(),
 }));
 const shown = vi.hoisted(() => ({ hidden: [] as string[], writes: [] as [string, boolean][], fail: false }));
+// The companion is off the UI (lib/today/companion-ui.ts); these tests cover the slot when it is on.
+vi.mock("@/lib/today/companion-ui", () => ({ COMPANION_UI_ENABLED: true }));
 vi.mock("@/lib/today/companion-visibility", () => ({
   useCompanionShown: (key: string) => !shown.hidden.includes(key),
   setCompanionShown: async (key: string, next: boolean) => {

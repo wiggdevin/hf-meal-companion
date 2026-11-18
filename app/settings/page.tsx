@@ -23,6 +23,7 @@ import CuisinesSection from "@/components/settings/CuisinesSection";
 import FoodWorldSection from "@/components/settings/FoodWorldSection";
 import BackgroundSection from "@/components/settings/BackgroundSection";
 import CompanionSection from "@/components/settings/CompanionSection";
+import { COMPANION_UI_ENABLED } from "@/lib/today/companion-ui";
 import ProcessorsSection from "@/components/settings/ProcessorsSection";
 import WaterSection from "@/components/settings/WaterSection";
 import HowSashaWorksCard from "@/components/tour/HowSashaWorksCard";
@@ -156,7 +157,7 @@ export default function SettingsPage() {
 
       <FoodWorldSection />
 
-      <CompanionSection />
+      {COMPANION_UI_ENABLED && <CompanionSection />}
 
       <BackgroundSection />
 
