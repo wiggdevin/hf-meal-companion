@@ -78,6 +78,7 @@ const STORAGE_FILES: Record<string, string> = {
   "lib/device/writer-lock.ts": "device, per account id: smc:device:writer:<id>",
   "lib/foods/prefs-client.ts": "account by value: meal-companion:food-pref-refs { <id>: … }",
   "lib/foods/starter-seed.ts": "account: smc:u:<id>:starter-suggestions-seeded-v1",
+  "lib/feedback-client.ts": "account (session): smc:u:<id>:feedback-draft",
   "lib/health/capability.ts": "device (session): smc:body_capability",
   "lib/profile/onboarding-state.ts": "account: smc:u:<id>:onboarding-invite-dismissed-at",
   "lib/recipes/session-checks.ts": "account (session): smc:u:<id>:recipe-checks:<revision>",
