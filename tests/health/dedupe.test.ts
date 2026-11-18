@@ -27,7 +27,7 @@ describe("dedupeKey", () => {
     const watch = dedupeKey({ type: "step_count", start_time: "2026-09-15T13:00:00-04:00",
       end_time: "2026-09-15T14:00:00-04:00", device_label: "Apple Watch" });
     const phone = dedupeKey({ type: "step_count", start_time: "2026-09-15T13:00:00-04:00",
-      end_time: "2026-09-15T14:00:00-04:00", device_label: "Sasha's iPhone" });
+      end_time: "2026-09-15T14:00:00-04:00", device_label: "My iPhone" });
     expect(watch).not.toBe(phone);
   });
 

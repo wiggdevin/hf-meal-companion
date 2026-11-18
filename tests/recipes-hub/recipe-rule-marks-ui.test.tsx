@@ -47,7 +47,7 @@ function recipe(name: string, ruleMark?: RuleMark | null): RecipeCandidate {
       nutrition: { kcal: known(700), protein: known(25), carbs: known(140), fat: known(5) }, allergenEvidence: {} }],
     steps: [{ seq: 1, text: "Boil the noodles." }],
     nutritionPerServing: { kcal: known(350), protein: known(12), carbs: known(70), fat: known(3) },
-    source: { author: "Sasha kitchen", sourceUrl: null, rightsKind: "original", rightsRecord: "o",
+    source: { author: "HF kitchen", sourceUrl: null, rightsKind: "original", rightsRecord: "o",
       sourceRevision: "1", kitchenTested: false },
     eligibility: { status: "eligible", reasons: [] },
     ...(ruleMark === undefined ? {} : { ruleMark }),

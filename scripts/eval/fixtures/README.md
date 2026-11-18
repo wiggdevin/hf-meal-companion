@@ -1,7 +1,7 @@
 # Phase 4 eval fixtures
 
 Thirty files, named exactly as `scripts/eval/phase-4-capture.jsonl` names them. They are **not**
-committed: they are Sasha's own photos and recordings, and this repository is not where her plate
+committed: they are real users' photos and recordings, and this repository is not where their plate
 photos live. Drop them here before a run; `.gitignore` keeps everything in this folder except this
 README out of git.
 

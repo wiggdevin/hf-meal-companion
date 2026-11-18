@@ -42,7 +42,7 @@ function loadWorker(routes: Record<string, Served>) {
   const listeners: Record<string, (event: unknown) => void> = {};
   const self = {
     addEventListener: (type: string, fn: (event: unknown) => void) => { listeners[type] = fn; },
-    location: { origin: "https://sasha.example" },
+    location: { origin: "https://hf.example" },
     skipWaiting: () => undefined,
     clients: { claim: async () => undefined, matchAll: async () => [] },
   };

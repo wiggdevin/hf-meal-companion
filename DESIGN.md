@@ -189,7 +189,7 @@ large colour. It is a 390 px phone app first.
   `--font-accent-face`) are unchanged.
 - **Mark:** the Patchwork H (`public/brand/hf-*.svg`, `components/brand/HfLogo.tsx`): ink, teal and
   clay strokes on light; bone, teal and clay on dark. The coach mark is the HF monogram
-  (`components/coach/SashaMark.tsx`, name kept). App icons and the favicon come from the HF set.
+  (`components/coach/HfMark.tsx`). App icons and the favicon come from the HF set.
 
 Token names are unchanged from Harvest and Porcelain; only their values moved (`paper`, `fog`,
 `graphite`, `charcoal`, `muted`, `tangerine`, `plum`, `amber`...). The older prose below is history:
@@ -554,7 +554,7 @@ search, this is AI").
     ("Logged", tick, haptic), then the card swaps on the gentle spring with the blur into the
     follow-ups: Undo for 8 s (a draining hairline; the real undo), "Your trend" and "Suggestions",
     which open the chat overlay with a short ask. Closing keeps a typed number.
-- **Chat header (`components/coach/CoachHeader.tsx`, U21):** the living mark (`SashaMark`: Thinking's
+- **Chat header (`components/coach/CoachHeader.tsx`, U21):** the living mark (`HfMark`: Thinking's
   three orbs in their goo on an ivory 44 px disc, drifting at a third of Thinking's pace, three times
   faster while a turn runs; still under reduced motion), the name (40 px on /coach, 20 px in the
   overlay) and the scope under it, plain metadata (a sage dot and "On Today" / "Whole app", never a

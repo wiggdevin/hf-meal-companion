@@ -194,7 +194,7 @@ async function main(): Promise<void> {
   for (const text of sentences) {
     hits[text] ??= { ok: 0, n: 0, ms: [], models: [] };
     const started = Date.now();
-    console.log(`SASHA: ${text}`);
+    console.log(`COACH: ${text}`);
     try {
       const res = await runTurn(client, db, userId,
         { threadId, messageId: randomUUID(), text, now: new Date().toISOString(), tz: TZ },

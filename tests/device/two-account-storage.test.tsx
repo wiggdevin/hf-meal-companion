@@ -42,7 +42,7 @@ const recipe = {
   ingredients: ["Carrots", "Olive oil", "Chicken"].map((name, index) => ingredient(index + 1, name)),
   steps: [{ seq: 1, text: "Cook." }],
   nutritionPerServing: { kcal: known(508), protein: known(51), carbs: known(44), fat: known(13) },
-  source: { author: "Sasha kitchen", sourceUrl: null, rightsKind: "original", rightsRecord: "o",
+  source: { author: "HF kitchen", sourceUrl: null, rightsKind: "original", rightsRecord: "o",
     sourceRevision: "1", kitchenTested: true },
   eligibility: { status: "eligible", reasons: [] },
 } as unknown as RecipeCandidate;

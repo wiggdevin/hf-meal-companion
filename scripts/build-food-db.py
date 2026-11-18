@@ -628,7 +628,7 @@ EXTRA = [
     ("fruit-pouch", "Fruit pouch, pear or banana base (3.5 oz)", "fruit", {"kcal": 71, "protein": 0.5, "carbs": 17.0, "fat": 0.0, "fiber": 2.0}, [{"label": "1 pouch", "grams": 99}], "typical apple-free pouch label"),
 ]
 
-# Off-plan flags for Sasha (colitis plan): gluten, dairy, apple. Name-based.
+# Historical off-plan flags (first-client plan): gluten, dairy, apple. Name-based.
 DAIRY = re.compile(r"\b(milk|cheese|yogurt|butter|cream|whey|ghee|ice cream|cheesecake|latte|cappuccino|alfredo|ricotta|feta|brie|mozzarella|parmesan|cheddar|provolone|swiss|pudding|frozen yogurt|hot chocolate|chocolate milk)\b", re.I)
 DAIRY_OK = re.compile(r"\b((?:almond|oat|soy|coconut) milk (?:latte|cappuccino)|almond milk|oat milk|soy milk|coconut milk|coconut water|peanut butter|almond butter|cashew butter|sesame butter|sunflower seed butter|cocoa butter|butternut|buttercup)\b", re.I)
 GLUTEN = re.compile(r"\b(bread|bagel|muffin|croissant|bun|roll|pita|naan|flour tortilla|pancake|waffle|french toast|spaghetti|pasta|noodle|couscous|barley|farro|spelt|wheat|rye|semolina|malt|bulgur|cracker|pretzel|cookie|brownie|cake|donut|pie|cinnamon|pop-tart|ramen|lo mein|dumpling|pierogi|sandwich|burger|pizza|burrito|quesadilla|enchilada|egg roll|spring roll|corn dog|mac|macaroni|lasagna|ziti|gnocchi|biscuit|cornbread|granola|cheerios|corn flakes|cream of wheat|beer|soy sauce|teriyaki|fish sticks|breaded|fried chicken|chicken nuggets|chicken tenders|onion rings|mozzarella sticks|crab cake|meatball|meatloaf|pot pie|gyro|sub |toast|graham|goldfish|rice krispies|oatmeal cookie|oreo|kit kat|falafel|shepherd)\b", re.I)

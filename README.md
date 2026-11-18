@@ -1,6 +1,6 @@
-# Sasha's Meal Companion
+# High Frequency Meal Companion
 
-A phone-first, multi-user PWA; Sasha is user 1. It tells each person what
+A phone-first, multi-user PWA; Not built for any one person. It tells each person what
 to eat and when, lets them tick meals off, and builds meals from the foods
 they can eat right now.
 
@@ -13,7 +13,7 @@ Live: https://hf-meal-companion.vercel.app
 - Supabase (project `fivatgdpuenszxxnijpc`) for sync and the MCP server
 - Vitest for tests
 - pnpm 11.25.0, Node 22
-- Deployed on Vercel (project `sasha-meal-companion`)
+- Deployed on Vercel (project `hf-meal-companion`)
 
 ## Quick start
 

@@ -52,7 +52,7 @@ import urllib.parse
 import urllib.request
 
 LABEL = "ops-alert"
-DEFAULT_HEALTH_URL = "https://sasha-meal-companion.vercel.app"
+DEFAULT_HEALTH_URL = "https://hf-meal-companion.vercel.app"
 BACKUP_MAX_AGE = dt.timedelta(hours=36)
 REOPEN_WINDOW = dt.timedelta(hours=2)
 HEALTH_ATTEMPTS = 3

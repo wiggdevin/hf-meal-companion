@@ -10,7 +10,7 @@ import { reloadTarget } from "@/lib/device/departure";
  * the same one, back again) could not start at all. Loads the real public/sw.js.
  */
 const SW_SOURCE = fs.readFileSync(path.resolve(__dirname, "../../public/sw.js"), "utf8");
-const ORIGIN = "https://sasha.example";
+const ORIGIN = "https://hf.example";
 
 type Cached = Record<string, string>;
 

@@ -25,7 +25,7 @@ function loadWorker(windows: WindowClient[]) {
   const caches = {
     open: async () => ({ put: async () => undefined, match: async () => undefined }),
     match: async () => undefined,
-    keys: async () => ["sasha-shell-v2", "sasha-shell-v3"],
+    keys: async () => ["hf-shell-v2", "hf-shell-v3"],
     delete: async (key: string) => { deleted.push(key); return true; },
   };
   const listeners: Record<string, (event: unknown) => void> = {};
@@ -35,7 +35,7 @@ function loadWorker(windows: WindowClient[]) {
   };
   const self = {
     addEventListener: (type: string, fn: (event: unknown) => void) => { listeners[type] = fn; },
-    location: { origin: "https://sasha.example" },
+    location: { origin: "https://hf.example" },
     skipWaiting: vi.fn(),
     clients,
   };
@@ -53,11 +53,11 @@ async function run(listeners: Record<string, (event: unknown) => void>, type: st
 
 describe("service worker v3 never drives open tabs", () => {
   it("activation keeps only the v3 shell cache and never navigates, reloads, messages or claims a window", async () => {
-    const a = windowClient("a", "https://sasha.example/");
-    const b = windowClient("b", "https://sasha.example/foods");
+    const a = windowClient("a", "https://hf.example/");
+    const b = windowClient("b", "https://hf.example/foods");
     const { listeners, clients, deleted } = loadWorker([a, b]);
     await run(listeners, "activate");
-    expect(deleted).toEqual(["sasha-shell-v2"]);
+    expect(deleted).toEqual(["hf-shell-v2"]);
     expect(clients.claim).not.toHaveBeenCalled();
     for (const w of [a, b]) {
       expect(w.navigate).not.toHaveBeenCalled();
@@ -73,7 +73,7 @@ describe("service worker v3 never drives open tabs", () => {
 
   // FluidVoice update availability: the one message it answers is the page's own explicit Reload.
   it("skips waiting only when a page asks with SKIP_WAITING, and still never drives a window", () => {
-    const a = windowClient("a", "https://sasha.example/");
+    const a = windowClient("a", "https://hf.example/");
     const { listeners, self, clients } = loadWorker([a]);
     for (const data of [undefined, null, "SKIP_WAITING", { type: "RELOAD" }, { kind: "SKIP_WAITING" }]) {
       listeners.message({ data });

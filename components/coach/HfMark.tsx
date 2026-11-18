@@ -15,7 +15,7 @@ import styles from "./CoachHeader.module.css";
 /** How much faster the mark moves while the assistant works. */
 export const THINKING_RATE = 3;
 
-export default function SashaMark({ thinking = false, size = 32 }: { thinking?: boolean; size?: number }) {
+export default function HfMark({ thinking = false, size = 32 }: { thinking?: boolean; size?: number }) {
   const reduce = useReducedMotion() === true;
   const root = useRef<HTMLSpanElement>(null);
   useEffect(() => {

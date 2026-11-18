@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RecipeCandidate } from "@/lib/recipe-catalog/types";
-import { ASK_SASHA_MAX_MEALS, askCapNotice, ASK_SASHA_MAX_QUESTION, ASK_SASHA_MAX_TEXT, askSashaPayload, askSashaText,
+import { ASK_COACH_MAX_MEALS, askCapNotice, ASK_COACH_MAX_QUESTION, ASK_COACH_MAX_TEXT, askCoachPayload, askCoachText,
   affectedLabel, impactRecipeOptions, impactSwipe } from "./AvoidImpact";
 
 describe("affected meal swipe", () => {
@@ -49,16 +49,16 @@ describe("verified affected meal replacements", () => {
 
 describe("Ask High Frequency payload", () => {
   it("carries the user's own trimmed wording with the affected ids, deduplicated", () => {
-    expect(askSashaPayload("  Can I keep the pasta?  ",
+    expect(askCoachPayload("  Can I keep the pasta?  ",
       ["2026-10-01:meal-1", "2026-10-02:meal-2", "2026-10-01:meal-1"])).toEqual({
       question: "Can I keep the pasta?", affectedIds: ["2026-10-01:meal-1", "2026-10-02:meal-2"] });
   });
 
   it("caps the ids at the existing bounded request limit", () => {
     const ids = Array.from({ length: 20 }, (_, i) => `2026-10-${String(i + 1).padStart(2, "0")}:meal-1`);
-    const payload = askSashaPayload("Swap these?", [...ids, ...ids]);
-    expect(ASK_SASHA_MAX_MEALS).toBe(12);
-    expect(payload?.affectedIds).toEqual(ids.slice(0, ASK_SASHA_MAX_MEALS));
+    const payload = askCoachPayload("Swap these?", [...ids, ...ids]);
+    expect(ASK_COACH_MAX_MEALS).toBe(12);
+    expect(payload?.affectedIds).toEqual(ids.slice(0, ASK_COACH_MAX_MEALS));
   });
 
   it("says when only the first meals are sent: more than the limit is covered", () => {
@@ -71,8 +71,8 @@ describe("Ask High Frequency payload", () => {
   });
 
   it("sends nothing for blank wording and bounds a long one", () => {
-    expect(askSashaPayload("   \n ", ["2026-10-01:meal-1"])).toBeNull();
-    expect(askSashaPayload("x".repeat(900), [])?.question).toHaveLength(ASK_SASHA_MAX_QUESTION);
+    expect(askCoachPayload("   \n ", ["2026-10-01:meal-1"])).toBeNull();
+    expect(askCoachPayload("x".repeat(900), [])?.question).toHaveLength(ASK_COACH_MAX_QUESTION);
   });
 });
 
@@ -88,7 +88,7 @@ describe("Ask High Frequency request text", () => {
 
   it("sends everything unchanged when it fits", () => {
     const list = items(2, 30);
-    const text = askSashaText({ ...base, question: "Keep these?", items: list, options: options(list, 20) });
+    const text = askCoachText({ ...base, question: "Keep these?", items: list, options: options(list, 20) });
     expect(text).toContain("Keep these?");
     for (const item of list) expect(text).toContain(item.title.slice(0, 80));
     for (const row of options(list, 20)) expect(text).toContain(row.names[1]);
@@ -96,8 +96,8 @@ describe("Ask High Frequency request text", () => {
 
   it("trims verified options before any meal title", () => {
     const list = items(12, 60);
-    const text = askSashaText({ ...base, question: long("Why?", 400), items: list, options: options(list) });
-    expect(text.length).toBeLessThanOrEqual(ASK_SASHA_MAX_TEXT);
+    const text = askCoachText({ ...base, question: long("Why?", 400), items: list, options: options(list) });
+    expect(text.length).toBeLessThanOrEqual(ASK_COACH_MAX_TEXT);
     for (const item of list) expect(text).toContain(item.title);
     expect(text).not.toContain(options(list)[11].names[1]);
   });
@@ -105,10 +105,10 @@ describe("Ask High Frequency request text", () => {
   it("trims meal titles only after the options are gone, never the question or an id", () => {
     // More meals than the UI sends, so the second stage is reached: titles shorten, ids stay.
     const list = items(20);
-    const question = long("Can these stay?", ASK_SASHA_MAX_QUESTION);
-    const text = askSashaText({ ...base, question, items: list, options: options(list, 200) });
-    expect(ASK_SASHA_MAX_TEXT).toBe(2000);
-    expect(text.length).toBeLessThanOrEqual(ASK_SASHA_MAX_TEXT);
+    const question = long("Can these stay?", ASK_COACH_MAX_QUESTION);
+    const text = askCoachText({ ...base, question, items: list, options: options(list, 200) });
+    expect(ASK_COACH_MAX_TEXT).toBe(2000);
+    expect(text.length).toBeLessThanOrEqual(ASK_COACH_MAX_TEXT);
     expect(text.startsWith(question)).toBe(true);
     for (const item of list) expect(text).toContain(`${item.date}:${item.slot}`);
     expect(text).not.toContain("Option A1");

@@ -7,7 +7,7 @@ const TZ = "America/New_York";
 const HAE = { data: { metrics: [
   { name: "step_count", units: "count", data: [
     { date: "2026-09-15 13:00:00 -0400", qty: 812, source: "Apple Watch" },
-    { date: "2026-09-15 14:00:00 -0400", qty: 610, source: "Sasha's iPhone" }] },
+    { date: "2026-09-15 14:00:00 -0400", qty: 610, source: "My iPhone" }] },
   { name: "active_energy", units: "kcal", data: [
     { date: "2026-09-15 13:00:00 -0400", qty: 96.4, source: "Apple Watch" }] },
   { name: "weight_body_mass", units: "lb", data: [

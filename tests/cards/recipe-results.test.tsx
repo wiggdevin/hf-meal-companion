@@ -20,7 +20,7 @@ function recipe(over: Partial<RecipeCandidate> = {}): RecipeCandidate {
       allergenEvidence: {} }],
     steps: [{ seq: 1, text: "Simmer the beans." }],
     nutritionPerServing: { kcal: known(300), protein: known(20), carbs: known(40), fat: known(5) },
-    source: { author: "Sasha kitchen", sourceUrl: null, rightsKind: "original", rightsRecord: "original-1",
+    source: { author: "HF kitchen", sourceUrl: null, rightsKind: "original", rightsRecord: "original-1",
       sourceRevision: "1", kitchenTested: false },
     eligibility: { status: "eligible", reasons: [] }, ...over,
   };

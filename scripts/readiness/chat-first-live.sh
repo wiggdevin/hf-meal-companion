@@ -8,7 +8,7 @@ set -u
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 PROJECT_ID="prj_qOr6rQOZ5yfCd5VxB227apmg6pvF"
 TEAM_ID="team_ZovXSbiQdKR8CvRpDYfAzbAr"
-PROD_URL="https://sasha-meal-companion.vercel.app"
+PROD_URL="https://hf-meal-companion.vercel.app"
 SUPABASE_REF="fivatgdpuenszxxnijpc"
 PR="${1:-}"
 fail=0

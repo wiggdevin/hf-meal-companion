@@ -27,7 +27,7 @@ import CompanionSection from "@/components/settings/CompanionSection";
 import { COMPANION_UI_ENABLED } from "@/lib/today/companion-ui";
 import ProcessorsSection from "@/components/settings/ProcessorsSection";
 import WaterSection from "@/components/settings/WaterSection";
-import HowSashaWorksCard from "@/components/tour/HowSashaWorksCard";
+import HowItWorksCard from "@/components/tour/HowItWorksCard";
 import { useSettingsController } from "@/components/settings/use-settings-controller";
 import { isExistingAccount } from "@/lib/profile/onboarding-state";
 import Button from "@/components/ui/Button";
@@ -162,7 +162,7 @@ export default function SettingsPage() {
 
       <BackgroundSection />
 
-      <HowSashaWorksCard />
+      <HowItWorksCard />
 
       <ScheduleSection shiftMinutes={settings.shiftMinutes} slotTimes={settings.slotTimes}
         mealsPerDay={settings.mealsPerDay} activeTargetProfile={settings.activeTargetProfile}

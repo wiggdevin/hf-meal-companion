@@ -20,7 +20,7 @@ function loadServiceWorker(fetchImpl: (req: unknown) => Promise<Response>) {
   const caches = {
     open: async () => cache,
     match: (req: { url: string } | string) => cache.match(req),
-    keys: async () => ["sasha-shell-v2"],
+    keys: async () => ["hf-shell-v2"],
     delete: async () => true,
   };
   const listeners: Record<string, (event: unknown) => void> = {};
@@ -28,7 +28,7 @@ function loadServiceWorker(fetchImpl: (req: unknown) => Promise<Response>) {
     addEventListener: (type: string, fn: (event: unknown) => void) => {
       listeners[type] = fn;
     },
-    location: { origin: "https://sasha.example" },
+    location: { origin: "https://hf.example" },
     skipWaiting: () => {},
     clients: { claim: () => {} },
   };
@@ -50,7 +50,7 @@ function dispatchFetch(listeners: Record<string, (event: unknown) => void>, requ
 
 describe("the service worker's handling of /api/ requests", () => {
   it("does not resolve a stale cached body when the network fails on a later load", async () => {
-    const url = "https://sasha.example/api/health/daily?from=2026-09-15&to=2026-09-15";
+    const url = "https://hf.example/api/health/daily?from=2026-09-15&to=2026-09-15";
     let calls = 0;
     const fetchImpl = async () => {
       calls += 1;

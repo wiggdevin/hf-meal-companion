@@ -19,7 +19,7 @@
   animation: mark-breathe 5.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 
-/* At rest the monogram breathes at a third of the thinking pace; SashaMark raises the playback rate
+/* At rest the monogram breathes at a third of the thinking pace; HfMark raises the playback rate
    to 3 while a turn is in flight, so the two read as the same body. */
 @keyframes mark-breathe {
   0%, 100% { transform: scale(1); }

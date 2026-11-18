@@ -19,7 +19,7 @@ on:
   # One nightly run (~25 billed min/day) catches that within a day for ~170 fewer
   # runs/week than push-to-main gave us. Trigger one on demand right after landing a
   # cluster of PRs with:
-  #   gh workflow run ci.yml --repo wiggdevin/sasha-meal-companion --ref main
+  #   gh workflow run ci.yml --repo wiggdevin/hf-meal-companion --ref main
   # Longer term, once this repo is public and branch protection supports it, a merge queue
   # (tests the post-merge result before merging, instead of after) replaces this entirely.
   pull_request: {}
