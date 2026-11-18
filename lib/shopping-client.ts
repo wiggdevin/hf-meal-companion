@@ -9,6 +9,7 @@ import type { ShoppingPreviewResult } from "@/lib/shopping/preview-contract";
 import { withRuleMark, withRuleMarks } from "@/lib/shopping/rule-mark-wire";
 import { refreshShoppingFocus } from "@/lib/shopping/focus-client";
 import { currentShoppingPeriod } from "@/lib/shopping/current";
+import { SHOPPING_COMING_SOON } from "@/lib/recipe-pilot-copy";
 
 export type ShoppingSnapshot = { period: ShoppingPeriod | null; lines: ShoppingLine[];
   purchaseWindows?: ShoppingPurchaseWindow[] };
@@ -57,7 +58,7 @@ async function shoppingRequest<T>(path: string, init: RequestInit = {},
       "recipe_plan_unavailable", "shopping_unavailable", "preview_unavailable"].includes(code) && message)
       throw fail(message);
     if (code === "recipe_pilot_unavailable")
-      throw fail("Shopping is not available for this account yet.");
+      throw fail(SHOPPING_COMING_SOON);
     if (res.status === 409) throw fail("Shopping changed elsewhere. Refresh and preview again.");
     throw fail(`Shopping request failed (${res.status}). Try again.`);
   }

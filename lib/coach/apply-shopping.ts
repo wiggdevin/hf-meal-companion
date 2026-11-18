@@ -17,8 +17,9 @@ import { recipeAccessForCurrentAccount } from "@/lib/recipe-access-client";
 import { addToCurrentShoppingList, deleteShoppingLine, shoppingAnswerStatus, shoppingRefused }
   from "@/lib/shopping-client";
 import type { ShoppingLine } from "@/lib/shopping/types";
+import { SHOPPING_COMING_SOON } from "@/lib/recipe-pilot-copy";
 
-export const SHOPPING_UNAVAILABLE_REASON = "Shopping isn't available for this account yet.";
+export const SHOPPING_UNAVAILABLE_REASON = SHOPPING_COMING_SOON;
 const SHOPPING_RETRY_REASON = "Those items did not save. Try again.";
 /** W020: lines that saved before an account switch stay on that account's list and the card has
  *  no Undo for them. "May": a switch inside one try loses that try's answer, so the apply cannot

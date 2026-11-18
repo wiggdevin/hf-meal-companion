@@ -130,7 +130,7 @@ describe("the recipe widget", () => {
   it("hides the catalog and says why when the account has no recipe access", () => {
     render(<RecipeHub access={{ enabled: false, loading: false }} onClose={() => {}} onSaved={() => {}} />);
     expect(screen.queryByRole("region", { name: "Recipe catalog" })).toBeNull();
-    expect(screen.getByText(/recipe catalog isn’t on for this account/)).toBeTruthy();
+    expect(screen.getByText(/Shared recipes are coming soon for your account/)).toBeTruthy();
     expect(search).not.toHaveBeenCalled();
   });
 
