@@ -4,7 +4,7 @@ A phone-first, multi-user PWA; Sasha is user 1. It tells each person what
 to eat and when, lets them tick meals off, and builds meals from the foods
 they can eat right now.
 
-Live: https://sasha-meal-companion.vercel.app
+Live: https://hf-meal-companion.vercel.app
 
 ## Stack
 
