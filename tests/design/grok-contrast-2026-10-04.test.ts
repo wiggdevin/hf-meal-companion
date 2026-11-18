@@ -114,7 +114,7 @@ describe("Grok audit 2026-10-04: .olive-panel is a light tint, not dark olive", 
     expect(panelAlpha).toBeLessThanOrEqual(0.1); // a wash, not a fill
   });
 
-  it("every section hue composited at that alpha over every ivory card body stays light enough for ink text", () => {
+  it("every section hue composited at that alpha over every white card body stays light enough for ink text", () => {
     for (const hue of Object.values(SECTIONS)) {
       for (const base of ivoryBackdrops) {
         const composite = over(hue, panelAlpha, hexToRgb(base));
@@ -177,7 +177,7 @@ describe("Grok audit 2026-10-04: InstallPrompt and ProposalCard paint --grad-pan
    * check the same rule (ivory panel, never the matte gradient or scope) against what it actually
    * renders now.
    */
-  it("InstallPrompt.tsx paints the ivory card system (.shell/.surface, --grad-card) and never the matte gradient or scope", () => {
+  it("InstallPrompt.tsx paints the white card system (.shell/.surface, --grad-card) and never the matte gradient or scope", () => {
     expect(INSTALL_PROMPT).toMatch(/className="shell"/);
     expect(INSTALL_PROMPT).toMatch(/className="surface /); // the hand-built iOS Share guide's own panel
     expect(INSTALL_PROMPT).not.toMatch(/--grad-matte|\bmatte\b/);

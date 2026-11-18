@@ -24,8 +24,8 @@ describe("WCAG contrast maths", () => {
 describe("the contrast table", () => {
   it("covers every surface and every section hue", () => {
     const surfaces = SURFACES.map((s) => s.id);
-    for (const id of ["oat ground", "ivory card (.surface, sheets)", "beige recess (.well, trays)", "field",
-      "sage wash", "Dijon wash", "persimmon wash", "red wash", ".olive-panel on ivory", "olive fill (primary)",
+    for (const id of ["porcelain ground", "white card (.surface, sheets)", "tray (.well, trays)", "field",
+      "sage wash", "amber wash", "tomato wash", "red wash", ".olive-panel on ivory", "ink fill (primary)",
       "charcoal matte", ".olive-panel in .matte", ".matte-reset tray", "plan header band", "plan header chip"]) {
       expect(surfaces).toContain(id);
     }
@@ -42,8 +42,8 @@ describe("the contrast table", () => {
 
   it("checks the neutral Tag (the AI label) on every surface it rides on, light and matte", () => {
     expect(tagPairs().map((pair) => pair.surface)).toEqual([
-      "neutral tag on ivory card", "neutral tag on beige recess", "neutral tag on field",
-      "neutral tag on oat ground", "neutral tag on coach bubble", "neutral tag in the matte",
+      "neutral tag on white card", "neutral tag on tray", "neutral tag on field",
+      "neutral tag on porcelain ground", "neutral tag on coach bubble", "neutral tag in the matte",
     ]);
   });
 

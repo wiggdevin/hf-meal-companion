@@ -14,18 +14,18 @@ describe("Settings › Background", () => {
   });
   afterEach(() => { cleanup(); unbindAccount(); });
 
-  it("lists four grounds with Oat on", () => {
+  it("lists four grounds with Porcelain on", () => {
     render(<BackgroundSection />);
     const radios = screen.getAllByRole("radio");
-    expect(radios.map((r) => r.textContent)).toEqual(["Oat", "Sage", "Clay", "Mist"]);
-    expect(screen.getByRole("radio", { name: "Oat" }).getAttribute("aria-checked")).toBe("true");
+    expect(radios.map((r) => r.textContent)).toEqual(["Porcelain", "Fern", "Blush", "Mist"]);
+    expect(screen.getByRole("radio", { name: "Porcelain" }).getAttribute("aria-checked")).toBe("true");
   });
 
   it("paints and keeps the choice for this account only", () => {
     render(<BackgroundSection />);
-    fireEvent.click(screen.getByRole("radio", { name: "Clay" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Blush" }));
     expect(document.documentElement.dataset.ground).toBe("clay");
-    expect(screen.getByRole("radio", { name: "Clay" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("radio", { name: "Blush" }).getAttribute("aria-checked")).toBe("true");
     expect(readGround(h)).toBe("clay");
     unbindAccount();
     expect(readGround(bindAccount("user-b"))).toBe("oat");
@@ -37,8 +37,8 @@ describe("Settings › Background", () => {
     expect(radios.map((r) => r.tabIndex)).toEqual([0, -1, -1, -1]);
     fireEvent.keyDown(radios[0], { key: "ArrowRight" });
     expect(document.documentElement.dataset.ground).toBe("sage");
-    expect(screen.getByRole("radio", { name: "Sage" }).tabIndex).toBe(0);
-    fireEvent.keyDown(screen.getByRole("radio", { name: "Sage" }), { key: "ArrowLeft" });
+    expect(screen.getByRole("radio", { name: "Fern" }).tabIndex).toBe(0);
+    fireEvent.keyDown(screen.getByRole("radio", { name: "Fern" }), { key: "ArrowLeft" });
     expect(document.documentElement.dataset.ground).toBe("oat");
   });
 });

@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import { Fraunces, Plus_Jakarta_Sans } from "next/font/google";
+import { Geist, Newsreader } from "next/font/google";
 import "./globals.css";
 import AppChrome from "@/components/AppChrome";
 import { CapabilitiesProvider } from "@/components/CapabilitiesProvider";
@@ -19,18 +19,18 @@ import { readAppCapabilities } from "@/lib/capabilities";
 import SectionHue from "@/components/SectionHue";
 import { APP_NAME } from "@/lib/brand";
 
-// Harvest theme type (DESIGN.md §Typography, 2026-10-01): Fraunces for titles, Plus Jakarta Sans for
-// the rest. Both are variable fonts; Fraunces also carries its optical-size and softness axes, so a
-// 64 px numeral and a 20 px card title each get their own cut. next/font self-hosts both, so the
-// browser never calls Google.
-const display = Fraunces({
+// Porcelain theme type (DESIGN.md §Typography, 2026-11-17): Newsreader for the one state sentence and
+// titles, Geist for everything else and every number (tabular figures). Newsreader carries its
+// optical-size axis, so a 64 px wordmark and a 20 px card title each get their own cut. next/font
+// self-hosts both, so the browser never calls Google.
+const display = Newsreader({
   subsets: ["latin"],
-  axes: ["opsz", "SOFT"],
+  axes: ["opsz"],
   style: ["normal", "italic"],
   variable: "--font-display-face",
   display: "swap",
 });
-const sans = Plus_Jakarta_Sans({
+const sans = Geist({
   subsets: ["latin"],
   variable: "--font-text-face",
   display: "swap",

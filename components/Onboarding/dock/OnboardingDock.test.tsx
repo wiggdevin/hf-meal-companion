@@ -65,8 +65,8 @@ describe("OnboardingDock", () => {
 
   it("game mode: shows only the escape chip — the game itself is not inside the dock", () => {
     const onEscape = vi.fn();
-    render(<OnboardingDock mode="game" reduce={false} escapeLabel="Sprout, pick for me" onEscape={onEscape} />);
-    fireEvent.click(screen.getByRole("button", { name: "Sprout, pick for me" }));
+    render(<OnboardingDock mode="game" reduce={false} escapeLabel="Pick for me" onEscape={onEscape} />);
+    fireEvent.click(screen.getByRole("button", { name: "Pick for me" }));
     expect(onEscape).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("searchbox")).toBeNull();
   });

@@ -31,7 +31,7 @@ describe("the contrast step between surfaces", () => {
     expect(worst(CARD, INSET)).toBeGreaterThanOrEqual(STEP);
   });
 
-  it("the ink card steps off every ground and the ivory card; its inset steps down off it", () => {
+  it("the ink card steps off every ground and the white card; its inset steps down off it", () => {
     for (const ground of GROUNDS) {
       expect(worst(INK, [hexToRgb(ground.base)]), ground.id).toBeGreaterThanOrEqual(STEP);
     }
@@ -53,7 +53,7 @@ describe("the contrast step between surfaces", () => {
   });
 
   it("defines the card roles: hairline, padding and radius scales", () => {
-    expect(GLOBALS_CSS).toMatch(/--hairline-card: rgb\(var\(--ink-rgb\) \/ 0\.16\);/);
+    expect(GLOBALS_CSS).toMatch(/--hairline-card: rgb\(var\(--ink-rgb\) \/ 0\.08\);/);
     for (const [size, steps] of [["sm", 3], ["md", 4], ["lg", 5]] as const) {
       expect(GLOBALS_CSS).toContain(`--card-pad-${size}: calc(var(--spacing) * ${steps});`);
     }

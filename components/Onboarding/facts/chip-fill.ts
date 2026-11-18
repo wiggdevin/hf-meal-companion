@@ -10,6 +10,15 @@
  * `tests/design/contrast-scan.test.ts` rule 6 now fails a light fill under a `.matte` ancestor in
  * another file, which is how this slipped past the scan before.
  *
+ * Porcelain (2026-11-18): the shell now stands on the light porcelain ground with no `.matte`
+ * scope, so the chip is a white tile (`--color-surface`) with an ink hairline, like every other
+ * Porcelain card.
+ *
  * Every caller supplies its own `rounded-*` and its own min-height (≥ 44 px, DESIGN.md).
  */
-export const CHIP_FILL = "bg-[rgb(var(--ink-rgb)/0.1)] shadow-[0_0_0_1px_rgb(var(--ink-rgb)/0.3)]";
+export const CHIP_FILL = "bg-surface shadow-[0_0_0_1px_rgb(var(--ink-rgb)/0.16)]";
+
+/** The picked chip: the ink primary fill with white text. A separate class set from `CHIP_FILL`
+ *  (callers pick one or the other), so a white resting tile and the on-primary text never share
+ *  one element's classes. */
+export const CHIP_PICKED = "[background:var(--grad-ink)] text-on-primary shadow-[0_0_0_1px_rgb(var(--ink-rgb)/0.55)]";

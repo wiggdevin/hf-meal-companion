@@ -1,6 +1,6 @@
-/* Onboarding v2 shell (lane L2, 2026-10-07; VISUAL-SPEC.md §1). Full-bleed matte charcoal — the
-   same family as the meal card and dock, never flat black, never the light oat ground a card stands
-   on — no header, no progress bar: Sprout is the progress indicator (SproutGuide). DESIGN.md
+/* Onboarding v2 shell (lane L2, 2026-10-07; VISUAL-SPEC.md §1). Porcelain (2026-11-18): full-bleed
+   on the light porcelain ground with ink text, the same ground as every other screen — no header,
+   no progress bar, no companion (lib/today/companion-ui.ts). DESIGN.md
    licenses an internally-scrolling surface for a redesigned onboarding that is its own overlay
    (§Layout, "one scroller per screen"); this is that one scroller. All colour comes from tokens
    already declared in app/globals.css / app/design-tokens.css. */
@@ -12,11 +12,9 @@
   isolation: isolate;
   display: flex;
   flex-direction: column;
-  /* `--grad-matte`: "the meal card and dock" (app/globals.css) — the house charcoal, not a literal.
-     The grain is this rule's own pseudo-element (not the global `.matte-grain` utility — that class
-     also sets `position: relative`, which risks fighting this rule's own `position: fixed` on
-     specificity/cascade order rather than intent) — same `--grain` token, same 4% opacity. */
-  background: var(--grad-matte);
+  /* The porcelain ground (`--color-paper`, the same fill as `body`). The grain pseudo-element
+     below keeps the `--grain` token but draws nothing: Porcelain has no grain. */
+  background: var(--color-paper);
 }
 .shell::after {
   content: "";
@@ -25,7 +23,7 @@
   z-index: 0;
   pointer-events: none;
   background-image: var(--grain);
-  opacity: 0.04;
+  opacity: 0;
 }
 
 /* VISUAL-SPEC.md §3: a soft backdrop so the stage is never an empty field. This PR's own version is
@@ -38,26 +36,9 @@
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  /* The olive the house `--grad-ink` itself starts from (app/design-tokens.css), at low alpha —
-     "olive-tinted on charcoal" (VISUAL-SPEC.md §3), not a new hue. §3 names 6-8 shapes at 12%; this
-     is 6, at 18% — a real-device check (round-trip screenshot) found the spec's own 12%, stacked
-     with a radial fall-off to transparent, read as all but invisible against charcoal, which would
-     defeat §3's entire purpose (fixing the "big empty middle" §0 flags). 18% is the smallest bump
-     that stayed visibly soft rather than flat-invisible; the 12% lives in a stop's own alpha
-     (`color-mix`), never a second multiplied container opacity — stacking both nearly erased it. */
-  background:
-    radial-gradient(140px 140px at 18% 22%,
-      color-mix(in srgb, var(--color-olive-shell-top) 18%, transparent), transparent 70%),
-    radial-gradient(110px 110px at 82% 18%,
-      color-mix(in srgb, var(--color-olive-shell-top) 18%, transparent), transparent 70%),
-    radial-gradient(130px 130px at 24% 78%,
-      color-mix(in srgb, var(--color-olive-shell-top) 18%, transparent), transparent 70%),
-    radial-gradient(100px 100px at 78% 74%,
-      color-mix(in srgb, var(--color-olive-shell-top) 18%, transparent), transparent 70%),
-    radial-gradient(120px 120px at 50% 50%,
-      color-mix(in srgb, var(--color-olive-shell-top) 18%, transparent), transparent 70%),
-    radial-gradient(90px 90px at 60% 30%,
-      color-mix(in srgb, var(--color-olive-shell-top) 18%, transparent), transparent 70%);
+  /* Porcelain (2026-11-18): the olive-on-charcoal blobs read as grey smudges on the light ground,
+     so the field stays plain porcelain; only the reward beat's soft tomato glow remains. */
+  background: none;
   transition: opacity 320ms ease;
 }
 .backdrop[data-reward] {
@@ -149,7 +130,7 @@
   justify-content: center;
   gap: 12px;
   padding: 24px 24px calc(24px + env(safe-area-inset-bottom, 0px));
-  background: var(--grad-matte);
+  background: var(--color-paper);
 }
 
 /* Short-lived note under the composer (a typed answer Sprout could not read, or a health detail

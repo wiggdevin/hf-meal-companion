@@ -91,12 +91,12 @@ describe("the re-skinned falling-foods step (NEXT_PUBLIC_CHAT_ONBOARDING=1 path)
     }
   });
 
-  it("'Sprout, pick for me' marks two defaults per role as loved, never touching an avoid", () => {
+  it("'Pick for me' marks two defaults per role as loved, never touching an avoid", () => {
     const onMark = vi.fn();
     render(<FallingFoodsStep choices={starterChoices([], profile)} marks={{ "olive-oil": "avoid" }}
       onMark={onMark} />);
     confirmNoAllergy();
-    fireEvent.click(screen.getByRole("button", { name: "Sprout, pick for me" }));
+    fireEvent.click(screen.getByRole("button", { name: "Pick for me" }));
     expect(onMark).toHaveBeenCalledWith("chicken-breast-roasted", "eats");
     expect(onMark).not.toHaveBeenCalledWith("olive-oil", expect.anything());
   });

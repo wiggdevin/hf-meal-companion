@@ -1,6 +1,6 @@
-/* The floating dock (DESIGN.md Cards and Surfaces › Dock). Two matte charcoal bodies, after the
-   reference's quantity pill: the four-tab capsule and the assistant bubble, grained, bevelled and
-   lifted on a warm drop. The nav carries the global `matte` scope, so text roles inside read cream. */
+/* The floating dock (DESIGN.md Cards and Surfaces › Dock). Two ink bodies: the four-tab capsule and
+   the assistant bubble, lifted on the float shadow. The nav carries the global `matte` scope, so text
+   roles inside read white; the active tab is a white capsule with an ink icon and label. */
 
 .dock {
   transform: translateY(calc(-1 * var(--dock-lift, 0px)));
@@ -13,12 +13,7 @@
   /* farthest-side fits the tint ellipse to each body's own shape: dense in the middle, clear at the rim. */
   background: var(--grad-matte);
   backdrop-filter: blur(12px);
-  box-shadow:
-    inset 0 1px 1px rgb(var(--ink-rgb) / 0.1),
-    inset 0 -1px 1px rgb(var(--on-olive-rgb) / 0.2),
-    0 0 0 1px rgb(var(--ink-rgb) / 0.04),
-    0 20px 40px -18px rgb(var(--on-olive-rgb) / 0.6),
-    0 2px 6px rgb(var(--on-olive-rgb) / 0.12);
+  box-shadow: inset 0 1px 0 rgb(var(--ink-rgb) / 0.08), var(--shadow-float);
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
@@ -49,29 +44,27 @@
 
 .tab:hover { color: var(--color-charcoal); }
 
-/* The olive selection lens (DESIGN.md: the dock's active pill is the primary fill). */
+/* The selection capsule (DESIGN.md: the dock's active tab is a white capsule on the ink body). */
 .lens {
   position: absolute;
   left: 0;
   z-index: 1;
   height: 52px;
   border-radius: 9999px;
-  background: var(--grad-ink);
-  box-shadow:
-    inset 0 1px 1px rgb(var(--ink-rgb) / 0.1),
-    inset 0 -1px 1px rgb(var(--on-olive-rgb) / 0.2);
+  background: rgb(var(--cream-rgb));
+  box-shadow: 0 1px 2px rgb(var(--charcoal-deep-rgb) / 0.25);
   transform-origin: center;
   will-change: transform, width;
   pointer-events: none;
 }
 
-/* A second copy of the tab faces in cream, clipped to the lens: an icon turns cream exactly where
-   the lens covers it, so the colour travels with the lens instead of switching in one frame. */
+/* A second copy of the tab faces in ink, clipped to the capsule: an icon turns ink exactly where
+   the capsule covers it, so the colour travels with the lens instead of switching in one frame. */
 .ink {
   position: absolute;
   inset: 0;
   z-index: 2;
-  color: var(--color-on-primary);
+  color: var(--color-primary);
   pointer-events: none;
 }
 

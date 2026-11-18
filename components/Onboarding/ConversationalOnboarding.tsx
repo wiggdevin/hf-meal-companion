@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useIsPresent, useReducedMotionConfig } from "motion/react";
 import Button from "@/components/ui/Button";
 import SproutGuide, { type OnboardingPose } from "@/components/Onboarding/SproutGuide";
+import { COMPANION_UI_ENABLED } from "@/lib/today/companion-ui";
+import { APP_NAME } from "@/lib/brand";
 import OnboardingDock, { type OnboardingDockMode } from "@/components/Onboarding/dock/OnboardingDock";
 import { useDockDictation } from "@/components/Onboarding/dock/useDockDictation";
 import WeekBeat from "@/components/Onboarding/beats/WeekBeat";
@@ -114,11 +116,11 @@ export const ONBOARDING_SCOPE = { kind: "page", page: "onboarding" } as const;
 /** Why the plan cannot be used yet, and the one step that fixes it. */
 type PlanNotice = { text: string; actionLabel: string; action: "foods" | "rules" | "facts" | "retry" };
 const RULES_UNCHECKED_NOTICE: PlanNotice = {
-  text: "Sprout couldn't check your food rules yet, so it can't pick foods for you.",
+  text: `${APP_NAME} couldn't check your food rules yet, so it can't pick foods for you.`,
   actionLabel: "Check again", action: "retry",
 };
 const FOODS_SHORT_NOTICE: PlanNotice = {
-  text: "Sprout couldn't fill every group from the foods your rules allow. Tap a few more you'd eat, or adjust your food rules.",
+  text: `${APP_NAME} couldn't fill every group from the foods your rules allow. Tap a few more you'd eat, or adjust your food rules.`,
   actionLabel: "Adjust food rules", action: "rules",
 };
 const PLAN_FOODS_SHORT_NOTICE: PlanNotice = {
@@ -126,7 +128,7 @@ const PLAN_FOODS_SHORT_NOTICE: PlanNotice = {
   actionLabel: "Choose more foods", action: "foods",
 };
 const PROFILE_SHORT_NOTICE: PlanNotice = {
-  text: "A few answers are still missing, so Sprout can't build your plan yet.",
+  text: `A few answers are still missing, so ${APP_NAME} can't build your plan yet.`,
   actionLabel: "Finish your answers", action: "facts",
 };
 
@@ -250,7 +252,7 @@ const SKIP_CONFIRM = "Skip setup? Your answers won’t be saved.";
 const BLOCKED_NOTE = "That sounds like a health or allergy detail. Tap what applies here, so every plan respects it.";
 const RULES_UNVERIFIED = "Couldn’t verify your food rules. Try again.";
 const HEALTH_ANSWERS_UNCHECKED = "Couldn’t check your saved health answers. Check your connection, then try again.";
-const UNREAD_NOTE = "Sprout didn’t catch that. Try a number, like 34 or 5 10, or tap an answer.";
+const UNREAD_NOTE = `${APP_NAME} didn’t catch that. Try a number, like 34 or 5 10, or tap an answer.`;
 
 /** Clear extension points for a caller that wants to render something other than this lane's own
  *  default (tests, mainly): each slot replaces this beat's default content, with no change to the
@@ -405,7 +407,7 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
   const [shownFoodIds, setShownFoodIds] = useState<readonly string[]>([]);
   /** The person's own taps, in order — the reward card lists these first. */
   const [userPicks, setUserPicks] = useState<readonly string[]>([]);
-  /** Foods the person tapped off in this flow: "Sprout, pick for me" never picks them again. */
+  /** Foods the person tapped off in this flow: "Pick for me" never picks them again. */
   const [tappedOff, setTappedOff] = useState<ReadonlySet<string>>(() => new Set());
   /** Model calls this session's typed answers made (the extract client's budget). */
   const [extractCalls, setExtractCalls] = useState(0);
@@ -641,7 +643,7 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
   const foodAccess = useOnboardingFoodAccess(onboardingState);
   // GPT-6 Sol round-1 BLOCK: `useStarterStep` was only enabled for "legacy", so a pilot account's
   // `FoodsTopPickChips` (which reads `starter.choices`) always saw `null` — an empty picker and a
-  // "Sprout, pick for me" that could never select anything. Pilot accounts need the same
+  // "Pick for me" that could never select anything. Pilot accounts need the same
   // safety-filtered starter list this shell now shows them.
   // The love round starts with nothing marked: only foods the person taps (or Sprout fills in on
   // request) are saved (live QA 2026-10-07: 29 unseen defaults were saved as Eats).
@@ -1183,20 +1185,20 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
       parse={readPractices}
       initial={plan.practices ?? (facts.dietFlags ?? normalizePreferenceFlags(base?.dietPrefs?.flags))
         .filter((flag): flag is PracticeId => (PRACTICE_IDS as readonly string[]).includes(flag))}
-      unreadNote="Sprout didn’t catch that. Try words like vegetarian or no pork, or pick from the list."
+      unreadNote={`${APP_NAME} didn’t catch that. Try words like vegetarian or no pork, or pick from the list.`}
       onDone={(ids) => answerPlan("practices", { practices: ids as PracticeId[] })} />;
     if (beat === "dislikes") return <PrefsBeat key="dislikes" question="Any foods you’d rather skip?"
-      helper="Sprout will show these less. They are not allergies, and they never rule a food out."
+      helper={`${APP_NAME} will show these less. They are not allergies, and they never rule a food out.`}
       inputLabel="Foods to skip" placeholder="e.g. mushrooms, olives" tiles={DISLIKE_TILES} labelFor={dislikeTileLabel}
       parse={readDislikes} initial={plan.dislikes ?? null}
-      unreadNote="Sprout didn’t catch a food there. Try a food name, like mushrooms, or pick from the list."
+      unreadNote={`${APP_NAME} didn’t catch a food there. Try a food name, like mushrooms, or pick from the list.`}
       onDone={(ids) => answerPlan("dislikes", { dislikes: ids as TasteDislike[] })} />;
     if (beat === "cuisines") return <PrefsBeat key="cuisines" question="Which cuisines do you love?"
       helper={`Pick up to ${CUISINES_MAX}. Food ideas will lean toward them; they never rule a food out.`}
       inputLabel="Cuisines" placeholder="e.g. Mexican, Thai, Italian" tiles={CUISINE_TILES} labelFor={cuisineLabel}
       parse={readCuisines}
       initial={plan.cuisines ?? (base?.cuisines ?? []).filter((key): key is CuisineKey => (CUISINES as readonly string[]).includes(key))} max={CUISINES_MAX}
-      unreadNote="Sprout didn’t catch a cuisine there. Try Mexican, Italian or Thai, or pick from the list."
+      unreadNote={`${APP_NAME} didn’t catch a cuisine there. Try Mexican, Italian or Thai, or pick from the list.`}
       onDone={(ids) => answerPlan("cuisines", { cuisines: ids as CuisineKey[] })} />;
     if (beat === "foods") return slots.foodGame ?? foodsContent;
     return slots.plateReward ?? <RewardPlateCard targets={targets} lovedFoods={lovedFoods} meals={previewMeals}
@@ -1212,12 +1214,11 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
     : BEAT_POSE[beat];
   const guideLine = guidePose === "listening" ? "Sprout is listening to you." : BEAT_LINE[beat];
 
-  return <div className={`${styles.shell} matte`} data-onboarding-v2="true"
+  return <div className={styles.shell} data-onboarding-v2="true"
     data-scope-kind={ONBOARDING_SCOPE.kind} data-scope-page={ONBOARDING_SCOPE.page}>
-    {/* VISUAL-SPEC.md §1: matte charcoal, the same family as the meal card and dock — never flat
-        black, never the oat ground (this is a full-screen onboarding surface, not a card standing
-        on it). §3: a soft backdrop so the stage is never an empty field; it quiets to one glow for
-        the reward beat, the deliberate exception to "always busy". */}
+    {/* Porcelain (2026-11-18): the shell stands on the light porcelain ground with ink text, like
+        every other screen; no `.matte` scope. §3: a soft backdrop so the stage is never an empty
+        field; it quiets to one glow for the reward beat. */}
     <div className={styles.backdrop} data-reward={beat === "reward" || undefined} aria-hidden="true" />
     {/* ui-ux-buddy NIT: `.guide`'s `layout="position"` projects inside this scrolling ancestor —
         `layoutScroll` keeps that projection correct if the account has scrolled mid-transition,
@@ -1233,10 +1234,12 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
             (`.guide`'s own box no longer changes size with BEAT_SIZE — SproutGuide.tsx now renders
             a constant BASE_SIZE box and scales its child via transform — so this `layout` only ever
             has a position shift to track here, never a size one.) */}
-        <motion.div layout="position" transition={reduce ? INSTANT : CONTAINER_ENTER}
-          className={styles.guide}>
+        {/* The companion is off the UI (lib/today/companion-ui.ts): no guide stage, and the beat's
+            card leads the stream. The wiring stays for when the flag comes back on. */}
+        {COMPANION_UI_ENABLED && <motion.div layout="position"
+          transition={reduce ? INSTANT : CONTAINER_ENTER} className={styles.guide}>
           <SproutGuide pose={guidePose} line={guideLine} size={BEAT_SIZE[beat]} />
-        </motion.div>
+        </motion.div>}
         {/* Sol review round 2: a simultaneous crossfade kept two full beats (wildly different
             heights) in flow at once, which could shift the scroller under a control mid-tap — this
             is sequential, matching DESIGN.md's own rule ("content-then-frame on close"). The dock's
@@ -1292,7 +1295,7 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
           : `Done · ${lovedCount} loved`}
         confirmStatus={saving || confirmingFoods ? "pending" : undefined}
         onConfirm={handleDockConfirm}
-        escapeLabel="Sprout, pick for me" onEscape={beat === "foods" ? pickForMe : () => advance("reward")} />
+        escapeLabel="Pick for me" onEscape={beat === "foods" ? pickForMe : () => advance("reward")} />
     </div>}
     <AnimatePresence>
       {saving && <SavingStage key="saving" title={saving.title} step={saving.step} />}

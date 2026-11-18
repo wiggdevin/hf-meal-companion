@@ -183,7 +183,7 @@ async function passPrefsBeats(): Promise<void> {
   fireEvent.click(screen.getByRole("button", { name: "None of these" }));
 }
 
-/** A pilot account whose rules allow two foods per group, none marked yet: "Sprout, pick for me"
+/** A pilot account whose rules allow two foods per group, none marked yet: "Pick for me"
  *  can fill a usable plan (the mocked hook's `mark` is a spy, so the marks stay empty and the
  *  reward beat is NOT ready unless a test marks them itself). */
 function pickableFoods(): void {
@@ -201,8 +201,8 @@ async function reachReward(): Promise<void> {
   await fillRemainingRequiredFacts();
   fireEvent.click(screen.getByRole("button", { name: "That’s me" })); // -> week
   await passPlanBeats(); // -> foods
-  await screen.findByRole("button", { name: "Sprout, pick for me" });
-  fireEvent.click(screen.getByRole("button", { name: "Sprout, pick for me" })); // -> reward
+  await screen.findByRole("button", { name: "Pick for me" });
+  fireEvent.click(screen.getByRole("button", { name: "Pick for me" })); // -> reward
   // Every required body fact was answered above, so the preview-target computation already has
   // what it needs — the reward card renders "ready", not "preparing".
   await screen.findByTestId("reward-plate-ready");
@@ -217,7 +217,23 @@ describe("ConversationalOnboarding", () => {
     expect(shell?.getAttribute("data-scope-page")).toBe("onboarding");
   });
 
-  it("opens on the goal question with Sprout listening, no progress bar, no header", () => {
+  it("draws no companion while COMPANION_UI_ENABLED is off: no mascot, no guide line, no"
+    + " Sprout in the copy, and the greeting still reads as Sasha", () => {
+    const { container } = render(<ConversationalOnboarding />);
+    screen.getByText(/Hey\. I’m Sasha\./);
+    expect(container.querySelector("[data-pose]")).toBeNull();
+    expect(container.querySelector("[data-sprout-guide-size]")).toBeNull();
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.textContent ?? "").not.toMatch(/Sprout/);
+  });
+
+  it("stands on the porcelain ground, not the dark .matte scope", () => {
+    const { container } = render(<ConversationalOnboarding />);
+    const shell = container.querySelector('[data-onboarding-v2="true"]');
+    expect(shell?.classList.contains("matte")).toBe(false);
+  });
+
+  it("opens on the goal question, no progress bar, no header", () => {
     render(<ConversationalOnboarding />);
     screen.getByText(/What’s your main goal right now\?/);
     expect(screen.queryByRole("progressbar")).toBeNull();
@@ -359,7 +375,7 @@ describe("ConversationalOnboarding", () => {
     // status) — awaited directly, since the dock's own escape chip switches mode a beat ahead of
     // the stream's sequential swap and would resolve this `findBy` too early otherwise.
     await screen.findByText(/Checking your food rules/);
-    screen.getByRole("button", { name: "Sprout, pick for me" });
+    screen.getByRole("button", { name: "Pick for me" });
   });
 
   it("the foods beat renders the pilot top-pick chips, not the falling game, for a pilot account", async () => {
@@ -384,7 +400,7 @@ describe("ConversationalOnboarding", () => {
     await screen.findByTestId("falling-food-pile");
   });
 
-  it("'Sprout, pick for me' marks the default starter foods before advancing to the reward beat", async () => {
+  it("'Pick for me' marks the default starter foods before advancing to the reward beat", async () => {
     foodAccess.status = "pilot";
     starterFixture.choices = [
       { id: "chicken-breast-roasted", role: "protein", default: true },
@@ -401,7 +417,7 @@ describe("ConversationalOnboarding", () => {
 
   // GPT-6 Sol BLOCK (onb2-p0): with too few foods the rules allow, pick-for-me moved on anyway
   // and "Use this plan" then took the skip path.
-  it("'Sprout, pick for me' with too few allowed foods stays on Foods, says so, and offers to"
+  it("'Pick for me' with too few allowed foods stays on Foods, says so, and offers to"
     + " adjust the rules", async () => {
     foodAccess.status = "pilot";
     starterFixture.choices = [
@@ -414,18 +430,18 @@ describe("ConversationalOnboarding", () => {
     await fillRemainingRequiredFacts();
     fireEvent.click(screen.getByRole("button", { name: "That’s me" }));
     await passPlanBeats();
-    fireEvent.click(await screen.findByRole("button", { name: "Sprout, pick for me" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Pick for me" }));
     const notice = await screen.findByTestId("plan-notice");
     expect(notice.textContent).toMatch(/couldn't fill every group/);
     expect(screen.queryByTestId("reward-plate-ready")).toBeNull();
-    screen.getByRole("button", { name: "Sprout, pick for me" }); // still on Foods
+    screen.getByRole("button", { name: "Pick for me" }); // still on Foods
     fireEvent.click(within(notice).getByRole("button", { name: "Adjust food rules" }));
     await screen.findByTestId("safety-round");
     expect(persistSkippedOnboarding).not.toHaveBeenCalled();
   });
 
   // GPT-6 Sol WARN (onb2-p0): pick-for-me re-selected a food the person had just tapped off.
-  it("'Sprout, pick for me' never re-picks a food the person tapped off", async () => {
+  it("'Pick for me' never re-picks a food the person tapped off", async () => {
     foodAccess.status = "pilot";
     starterFixture.choices = [
       { id: "chicken-breast-roasted", role: "protein", default: true },
@@ -449,7 +465,7 @@ describe("ConversationalOnboarding", () => {
     fireEvent.click(await screen.findByRole("button", { name: /^Love Chicken breast/ }));
     expect(starterSpies.mark).toHaveBeenCalledWith("chicken-breast-roasted", "neutral");
     starterSpies.mark.mockClear();
-    fireEvent.click(screen.getByRole("button", { name: "Sprout, pick for me" }));
+    fireEvent.click(screen.getByRole("button", { name: "Pick for me" }));
     expect(starterSpies.mark).not.toHaveBeenCalledWith("chicken-breast-roasted", "eats");
     expect(starterSpies.mark).toHaveBeenCalledWith("turkey-breast-roasted", "eats");
     expect(starterSpies.mark).toHaveBeenCalledWith("salmon-wild-sockeye-cooked", "eats");
@@ -483,7 +499,7 @@ describe("ConversationalOnboarding", () => {
     screen.getByTestId("reward-plate-ready");
     screen.getByRole("button", { name: "Skip for now" }); // the only skip, unchanged
     fireEvent.click(within(notice).getByRole("button", { name: "Choose more foods" }));
-    await screen.findByRole("button", { name: "Sprout, pick for me" });
+    await screen.findByRole("button", { name: "Pick for me" });
   });
 
   it("'Use this plan' really writes once every required fact and a ready pilot food selection"
@@ -723,7 +739,7 @@ describe("ConversationalOnboarding", () => {
       expect(screen.queryByTestId("pace-beat")).toBeNull();
       fireEvent.click(screen.getByRole("button", { name: "Looks right" }));
       await passPrefsBeats();
-      fireEvent.click(await screen.findByRole("button", { name: "Sprout, pick for me" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Pick for me" }));
       const notes = await screen.findByTestId("plan-notes");
       expect(notes.textContent).toMatch(/don't add pregnancy or breastfeeding needs/);
       expect(notes.textContent).toMatch(/won't set a loss or gain pace/);
@@ -741,7 +757,7 @@ describe("ConversationalOnboarding", () => {
       expect(screen.queryByTestId("pace-beat")).toBeNull();
       fireEvent.click(screen.getByRole("button", { name: "Looks right" }));
       await passPrefsBeats();
-      fireEvent.click(await screen.findByRole("button", { name: "Sprout, pick for me" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Pick for me" }));
       const notes = await screen.findByTestId("plan-notes");
       expect(notes.textContent).toMatch(/won't set a loss or gain pace/);
       expect(notes.textContent).toMatch(/kidney disease/);

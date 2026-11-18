@@ -98,7 +98,7 @@ function FallingFoodsStep({ choices, marks, onMark }: FoodsStepProps) {
         ? <FallingFoodPile choices={choices} marks={marks} onMark={onMark} />
         : <AvoidRound choices={choices} marks={marks} onMark={onMark} />}
       <div className="flex gap-2">
-        <Button size="sm" variant="ghost" onClick={pickForMe}>Sprout, pick for me</Button>
+        <Button size="sm" variant="ghost" onClick={pickForMe}>Pick for me</Button>
         {round === "love"
           ? <Button size="sm" variant="secondary" onClick={() => setRound("avoid")}>
             Next: anything you never eat?

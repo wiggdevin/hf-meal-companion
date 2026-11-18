@@ -61,12 +61,12 @@ describe("CardFrame elevation", () => {
     expect(inner).not.toContain("shell");
   });
 
-  it("the nested faces drop no shadow and draw the 16 % hairline", () => {
+  it("the nested faces drop no shadow and draw the 8 % hairline", () => {
     for (const selector of [".card-recess", ".card-e0:not(.card-olive)"]) {
       expect(rule(selector)).toMatch(/border-color: var\(--hairline-card\);/);
       expect(rule(selector)).toMatch(/box-shadow: none;/);
     }
-    expect(css).toMatch(/--hairline-card: rgb\(var\(--ink-rgb\) \/ 0\.16\);/);
+    expect(css).toMatch(/--hairline-card: rgb\(var\(--ink-rgb\) \/ 0\.08\);/);
   });
 
   it("the ink card stands on the ground with the hero drop; its inset is E0 in the matte scope", () => {

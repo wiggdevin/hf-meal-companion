@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
  * Recipe card and detail design (owner ask 2026-10-03). Carousel cards are clearly cards: an ivory
- * surface with a hairline and the card shadow on the beige recess, a rounded photo, a bold `.kcal`
+ * surface with a hairline and the card shadow on the tray, a rounded photo, a bold `.kcal`
  * figure, protein in plum and a sage or Dijon fit tag. The detail reads top to bottom: hero and
  * serif title, glance chips, the colour-coded macro strip, actions, the ingredient checklist (Avoid
  * in each row's overflow), numbered method steps, and a muted footer.
@@ -63,7 +63,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("the carousel recipe card", () => {
-  it("is an ivory card in a row that bleeds to the panel (no recessed tray), with a rounded photo, bold kcal, plum protein and a fit tag", async () => {
+  it("is an white card in a row that bleeds to the panel (no recessed tray), with a rounded photo, bold kcal, plum protein and a fit tag", async () => {
     render(<RecipeCarousel remaining={{ kcal: 600, protein: 50, carbs: 60, fat: 20 }} date="2026-10-03" />);
     const carousel = await screen.findByRole("region", { name: "Recipe catalog" });
     const [fits, over] = within(carousel).getAllByRole("button", { expanded: false })
