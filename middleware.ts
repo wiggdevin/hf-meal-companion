@@ -4,7 +4,8 @@
  *
  * The matcher keeps this away from /api/*, /auth/*, /_next/* and any path with
  * a file extension. /sign-in gets the page policy below but never the auth
- * check, or a signed-out visitor would loop on the redirect.
+ * check, or a signed-out visitor would loop on the redirect. /privacy is public
+ * the same way: it is read before an account exists.
  *
  * Every page response also carries the nonce CSP (W079, lib/security-headers.ts):
  * the nonce goes on the request's own policy header, where Next reads it and
@@ -22,6 +23,11 @@ export const config = {
 
 function isSignIn(pathname: string): boolean {
   return pathname === "/sign-in" || pathname.startsWith("/sign-in/");
+}
+
+/** The public privacy page (readiness audit 2026-11-17, A2): read before an account exists. */
+function isPublicPage(pathname: string): boolean {
+  return pathname === "/privacy";
 }
 
 export default async function middleware(req: NextRequest): Promise<NextResponse> {
@@ -44,7 +50,8 @@ export default async function middleware(req: NextRequest): Promise<NextResponse
 
   let res = next();
   // The /design fixture galleries: local development with an explicit opt-in only (app/design/gallery-access.ts).
-  if (designGalleryOpen(req.nextUrl.pathname) || isSignIn(req.nextUrl.pathname)) return withPolicy(res);
+  if (designGalleryOpen(req.nextUrl.pathname) || isSignIn(req.nextUrl.pathname)
+    || isPublicPage(req.nextUrl.pathname)) return withPolicy(res);
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;

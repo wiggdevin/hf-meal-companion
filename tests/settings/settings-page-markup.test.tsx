@@ -232,6 +232,7 @@ const SECTION_ORDER = [
   "Data &amp; account",
   "Export",
   "Sync",
+  "Send feedback",
   "Sign out",
   "Who handles your data",
 ];

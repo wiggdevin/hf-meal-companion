@@ -81,6 +81,11 @@ describe("isAuthExempt", () => {
     expect(isAuthExempt("/auth/callback")).toBe(true);
   });
 
+  it("exempts the public privacy page, and only that path", () => {
+    expect(isAuthExempt("/privacy")).toBe(true);
+    expect(isAuthExempt("/privacy-settings")).toBe(false);
+  });
+
   it("does not exempt the home route", () => {
     expect(isAuthExempt("/")).toBe(false);
   });

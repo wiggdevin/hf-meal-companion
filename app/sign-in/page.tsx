@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { safePath } from "@/lib/supabase/client";
 import { LIMITED_CODES, UNAVAILABLE_CODES, signInAuth, type SignInError } from "@/lib/sign-in-client";
@@ -169,7 +170,12 @@ export default function SignInPage() {
         </div>
       </div>
 
-      <p className="ground-muted ts text-center text-tiny text-graphite">Only you see your data</p>
+      <p className="ground-muted ts text-center text-tiny text-graphite">
+        {mode === "create"
+          ? "By creating an account you accept how this test version handles your data: "
+          : "Other accounts never see your data. How it is handled: "}
+        <Link href="/privacy" className="underline">Privacy</Link>
+      </p>
     </main>
   );
 }

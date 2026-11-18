@@ -237,6 +237,10 @@ export const BUILDERS: Record<string, Builder> = {
   onboarding_events: async (owner) => withId("onboarding_events", { user_id: owner,
     client_event_id: randomUUID(), at: new Date().toISOString(), flow_version: "onboarding_v2",
     kind: "step_entered", step: "facts" }, { step: "allergy" }),
+  // Tester feedback (migration 20270108090000): written only by POST /api/feedback with the
+  // service role; accounts hold no grant on it.
+  feedback: async (owner) => withId("feedback", { user_id: owner, message: "tenancy" },
+    { message: "touched" }),
   // Phase 18 W2b: written only by POST /api/foods/world (service role); the owner reads it.
   food_world_condition_confirmations: async (owner) => ({ table: "food_world_condition_confirmations",
     row: { user_id: owner, condition_key: "tenancy", choice: "no_limit" },
