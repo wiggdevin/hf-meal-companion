@@ -94,6 +94,34 @@ describe("runTurn — next-action chip (§6, slice 7)", () => {
     }));
   });
 
+  // Weak-spot audit 2026-11-17 item 5: a log turn's echoed items are not suggestions to pick.
+  it("offers no pick_suggestion chip when the only cards echo what was just logged", async () => {
+    const generate = vi.fn()
+      .mockResolvedValueOnce({ kind: "tool",
+        calls: [{ name: "search_foods", args: { query: "rice" } }] })
+      .mockResolvedValueOnce({
+        kind: "final", text: "Logged 1 g of rice.",
+        actions: [{ kind: "log_meal", date: "2026-09-11", slot: "meal-1",
+          items: [{ name: "rice", grams: 1 }] }],
+        suggestions: [{ name: "Rice", grams: 1 }],
+      });
+    const writes = { rows: [] as { table: string; row: unknown }[] };
+    const verifiedPorts = {
+      ...ports,
+      searchFoods: async () => [{
+        foodRefId: "3f1b1a2c-0000-4000-8000-00000000001a", name: "rice", brand: null,
+        kcalPer100g: 130, prefStatus: "eats" as const, allergenTags: [] as string[],
+      }],
+    };
+    await runTurn(db({}, writes), db({}, writes), "u1", { ...REQ, text: "log 1 g of rice" },
+      { generate: generate as never, ports: verifiedPorts, ...logged,
+        now: () => 0, newId: () => "id-1" });
+    const blocks = assistantBlocks(writes);
+    expect(blocks).not.toContainEqual(expect.objectContaining({
+      kind: "next_action_chip", action: "pick_suggestion",
+    }));
+  });
+
   it("adds no chip when nothing in turn state is eligible", async () => {
     const generate = vi.fn().mockResolvedValueOnce({ kind: "final", text: "Sounds good." });
     const writes = { rows: [] as { table: string; row: unknown }[] };

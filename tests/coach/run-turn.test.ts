@@ -621,6 +621,42 @@ describe("runTurn", () => {
     expect(assistant.tool_calls.recipeRefusals).toEqual(refusals);
   });
 
+  // Weak-spot audit 2026-11-17 item 5 (guard): a refusal offers nothing to pick.
+  it("adds no pick_suggestion chip beside a recipe refusal", async () => {
+    const generate = vi.fn().mockResolvedValueOnce({
+      kind: "final", text: "Saved Dinner.", actions: [{
+        kind: "save_recipe", name: "Dinner", items: [{ name: "cheese", grams: 30 }],
+      }],
+      suggestions: [{ name: "rice", grams: 100 }],
+    });
+    const writes = { rows: [] as { table: string; row: Record<string, unknown> }[] };
+    const result = await runTurn(db(RESTRICTED, writes), db(RESTRICTED, writes), "u1",
+      { ...REQ, text: "save cheese as Dinner" }, {
+        generate: generate as never,
+        classifyIntent: vi.fn().mockResolvedValue(null) as never,
+        verifyReply: vi.fn().mockResolvedValue({ flagged: false, p: null }) as never,
+        logEntryExists: async () => true,
+        ports: {
+          ...ports,
+          searchFoods: async (_userId, name) => name === "cheese" ? [{
+            foodRefId: "3f1b1a2c-0000-4000-8000-0000000000c1", name: "cheese",
+            brand: null, kcalPer100g: 400, proteinPer100g: 20, carbsPer100g: 2,
+            fatPer100g: 33, prefStatus: null, allergenTags: ["dairy"], category: [],
+          }] : [{
+            foodRefId: "3f1b1a2c-0000-4000-8000-0000000000e1", name: "rice",
+            brand: null, kcalPer100g: 130, proteinPer100g: 2.7, carbsPer100g: 28,
+            fatPer100g: 0.3, prefStatus: "eats" as const, allergenTags: [],
+          }],
+        },
+        now: () => 0,
+        newId: () => "id-1",
+      });
+    expect(result.messages.at(-1)?.content).toMatch(/Skipped cheese/);
+    const blocks = result.messages.at(-1)?.blocks ?? [];
+    expect(blocks.some((b) => b.kind === "next_action_chip" && b.action === "pick_suggestion"))
+      .toBe(false);
+  });
+
   it("policy-filters an injected compose result into refusals with no ideas or composed card", async () => {
     const meal: ComposedMeal = {
       wish: "cheese dinner", slot: null,

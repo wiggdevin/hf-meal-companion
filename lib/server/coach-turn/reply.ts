@@ -38,6 +38,8 @@ import type { TurnKit } from "@/lib/server/coach-turn/kit";
 import { scanReply, type ModelEnv, type ModelState } from "@/lib/server/coach-turn/model-state";
 import { validatedBlocks, type TurnOutcome } from "@/lib/server/coach-turn/outcome";
 import type { OpenTurn } from "@/lib/server/coach-turn/types";
+import type { CoachAction } from "@/lib/coach/actions";
+import type { CoachSuggestion } from "@/lib/coach/types";
 
 export async function modelReply(
   turn: OpenTurn, kit: TurnKit, env: ModelEnv, state: ModelState, intent: IntentRead,
@@ -246,7 +248,8 @@ export async function modelReply(
       hasPendingProfileConfirmation: blocks.some((b) => b.kind === "dietary_profile_proposal"),
       hasUncheckedLabelFood: draftChecks.some((c) => c.verdict === "unverified")
         || suggestions.some((c) => c.verdict === "unverified"),
-      hasSuggestionsAvailable: suggestions.length > 0 || blocks.some((b) => b.kind === "food_ideas"),
+      hasSuggestionsAvailable: !clarifying && recipeRefusals.length === 0
+        && (pickableSuggestions(suggestions, actions).length > 0 || blocks.some((b) => b.kind === "food_ideas")),
     });
     if (candidate) blocks = [...blocks, hydrateNextActionChip(newId(), candidate)];
   }
@@ -289,6 +292,23 @@ export async function modelReply(
       },
     },
   };
+}
+
+/**
+ * Weak-spot audit 2026-11-17 item 5: the cards a "Pick from your suggestions" chip may point at.
+ * A log turn echoes what it logged as cards ("Logged 1 g of rice" beside a rice card), and a card a
+ * rule blocked cannot be picked, so neither counts as a suggestion still waiting on the user.
+ */
+function pickableSuggestions(
+  suggestions: CoachSuggestion[], actions: CoachAction[],
+): CoachSuggestion[] {
+  const key = (name: string) => name.trim().toLowerCase().replace(/\s+/g, " ");
+  const logged = actions.flatMap((action) => action.kind === "log_meal" ? action.items : []);
+  const loggedNames = new Set(logged.map((item) => key(item.name)));
+  const loggedRefs = new Set(logged.flatMap((item) =>
+    "foodRefId" in item && typeof item.foodRefId === "string" ? [item.foodRefId] : []));
+  return suggestions.filter((card) => card.verdict !== "blocked" && !loggedNames.has(key(card.name))
+    && !(card.foodRefId && loggedRefs.has(card.foodRefId)));
 }
 
 /**
