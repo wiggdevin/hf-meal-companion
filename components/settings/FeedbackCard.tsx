@@ -119,10 +119,10 @@ export function FeedbackSheet({ draft, onDraft, screen, send, onClose }: {
             disabled={phase === "sending"}
             onChange={(e) => { onDraft(e.target.value); if (phase === "failed") setPhase("idle"); }}
             className="well w-full resize-none px-4 py-3 text-body font-medium text-charcoal" />
-          <span className={`self-end ${CAPTION}`} aria-live="polite">
-            {draft.length.toLocaleString("en-US")} / {FEEDBACK_MAX_CHARS.toLocaleString("en-US")}
-          </span>
         </label>
+        <span className={`-mt-2 self-end ${CAPTION}`}>
+          {draft.length.toLocaleString("en-US")} / {FEEDBACK_MAX_CHARS.toLocaleString("en-US")}
+        </span>
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-col gap-1">
             <span className={FIELD_LABEL}>Include the screen I was on</span>
@@ -135,7 +135,7 @@ export function FeedbackSheet({ draft, onDraft, screen, send, onClose }: {
           </Button>
         </div>
         <p className={`m-0 ${CAPTION}`}>
-          We save your note with your account so we can follow up. It is not shared with anyone else.
+          We save your note with your account so the people running this test can read it and follow up. Other accounts never see it.
         </p>
         {error ? <Notice tone="error" title={error} /> : null}
       </form>

@@ -177,7 +177,7 @@ export default function SignInPage() {
         </p>
       ) : null}
       <p className="ground-muted ts text-center text-tiny text-graphite">
-        Only you see your data · <Link href="/privacy" className="underline">Privacy</Link>
+        Other accounts never see your data. How it is handled: <Link href="/privacy" className="underline">Privacy</Link>
       </p>
     </main>
   );

@@ -56,6 +56,13 @@ describe("FeedbackSheet states", () => {
     expect(screen.getByText("5 / 2,000")).toBeTruthy();
   });
 
+  it("names the field by its question only, and says who reads the note (Grok audit 2026-11-18)", () => {
+    render(<Harness send={vi.fn()} />);
+    expect(screen.getByRole("textbox", { name: "What did you do, and what did you see?" })).toBeTruthy();
+    expect(document.body.textContent).toContain("the people running this test can read it");
+    expect(document.body.textContent).not.toContain("not shared with anyone else");
+  });
+
   it("sent: shows the thanks notice and clears the draft", async () => {
     const send = vi.fn(async (): Promise<FeedbackOutcome> => "sent");
     render(<Harness send={send} />);
