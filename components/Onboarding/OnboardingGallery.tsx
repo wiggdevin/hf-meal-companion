@@ -37,7 +37,7 @@ export default function OnboardingGallery() {
     .map((item) => ({ id: item.id, name: foodShortName(item.id, dbFood(item.id)?.name ?? item.id), role: item.role as "protein" | "carb" | "fat" }));
 
   if (params.get("saving") === "1") {
-    return <div className={`${styles.shell} matte`}>
+    return <div className={styles.shell}>
       <SavingStage title="Building your plan…" step="Saving your profile, targets and foods." />
     </div>;
   }

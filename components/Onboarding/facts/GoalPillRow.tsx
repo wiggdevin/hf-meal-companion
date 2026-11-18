@@ -10,7 +10,7 @@
  * no-personal-defaults.test.ts's PERSON_NAME rule) — `APP_NAME` is the one allowlisted spelling.
  */
 import { APP_NAME } from "@/lib/brand";
-import { CHIP_FILL } from "@/components/Onboarding/facts/chip-fill";
+import { CHIP_FILL, CHIP_PICKED } from "@/components/Onboarding/facts/chip-fill";
 import type { Goal } from "@/components/Onboarding/facts/types";
 
 const PILLS: { value: Goal; label: string }[] = [
@@ -43,7 +43,7 @@ export function GoalPillRow({
             type="button"
             onClick={() => onSelect(pill.value)}
             aria-pressed={value === pill.value}
-            className={`${CHIP_FILL} min-h-12 rounded-full px-5 text-body font-medium text-charcoal data-[pressed=true]:text-on-primary data-[pressed=true]:[background:var(--grad-ink)]`}
+            className={`${value === pill.value ? CHIP_PICKED : `${CHIP_FILL} text-charcoal`} min-h-12 rounded-full px-5 text-body font-medium`}
             data-pressed={value === pill.value}
           >
             {pill.label}
