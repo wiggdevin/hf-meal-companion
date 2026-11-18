@@ -4,8 +4,8 @@
  * Sign-out keeps an account's data on the phone (lib/device/forget.ts); a deleted account must
  * not. This runs the ordinary departure (lib/device/departure.ts: close, quiet, freeze, settle),
  * and in its last step — after this page's own writes are durable and its database is closed —
- * signs the session out, deletes the account's IndexedDB database, every localStorage key that
- * names the account, and its entry in the device registry. Then the page goes to the sign-in page
+ * signs the session out, deletes the account's IndexedDB database, every localStorage and
+ * sessionStorage key that names the account, and its entry in the device registry. Then the page goes to the sign-in page
  * with `?deleted=1`, which says the account is gone. `announce` tells the account's other tabs to
  * leave first, so none of them holds the database open.
  */
@@ -30,8 +30,33 @@ function storage(): Storage | null {
   }
 }
 
+function sessionStore(): Storage | null {
+  try {
+    return typeof sessionStorage === "undefined" ? null : sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+/** Removes this tab's sessionStorage keys that name the account, such as an unsent feedback draft. */
+function eraseAccountSession(userId: string): void {
+  const store = sessionStore();
+  if (!store) return;
+  try {
+    const named: string[] = [];
+    for (let i = 0; i < store.length; i += 1) {
+      const key = store.key(i);
+      if (key !== null && key.includes(userId)) named.push(key);
+    }
+    for (const key of named) store.removeItem(key);
+  } catch {
+    // Storage we cannot reach holds nothing we could remove.
+  }
+}
+
 /** Removes every key filed under the account, or naming it, and its device-registry entry. */
 export function eraseAccountStorage(userId: string): void {
+  eraseAccountSession(userId);
   const store = storage();
   if (!store) return;
   try {

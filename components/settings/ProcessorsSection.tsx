@@ -1,3 +1,4 @@
+import Link from "next/link";
 import Card from "@/components/settings/Card";
 import SettingsSection from "@/components/settings/Section";
 import { CAPTION, CARD_TITLE } from "@/components/settings/settings-styles";
@@ -33,6 +34,7 @@ export default function ProcessorsSection() {
             </li>
           ))}
         </ul>
+        <Link href="/privacy" className={`self-start underline ${CAPTION}`}>Read the privacy page</Link>
       </Card>
     </SettingsSection>
   );
