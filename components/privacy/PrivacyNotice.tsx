@@ -47,7 +47,7 @@ export default function PrivacyNotice({ deletionEnabled }: { deletionEnabled: bo
       <Section title="Health information">
         <ul className={LIST}>
           <li>Food rules, allergies and conditions you enter are stored with your account and used to plan your meals.</li>
-          <li>Medical questions to the coach get a fixed reply that points you to your doctor. They are not sent to an AI model.</li>
+          <li>When the coach recognises a medical question, it gives a fixed reply that points you to your doctor and does not send that question to an AI model. The check can miss some questions, so a missed one goes to the coach like any other message.</li>
           <li>
             A coach message that involves your health notes can go to Google Gemini on a paid plan, with
             request log storage turned off in our project settings.
@@ -87,8 +87,9 @@ export default function PrivacyNotice({ deletionEnabled }: { deletionEnabled: bo
         {deletionEnabled ? (
           <p className={BODY}>
             In Settings, under Data &amp; account, Delete account removes your account and everything in it for good.
-            The nightly backup of the whole database is not edited; it is replaced each day, and your data leaves
-            it as older copies age out. You can download your data first.
+            Backup copies of the database are not edited, so your data can stay in them after you delete your
+            account. To have it removed from backups too, send feedback from Settings before you delete. You can
+            download your data first.
           </p>
         ) : (
           <p className={BODY}>

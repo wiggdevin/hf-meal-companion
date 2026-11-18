@@ -58,11 +58,18 @@ describe("the privacy page", () => {
     expect(html).toContain("can include health details you wrote");
   });
 
+  it("does not promise every medical question is kept from the model", () => {
+    const html = renderToStaticMarkup(<PrivacyPage />);
+    expect(html).not.toContain("They are not sent to an AI model");
+    expect(html).toContain("The check can miss some questions");
+  });
+
   it("points deletion at Settings only when ACCOUNT_DELETION_ENABLED=1", () => {
     vi.stubEnv("ACCOUNT_DELETION_ENABLED", "1");
     const on = renderToStaticMarkup(<PrivacyPage />);
     expect(on).toContain("Delete account removes your account");
-    expect(on).toContain("older copies age out");
+    expect(on).toContain("can stay in them after you delete");
+    expect(on).not.toContain("age out");
     vi.stubEnv("ACCOUNT_DELETION_ENABLED", "");
     expect(renderToStaticMarkup(<PrivacyPage />)).toContain("Self-serve deletion is not switched on");
   });
