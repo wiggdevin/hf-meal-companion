@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { HttpError, requireUser } from "@/lib/server/auth";
+import { RECIPES_COMING_SOON } from "@/lib/recipe-pilot-copy";
 
 type AccessEnv = { RECIPE_PLANNING_USER_IDS?: string; SUPABASE_URL?: string;
   NEXT_PUBLIC_SUPABASE_URL?: string; NODE_ENV?: string };
@@ -19,7 +20,7 @@ export function recipeAccessEnabled(userId: string, env: AccessEnv = process.env
 export async function requireRecipeUser(req: Request): Promise<{ client: SupabaseClient; userId: string }> {
   const account = await requireUser(req);
   if (!recipeAccessEnabled(account.userId)) {
-    throw new HttpError(404, "recipe_pilot_unavailable", "Recipes are not available for this account yet.");
+    throw new HttpError(404, "recipe_pilot_unavailable", RECIPES_COMING_SOON);
   }
   return account;
 }

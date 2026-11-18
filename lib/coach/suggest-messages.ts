@@ -6,8 +6,13 @@ export const NO_SNACK_FIT_MESSAGE =
   "I couldn't find a snack option that fits your food rules yet. Try another idea, or name a food you would like and I will build around it.";
 export const SUGGEST_RETRY_MESSAGE = "I couldn't build those suggestions right now. Please try again.";
 export const SUGGEST_TIMEOUT_MESSAGE = "I ran out of time building options — ask again in a moment.";
+/**
+ * Weak-spot audit 2026-11-17 item 8: a new account has no food the app can prove needs no cooking,
+ * so this line must give a way forward rather than a bare refusal. It still invents no card, and
+ * names no example food: any named food could break the account's own rules (Sol review 2026-11-18).
+ */
 export const REQUIRES_PREPARATION_MESSAGE =
-  "Every verified option I found needs preparation, so I don't have an honest no-cook option yet.";
+  "I can't confirm yet that any of your options needs no cooking, so I won't guess. Name a food you eat just as it is, and I will build a meal around it.";
 /**
  * A brand-new account has nothing to anchor options on (R1: zero `user_food_prefs` rows). Options
  * are built from the Eats list, so this is a fact to state — never the retry line, and never a

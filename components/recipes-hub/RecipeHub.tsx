@@ -26,6 +26,7 @@ import { clearFlightOutcomesUnder, useFlying } from "@/components/single-flight"
 import { currentAccountOrNull } from "@/lib/device/account";
 import type { RecipeAccess } from "@/lib/recipe-access-client";
 import { exampleAt, HUB_CHIPS, remainingLine, type HubChip } from "@/lib/recipes-hub/hub";
+import { RECIPES_COMING_SOON } from "@/lib/recipe-pilot-copy";
 
 const EXAMPLE_MS = 3500;
 
@@ -38,7 +39,7 @@ function AccessLine({ access }: { access: HubAccess }) {
     {access.retry && <button type="button" onClick={access.retry} className="tap min-h-11 text-caption underline">Retry</button>}
   </div>;
   return <p role="status" className="m-0 text-caption text-graphite">
-    The recipe catalog isn’t on for this account yet. Ask below: ideas still fit your day.</p>;
+    {RECIPES_COMING_SOON} Ask below: ideas still fit your day.</p>;
 }
 
 export default function RecipeHub({ id, access, onClose, onSaved, embedded = false }: {

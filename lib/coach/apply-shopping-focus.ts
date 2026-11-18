@@ -15,8 +15,9 @@ import type { ApplyResult, UndoToken } from "@/lib/coach/apply-shared";
 import { accountHandle } from "@/lib/device/account";
 import { recipeAccessForCurrentAccount } from "@/lib/recipe-access-client";
 import { undoShoppingFocusWrite, writeShoppingFocus } from "@/lib/shopping/focus-client";
+import { SHOPPING_COMING_SOON } from "@/lib/recipe-pilot-copy";
 
-export const SHOPPING_FOCUS_UNAVAILABLE_REASON = "Shopping isn't available for this account yet.";
+export const SHOPPING_FOCUS_UNAVAILABLE_REASON = SHOPPING_COMING_SOON;
 
 type FocusAction = Extract<CoachAction, { kind: "set_shopping_focus" }>;
 type FocusToken = Extract<UndoToken, { kind: "set_shopping_focus" }>;

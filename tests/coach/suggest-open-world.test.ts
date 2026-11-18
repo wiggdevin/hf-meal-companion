@@ -129,3 +129,17 @@ describe("W10 acceptance 3: a Favored account row stays out of the Jev shortlist
     expect(jevNames).not.toContain("Chicken breast, grilled");
   });
 });
+
+// Weak-spot audit 2026-11-17 item 8: a brand-new account has no food the app can prove needs no
+// cooking, so every no-cook wish failed closed with a bare refusal and no way forward.
+describe("a no-cook wish on a brand-new open account", () => {
+  it("offers a next step instead of a bare refusal, and still invents no no-cook card", async () => {
+    const cards = await suggestOptions({ kind: "meal", count: 3, wish: "what can I make without cooking?" },
+      openPorts());
+    expect(cards).toHaveLength(0);
+    const { message } = JSON.parse(JSON.stringify(cards)) as { message?: string };
+    expect(message).toMatch(/name a food you eat just as it is/i);
+    expect(message).not.toMatch(/yogurt|fruit/i);
+    expect(message).not.toMatch(/don't have an honest no-cook option/i);
+  });
+});

@@ -82,6 +82,8 @@ outright with no second provider to try.
   `https://openrouter.ai/api/v1/chat/completions`, governed by the same `callModel` path as
   Gemini (provenance, registry, circuit breaker, spend cap, one `ai_calls` row per call, provider
   `openrouter`). OpenRouter model ids are pinned in `lib/ai/lanes.ts`; changing one requires a PR.
+  Model ids are code pins, not env vars: `COACH_MODEL_ID`, `COACH_OPENROUTER_FALLBACK_MODEL`,
+  `VOICE_ENABLED` and `NOUS_*` are read by no code, so a value set for them changes nothing.
   The provider switch, key and attestation remain deployment settings.
 - **Attestation:** mirrors Gemini's R4 pair exactly, under its own name —
   `OPENROUTER_ATTESTED=1` — checked in the payload builder (`lib/ai/openrouter-payloads.ts`,
@@ -117,7 +119,7 @@ outright with no second provider to try.
   which skips that same-key fallback entirely because a second Gemini model meets the identical
   quota wall — retry once on the named OpenRouter model instead, since OpenRouter authenticates
   with a different key and is a different outage domain. `COACH_PROVIDER=openrouter` instead
-  routes the coach's PRIMARY turn there, with the pinned `google/gemini-2.5-flash` slug. The
+  routes the coach's PRIMARY turn there, with the pinned `google/gemini-3-flash-preview` slug. The
   fallback pin is `google/gemini-3-flash-preview`; each path still requires the OpenRouter key and
   attestation. Without them, the coach uses the Gemini pins.
 - **Usage and cost:** every request sends `usage: { include: true }`; the `ai_calls.cost_estimate`
@@ -319,7 +321,7 @@ OpenRouter answered 44 of 46 coach calls (96 %, p50 2.4 s).
   `lib/ai/openrouter-payloads.ts`) sends the twin's own system prompt and `data` envelope; a photo
   or label goes as one `image_url` data URL, after the same `validateImage` checks (JPEG/PNG,
   size and dimension caps) as before. Same `deny` + `zdr` + `require_parameters` routing as the
-  coach. Model: `google/gemini-2.5-flash`, pinned in `lib/ai/lanes.ts`.
+  coach. Model: `google/gemini-3-flash-preview`, pinned in `lib/ai/lanes.ts`.
 - **Fallback:** OpenRouter gets one attempt inside 8 s of the 20 s capture budget. Any provider
   failure (an HTTP error, a quota, no answer, an open circuit) falls back to the Gemini capture
   pair (`gemini-3.8-flash`, then `gemini-3.6-flash`) with the rest of the budget. A reply our

@@ -42,7 +42,7 @@ describe("R4 completed output boundaries", () => {
   it("preserves partial and portion shortfall disclosures in the gated recipe fallback", () => {
     const partial = Object.assign([meal], { partial: true as const, message: "Only one option could be checked." });
     const text = fastSuggestionReply("recipe", false, partial);
-    expect(text).toContain("not complete recipes");
+    expect(text).toContain("checked meal ideas instead");
     expect(text).toContain(partial.message);
     expect(fastSuggestionReply("recipe", false, [{ ...meal, shortfallNote: "Protein is below target." }]))
       .toContain("Protein is below target.");
