@@ -24,7 +24,9 @@ import { withoutListMarkConfirmations } from "@/lib/coach/list-mark-confirmation
 import { withoutLogConfirmations } from "@/lib/coach/log-confirmation";
 import { occasionAt } from "@/lib/meals/occasion";
 import { foodEvidenceFor } from "@/lib/coach/food-evidence";
-import { withoutPlanReports, type PlanRead } from "@/lib/coach/plan-report";
+import {
+  plannedMealTitles, withoutPlannedMealTitles, withoutPlanReports, type PlanRead,
+} from "@/lib/coach/plan-report";
 import { shoppingItemNames, withoutShoppingConfirmations } from "@/lib/coach/shopping-confirmation";
 import type { CoachAction } from "@/lib/coach/actions";
 import { allergenFacts, checkItem, type EvidenceByName } from "@/lib/coach/policy";
@@ -304,7 +306,8 @@ function rawLoggedIdentities(input: ReplyScanInput): LoggedIdentities {
     ? action.items.map((item) => ({ ...item, slot: action.slot, at: action.at,
       occasion: action.slot === "snack" ? "snack" : occasionAt(action.at) })) : []), notices: input.logNotices,
     listMarks: (input.actions ?? []).flatMap((action) =>
-    "name" in action ? [{ kind: action.kind, name: action.name }] : []) };
+    "name" in action ? [{ kind: action.kind, name: action.name }] : []),
+    mealTitles: plannedMealTitles(input.actions ?? []) };
 }
 
 /**
@@ -361,8 +364,8 @@ async function scan(
   const logged = await resolveLoggedIdentities(input, deadlineAt);
   legacyActive ||= hasAvoid();
   if (!legacyActive && rules === null) return { hardRulesActive: false, complete: true, failing: [] };
-  const adviceText = withoutLogConfirmations(withoutListMarkConfirmations(withoutPlanReports(input.text,
-    input.planReads ?? []),
+  const adviceText = withoutLogConfirmations(withoutListMarkConfirmations(withoutPlannedMealTitles(
+    withoutPlanReports(input.text, input.planReads ?? []), logged.mealTitles ?? []),
     logged.listMarks ?? []), logged.items ?? [], input.evidence, logged.notices ?? input.logNotices);
   if (!searching || adviceText !== input.text) {
     input = { ...input, text: adviceText };

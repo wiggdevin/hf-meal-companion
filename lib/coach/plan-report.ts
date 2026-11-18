@@ -96,3 +96,69 @@ export function withoutPlanReports(text: string, reads: readonly PlanRead[], onE
     return true;
   }).join(" ");
 }
+
+/** Words a meal title may add around its own foods: joiners, cooking methods, the dish's shape. */
+const TITLE_FILLER = new Set(("and & with plus on over of a the side bowl plate meal dinner lunch "
+  + "breakfast snack grilled roasted baked steamed boiled fried pan-fried sauteed sautéed scrambled "
+  + "poached toasted cooked raw fresh plain").split(" "));
+
+/**
+ * Words of a catalog name that do not change what the food is for a diet rule: colour and grain of
+ * a staple, cut or form of a meat, size, sweetening and how it was kept ("White rice, cooked",
+ * "Chicken breast, roasted"). Every other word of an item's name ("almond" milk, "Milk, cashew",
+ * "Bread, gluten-free", "Cream of rice") is part of its identity and must appear in the title.
+ */
+const NON_IDENTITY = new Set(("white brown wild long-grain basmati jasmine lean boneless skinless "
+  + "large small medium fresh frozen organic baby extra virgin unsalted salted unsweetened sweetened "
+  + "breast breasts thigh thighs fillet fillets filet leg legs wing wings drumstick drumsticks loin "
+  + "tenderloin cutlet cutlets ground whole regular canned drained prepared").split(" "));
+
+/**
+ * Weak-spot audit 2026-11-17 item 6: the titles of meals this turn's `set_slot_meal` actions set
+ * ("Grilled chicken and rice"), when every item grounded to an allowed food and every other word
+ * of the title is one of those items' own words or filler. Such a title names the meal, not a
+ * food, so the reply scan does not look it up as one. Mirrors withoutPlanReports above for a plan
+ * read; an ungrounded or unchecked item, or a title word naming any other food, keeps the title.
+ */
+export function plannedMealTitles(actions: readonly { kind: string }[]): string[] {
+  return actions.flatMap((action) => {
+    if (action.kind !== "set_slot_meal") return [];
+    const { title, items } = action as { title?: unknown; items?: unknown };
+    if (typeof title !== "string" || !clean(title) || !Array.isArray(items) || items.length === 0) return [];
+    const checked = items.every((item: { foodRefId?: unknown; verdict?: unknown; name?: unknown }) =>
+      typeof item.foodRefId === "string" && item.verdict === "allowed" && typeof item.name === "string");
+    if (!checked) return [];
+    const words = (s: string) => key(s).split(/[^\p{L}\p{N}&'-]+/u).filter(Boolean);
+    const singular = (w: string) => w.replace(/(?:es|s)$/, "");
+    const own = new Set(items.flatMap((item: { name: string }) => words(item.name)).flatMap((w) => [w, singular(w)]));
+    const titleWords = words(title);
+    const inTitle = new Set(titleWords.flatMap((w) => [w, singular(w)]));
+    // Sol, Carbon and DeepSeek reviews 2026-11-18: every identity word of every item's full name,
+    // both sides of a comma, must be in the title, so "Milk" never stands for "Milk, cashew".
+    const keepsIdentity = items.every((item: { name: string }) => words(item.name).every((w) =>
+      inTitle.has(w) || inTitle.has(singular(w)) || NON_IDENTITY.has(w) || TITLE_FILLER.has(w)));
+    return keepsIdentity
+      && titleWords.every((w) => TITLE_FILLER.has(w) || own.has(w) || own.has(singular(w)))
+      ? [title] : [];
+  });
+}
+
+/** A sentence that confirms a plan change ("I set your dinner to …", "Meal 2 is now …"). */
+const CONFIRMS = /\b(?:set|planned|put|added|changed|updated|swapped|moved|replaced|scheduled)\b|\bis now\b/i;
+
+/**
+ * Removes each planned meal title (whole phrase, any case) from the first sentence that both names it
+ * and confirms a plan change: that mention is the action's confirmation. Every other mention,
+ * before or after it, is advice and is scanned (reviews 2026-11-18).
+ */
+export function withoutPlannedMealTitles(text: string, titles: readonly string[]): string {
+  const sentences = text.match(/[^.!?]+(?:[.!?]+|$)/g) ?? [text];
+  for (const title of titles) {
+    const pattern = key(title).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "\\s+");
+    // The title must end its noun phrase: "Chicken" is not stripped out of "Chicken nuggets".
+    const re = new RegExp(`(^|[^\\p{L}\\p{N}])${pattern}(?=\\s*(?:$|[.,;:!?)]|(?:and|for|on|at|with|today|tonight|tomorrow|this|instead)\\b))`, "iu");
+    const at = sentences.findIndex((sentence) => re.test(sentence) && CONFIRMS.test(sentence));
+    if (at >= 0) sentences[at] = sentences[at].replace(re, "$1");
+  }
+  return sentences.join("");
+}

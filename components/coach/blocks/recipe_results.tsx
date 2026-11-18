@@ -8,6 +8,7 @@ import { useRecipeAccess } from "@/lib/recipe-access-client";
 import type { RecipeCandidate } from "@/lib/recipe-catalog/types";
 import { recipesJudgedNow, useRecipeReader } from "@/lib/recipes/recipe-freshness";
 import Notice from "@/components/ui/Notice";
+import { RECIPES_COMING_SOON } from "@/lib/recipe-pilot-copy";
 
 export default function RecipeResultsBlock({ blockId, recipes, limitations, exactMatch }: {
   blockId: string; recipes: RecipeCandidate[]; limitations?: string[];
@@ -59,7 +60,7 @@ export default function RecipeResultsBlock({ blockId, recipes, limitations, exac
   // The stored block cannot change in place; account and revision IDs define the read.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account?.epoch, access.enabled, ids, revision]);
-  if (!access.enabled) return <p role="status">{access.loading ? "Checking recipe access…" : "Shared recipes are unavailable for this account."}</p>;
+  if (!access.enabled) return <p role="status">{access.loading ? "Checking recipe access…" : RECIPES_COMING_SOON}</p>;
   if (!current || current.epoch !== account?.epoch) return <p role="status">Checking current recipe access…</p>;
   return <div className="flex flex-col gap-2">
     {/* O4a: ranking never filters, so a search with no exact match still shows its closest recipes. */}

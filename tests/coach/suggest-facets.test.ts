@@ -35,6 +35,7 @@ import {
   type SuggestionEvidence, type SuggestionFoodEvidence,
 } from "@/lib/coach/suggest-policy";
 import type { SuggestionCandidate } from "@/lib/coach/suggest-candidates";
+import { REQUIRES_PREPARATION_MESSAGE } from "@/lib/coach/suggest-messages";
 import type { ComposedItem } from "@/lib/coach/compose";
 import type { FoodHit } from "@/lib/coach/executors";
 import { catalogWarmFood } from "@/lib/foods/catalog-ingredients";
@@ -225,7 +226,7 @@ describe("suggestion facet gate", () => {
       expect(rank).not.toHaveBeenCalled();
       expect(JSON.parse(JSON.stringify(cards))).toEqual({
         cards: [],
-        message: "Every verified option I found needs preparation, so I don't have an honest no-cook option yet.",
+        message: REQUIRES_PREPARATION_MESSAGE,
       });
     });
 
@@ -238,7 +239,7 @@ describe("suggestion facet gate", () => {
     expect(cards).toHaveLength(0);
     expect(rank).not.toHaveBeenCalled();
     expect(JSON.parse(JSON.stringify(cards))).toMatchObject({
-      message: "Every verified option I found needs preparation, so I don't have an honest no-cook option yet.",
+      message: REQUIRES_PREPARATION_MESSAGE,
     });
   });
 
@@ -262,7 +263,7 @@ describe("suggestion facet gate", () => {
       storedOverride.ports);
 
     expect(blocked).toHaveLength(0);
-    expect(JSON.parse(JSON.stringify(blocked)).message).toContain("needs preparation");
+    expect(JSON.parse(JSON.stringify(blocked)).message).toBe(REQUIRES_PREPARATION_MESSAGE);
     expect(cachedOnly.rank).not.toHaveBeenCalled();
     expect(allowed).toHaveLength(1);
     // W10b: one survivor is under the 5-plate shortlist floor, so Jev is never called.

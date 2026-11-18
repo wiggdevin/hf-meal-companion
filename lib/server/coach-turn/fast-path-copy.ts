@@ -11,6 +11,7 @@ import type { ClassifiedIntentResult } from "@/lib/coach/intent";
 import { NO_MEAL_FIT_MESSAGE, NOTHING_LEFT_MESSAGE } from "@/lib/coach/suggest-messages";
 import { ideaReviewCopy } from "@/lib/coach/idea-review-copy";
 import type { SuggestionResult } from "@/lib/coach/suggest";
+import { RECIPE_IDEAS_INSTEAD } from "@/lib/recipe-pilot-copy";
 
 /**
  * Kinds that never take the fast path, whatever a spec says: a skip clears a meal only as the yes
@@ -42,7 +43,7 @@ export function fastSuggestionReply(
   // snack was impossible on a day with 1 700 kcal still to eat.
   if (composed.length === 0) return result.message
     ?? (kind === "snack" ? NOTHING_LEFT_MESSAGE : NO_MEAL_FIT_MESSAGE);
-  const notices = kind === "recipe" ? ["Shared recipe discovery is unavailable. These are checked meal ideas instead, not complete recipes."] : [];
+  const notices = kind === "recipe" ? [RECIPE_IDEAS_INSTEAD] : [];
   if (notices.length || result.message || composed.some((card) => !card.fitsTarget || card.shortfallNote || card.leftOut?.length)) {
     return ideaReviewCopy(composed, { notices, messages: result.message ? [result.message] : [] });
   }

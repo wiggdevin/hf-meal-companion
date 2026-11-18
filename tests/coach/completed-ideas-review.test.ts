@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { completedIdeasReply } from "@/lib/coach/completed-ideas";
 import type { ComposedMeal } from "@/lib/coach/compose";
 import type { UiBlock } from "@/lib/coach/ui-blocks";
+import { RECIPE_IDEAS_INSTEAD } from "@/lib/recipe-pilot-copy";
 const meal: ComposedMeal = { wish: "chicken wrap", slot: null, items: [{ name: "Chicken breast, roasted",
   foodRefId: "ref", catalogFoodRevisionId: 1, grams: 100, kcalPer100g: 165, proteinPer100g: 31,
   carbsPer100g: 0, fatPer100g: 4, macros: { kcal: 165, protein: 31, carbs: 0, fat: 4 }, verdict: "allowed" }],
@@ -29,7 +30,7 @@ describe("truthful completed-card review copy", () => {
     expect(text).not.toContain("chicken");
   });
   it("keeps gated provenance and partial messages exactly once", () => {
-    const notice = "Shared recipe discovery is unavailable. These are checked meal ideas instead, not complete recipes.";
+    const notice = RECIPE_IDEAS_INSTEAD;
     const message = "Only one option could be checked.";
     const text = completedIdeasReply(ask, call({ notice, message }), [meal], blocks([meal]), message)!;
     expect(text.startsWith(notice)).toBe(true);
@@ -54,5 +55,14 @@ describe("truthful completed-card review copy", () => {
     expect(authored).not.toMatch(/\b(?:fits?|target|within|safe|allowed)\b/i);
     expect(authored.toLowerCase()).not.toContain("chicken");
     expect(authored.toLowerCase()).not.toContain("cheese");
+  });
+});
+
+describe("recipe fallback copy (Sol review 2026-11-18 NIT)", () => {
+  it("does not call recipe discovery unavailable on the meal-idea fallback", async () => {
+    const { fastSuggestionReply } = await import("@/lib/server/coach-turn/fast-path-copy");
+    const card = { fitsTarget: true, allItemsOnEats: true } as never;
+    const text = fastSuggestionReply("recipe", false, [card] as never);
+    expect(text).not.toMatch(/unavailable/i);
   });
 });

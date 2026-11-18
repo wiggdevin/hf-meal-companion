@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ExecutorPorts, SuggestInput } from "@/lib/coach/executors";
 import { recipeSearchFromWish } from "@/lib/coach/recipe-query";
 import { recipeAccessEnabled } from "@/lib/server/recipe-access";
+import { RECIPES_COMING_SOON } from "@/lib/recipe-pilot-copy";
 
 /** Shared discovery stays gated; a no-cook wish may use the existing checked meal engine. */
 export async function coachRecipeSuggestions(client: SupabaseClient, userId: string,
@@ -11,7 +12,7 @@ export async function coachRecipeSuggestions(client: SupabaseClient, userId: str
     "This search cannot check a one-off ingredient exclusion. Add the ingredient to Avoids, then search again.",
   ] };
   if (!recipeAccessEnabled(userId)) {
-    const unavailable = "Shared recipe discovery is not available for this account yet.";
+    const unavailable = RECIPES_COMING_SOON;
     if (search.effort === "none") {
       const result = await meals(userId, { ...args, kind: "meal", count: Math.min(3, args.count ?? 3) });
       if (Array.isArray(result) && result.length) return result;

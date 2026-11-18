@@ -14,6 +14,7 @@ import type { RecipeAccess } from "@/lib/recipe-access-client";
 import { currentAccountOrNull, isCurrent, onAccountGone, onAccountReady } from "@/lib/device/account";
 import { SYNCED_EVENT } from "@/lib/sync/client";
 import Notice from "@/components/ui/Notice";
+import { RECIPES_AND_SHOPPING_COMING_SOON } from "@/lib/recipe-pilot-copy";
 
 /* DESIGN.md Iconography: linear, currentColor, drawn as inline SVG — never emoji or a text
    glyph. Filled when the recipe is a favorite, outline when it is not. */
@@ -144,7 +145,7 @@ export default function RecipesSection({ recipeAccess = { enabled: false, loadin
                 action={recipeAccess.retry ? { label: "Retry", onClick: recipeAccess.retry } : undefined} />
               : recipeAccess.loading
               ? <p className="m-0 text-caption text-muted" role="status">Checking recipe access…</p>
-              : <Notice tone="attention" title="Shared recipes and Shopping are not available for this account yet." />}
+              : <Notice tone="neutral" title={RECIPES_AND_SHOPPING_COMING_SOON} />}
 
             {recipes.length === 0 ? (
               <Notice tone="neutral"

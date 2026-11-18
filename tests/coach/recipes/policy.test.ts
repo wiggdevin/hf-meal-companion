@@ -202,6 +202,31 @@ describe("recipe composition policy", () => {
     expect(grounded.refusals).toEqual(["Skipped avoided food: on your Avoid list."]);
   });
 
+  // Weak-spot audit 2026-11-17 item 11 (decided): a recipe with an Avoid-list ingredient is refused
+  // whole, with one line that names the ingredient — never saved with that ingredient dropped.
+  it("refuses a mixed recipe with an Avoid-list ingredient and names it in one line", async () => {
+    const riceRef = REF("r1");
+    const peanutRef = REF("p1");
+    const action: CoachAction = {
+      kind: "save_recipe", actionId: "save-mixed", flagged: [], name: "Peanut rice bowl",
+      items: [item("rice", riceRef), item("peanuts", peanutRef)],
+    };
+    const evidence: SuggestionEvidence = {
+      status: "ready", preferenceFlags: [],
+      byIdentity: {
+        [`ref:${riceRef}`]: facts({ foodName: "rice" }),
+        [`ref:${peanutRef}`]: facts({ foodName: "peanuts", onEatsList: false, onAvoidList: true }),
+      },
+    };
+
+    const grounded = await filterRecipeActions("u1", [action], DEFAULT_PROFILE, { evidence });
+
+    expect(grounded.actions).toEqual([]);
+    expect(grounded.actions.some((a) => a.kind === "save_recipe")).toBe(false);
+    expect(grounded.refusals).toEqual(["Skipped peanuts: on your Avoid list."]);
+    expect(grounded.refusals[0]).not.toContain("\n");
+  });
+
   it("never promotes a grounded blocked item when fresh evidence is empty", async () => {
     const avoidedRef = REF("a2");
     const action: CoachAction = {

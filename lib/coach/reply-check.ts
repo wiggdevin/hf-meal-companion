@@ -56,7 +56,9 @@ export type ReplyCheckResult = {
 
 /** The food identities an exemption (finding #6) is keyed on: by name, or by grounded foodRefId. */
 export type LoggedIdentities = { names: Set<string>; refs: Set<string>;
-  items?: LoggedConfirmationItem[]; notices?: readonly string[]; listMarks?: { kind: string; name: string }[] };
+  items?: LoggedConfirmationItem[]; notices?: readonly string[]; listMarks?: { kind: string; name: string }[];
+  /** Titles of meals this turn's grounded set_slot_meal actions set (plan-report.ts plannedMealTitles). */
+  mealTitles?: string[] };
 
 /**
  * 2026-10-02 DeepSeek audit (finding #6): the foods THIS turn's own log_meal actions already
