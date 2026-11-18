@@ -16,9 +16,20 @@ import { reaskMessage, reaskReasonCode, type ReaskFailure } from "@/lib/coach/re
 import type { RawSuggestion } from "@/lib/coach/turn";
 import type { CoachDraft, CoachSuggestion } from "@/lib/coach/types";
 import type { ConstraintProfile } from "@/lib/policy/constraints";
+import { withoutLogConfirmations, type LoggedConfirmationItem } from "@/lib/coach/log-confirmation";
+import { lexiconMentions, normalizeFoodText } from "@/lib/coach/reply-mentions";
+import { catalogNameMatches } from "@/lib/coach/food-names";
+import { occasionAt } from "@/lib/meals/occasion";
+import { foodEvidenceFor, unknownFoodEvidence } from "@/lib/coach/food-evidence";
+import { withoutPlanReports, type PlanRead } from "@/lib/coach/plan-report";
 
 export type ReplyCheckInput = {
   text: string;
+  /** Model prose before server-authored policy notices and source titles are appended. */
+  adviceText?: string;
+  logItems?: readonly LoggedConfirmationItem[];
+  logNotices?: readonly string[];
+  planReads?: readonly PlanRead[];
   named: RawSuggestion[];
   draft: CoachDraft | null;
   actions: CoachAction[];
@@ -44,7 +55,8 @@ export type ReplyCheckResult = {
 };
 
 /** The food identities an exemption (finding #6) is keyed on: by name, or by grounded foodRefId. */
-export type LoggedIdentities = { names: Set<string>; refs: Set<string> };
+export type LoggedIdentities = { names: Set<string>; refs: Set<string>;
+  items?: LoggedConfirmationItem[]; notices?: readonly string[]; listMarks?: { kind: string; name: string }[] };
 
 /**
  * 2026-10-02 DeepSeek audit (finding #6): the foods THIS turn's own log_meal actions already
@@ -74,7 +86,10 @@ export function loggedFoodIdentities(
 
 /** What a suggestion card is judged on: the model's id, else the searched one, with its facts. */
 export function cardEvidence(s: RawSuggestion, evidence: EvidenceByName): EvidenceByName[string] {
-  const found = evidence[s.name];
+  const found = foodEvidenceFor(evidence, s.name);
+  if (found?.ambiguous || (found?.foodRefId && s.foodRefId && found.foodRefId !== s.foodRefId)) {
+    return unknownFoodEvidence(found?.onAvoidList);
+  }
   return {
     foodRefId: s.foodRefId ?? found?.foodRefId ?? null,
     allergenTags: found?.allergenTags ?? null, ...allergenFacts(found), category: found?.category ?? null,
@@ -87,7 +102,9 @@ export function checkReply(input: ReplyCheckInput): ReplyCheckResult {
   const suggestions: CoachSuggestion[] = named.map((s) => {
     const card = cardEvidence(s, evidence);
     const foodRefId = card.foodRefId;
-    const verdict = checkItem({ ...card, name: s.name, grams: s.grams ?? null }, profile, true);
+    const checked = checkItem({ ...card, name: s.name, grams: s.grams ?? null }, profile, true);
+    const verdict = card.ambiguous && checked.verdict !== "blocked"
+      ? { verdict: "unverified" as const } : checked;
     return {
       foodRefId, name: s.name, grams: s.grams ?? null,
       reason: verdict.verdict === "blocked" ? verdict.reason : null, verdict: verdict.verdict,
@@ -113,19 +130,21 @@ export function checkReply(input: ReplyCheckInput): ReplyCheckResult {
    * reply and it was never declared as a suggestion, its own verdict still has to be checked
    * before the text can be trusted.
    */
-  const namedNames = new Set(named.map((s) => s.name.toLowerCase()));
   // The confirmation sentence leaves the scan, but each item it put on the list is still judged
   // (DeepSeek audit round 9, HIGH): a blocked food never goes on the list unremarked.
-  const lowerText = [withoutShoppingConfirmations(
-    withoutListMarkConfirmations(text, input.actions ?? []), input.actions ?? []),
-    ...shoppingItemNames(input.actions ?? [])].join(" ").toLowerCase();
-  // finding #6: a food this turn's own log_meal already logged is exempt from this blocking scan —
-  // it is the user's record of what they ate, not advice the reply is offering them.
-  const logged = loggedFoodIdentities(input.actions);
+  const logItems = input.logItems ?? input.actions.flatMap((action) => action.kind === "log_meal"
+    ? action.items.map((item) => ({ ...item, slot: action.slot, at: action.at,
+      occasion: action.slot === "snack" ? "snack" : occasionAt(action.at) })) : []);
+  const advice = withoutLogConfirmations(withoutShoppingConfirmations(
+    withoutListMarkConfirmations(withoutPlanReports(input.adviceText ?? text, input.planReads ?? []),
+      input.actions), input.actions), logItems, evidence, input.logNotices);
+  const prose = ` ${normalizeFoodText([advice, ...shoppingItemNames(input.actions)].join(" "))} `;
+  const phrases = lexiconMentions(advice);
+  // Only a bound confirmation leaves the scan. A named card or a previous log never clears
+  // advice in the remaining prose; match whole names so "ham" does not match "shame".
   const textChecks: CoachSuggestion[] = Object.entries(evidence)
-    .filter(([name, found]) => !namedNames.has(name.toLowerCase())
-      && !logged.names.has(name.toLowerCase()) && !(found.foodRefId !== null && logged.refs.has(found.foodRefId))
-      && lowerText.includes(name.toLowerCase()))
+    .filter(([name]) => prose.includes(` ${normalizeFoodText(name)} `)
+      || phrases.some((phrase) => catalogNameMatches(name, phrase)))
     .map(([name, found]) => ({
       name, foodRefId: found.foodRefId,
       verdict: checkItem({

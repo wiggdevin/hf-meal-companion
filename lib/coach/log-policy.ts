@@ -202,7 +202,10 @@ export async function markLoggedActions(
     const marked = actions.map((action): CoachAction => {
       if (action.kind !== "log_meal") return action;
       const nextItems = action.items.map((item) => {
-        if (item.verdict === "blocked") return item;
+        if (item.verdict === "blocked") {
+          notices.push(`Off-plan: ${item.name}.`);
+          return item;
+        }
         notices.push(evidence.preferenceFlags.length > 0
           ? unverifiedNoticeForFlags(item.name, evidence.preferenceFlags)
           : `Not verified: ${item.name} (your food rules could not be checked).`);

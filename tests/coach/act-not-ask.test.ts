@@ -59,7 +59,7 @@ describe("a plan change with no grams and no catalog portion acts", () => {
     expect(action.kind).toBe("set_slot_meal");
     if (action.kind !== "set_slot_meal") return;
     expect(action).toMatchObject({ from: "2026-10-19", through: "2026-11-01", weekdays: [1, 2, 3, 4, 5] });
-    expect(action.items.map((item) => item.grams)).toEqual([50, 120]);
+    expect(action.items.map((item) => item.grams)).toEqual([235, 120]);
   });
 
   it("still asks what a food is when the catalog has nothing for it", async () => {

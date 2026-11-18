@@ -97,27 +97,29 @@ export const LANES = {
  * OpenRouter model ids share the lane table's PR-controlled pin policy. The Plan readers' pins are
  * the `plan` lane's primary model, so the lane and these pins cannot drift apart.
  */
+// 2026-11-16: the 2.5 route returned HTTP 404 under unchanged deny/ZDR/strict-schema flags.
+// The already-vetted 3 Flash route passed the same probe; see the remediation lane bench.
 export const OPENROUTER_PINS = {
-  coach: "google/gemini-2.5-flash",
+  coach: "google/gemini-3-flash-preview",
   coachFallback: "google/gemini-3-flash-preview",
   planPhoto: LANES.plan.model,
   planDocument: LANES.plan.model,
-  capture: "google/gemini-2.5-flash",
+  capture: "google/gemini-3-flash-preview",
   /** Onboarding v2's extraction call asks this model first (lib/server/onboarding-extract.ts),
    *  same pin as capture: a small bounded-schema read, not a conversation. */
-  onboardingExtract: "google/gemini-2.5-flash",
+  onboardingExtract: "google/gemini-3-flash-preview",
   /**
    * 2026-10-06 (Gemini project denial, #gemini-fallback): the audio-capable model voice capture
    * and the coach's transcribe fallback use once Gemini itself fails. The SAME slug already pinned
    * for text/photo/label capture (`capture` above), not a new, separately-vetted model: the Gemini
-   * family takes native audio input, not vision alone, and this slug already carries a 7-day
-   * production track record (docs/audit/2026-10-03-ai-call-success.md) and cleared OpenRouter
-   * attestation. A model id is a LITERAL here like every other pin in this table (module comment)
+   * family takes native audio input, not vision alone. WAV and AAC/M4A fallback probes passed
+   * on this pin (docs/audit/2026-11-16-openrouter-availability.md); the older 7-day record
+   * measured the retired 2.5 pin. OpenRouter attestation remains required. A model id is a LITERAL here like every other pin in this table (module comment)
    * — never env-driven — so "configurable by env" for this fallback means WHETHER it runs at all
    * (OPENROUTER_API_KEY + OPENROUTER_ATTESTED, the same gate lib/ai/capture.ts
    * captureOpenRouterReady already uses), not which model answers.
    */
-  captureVoice: "google/gemini-2.5-flash",
+  captureVoice: "google/gemini-3-flash-preview",
 } as const;
 
 /** The data classes a lane may carry: exactly its provider's clearance (spec §2). */

@@ -24,10 +24,11 @@ const evidence = { "Pork chop": {
 } };
 
 function verdictFor(profile: ConstraintProfile, name: keyof typeof evidence = "Pork chop") {
-  return checkReply({
+  const result = checkReply({
     text: `Try the ${name.toLowerCase()}.`, named: [{ name, foodRefId: evidence[name].foodRefId }],
     draft: null, actions: [], evidence, profile,
-  }).suggestions[0].verdict;
+  });
+  return result.suggestions[0]?.verdict ?? result.textChecks.find((item) => item.name === name)?.verdict;
 }
 
 describe("reply check with profile rules", () => {

@@ -100,8 +100,8 @@ export function planDocumentModel(): string {
  * Owner request 2026-10-02 ("Gemini calls go through OpenRouter"): the OpenRouter model that
  * answers text, photo and label capture FIRST (lib/ai/capture.ts runCapture), with the pinned
  * Gemini lane kept as the fallback. Like the coach and plan photo pins, it changes through the
- * lane table. The pin is the slug the 7-day
- * ai_calls report (docs/audit/2026-10-03-ai-call-success.md) measured at 96 % ok, p50 2.4 s.
+ * lane table. The current pin passed the strict transport bench documented in
+ * docs/audit/2026-11-16-openrouter-availability.md; the older 7-day report measured the retired pin.
  */
 export function captureOpenRouterModel(): string {
   return OPENROUTER_PINS.capture;

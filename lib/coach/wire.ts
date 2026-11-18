@@ -37,7 +37,7 @@ const suggestionShape = z.object({
   foodRefId: z.string().max(64).nullable().optional(),
   // `.min(0)`, NOT `.positive()`: positive() lowers to `exclusiveMinimum`, which the live API
   // rejects with a 400 ("Unknown name exclusiveMinimum") - measured 2026-09-12. The union below
-  // still refuses 0 grams.
+  // still refuses 0 grams; redundant zero-gram slot-meal mirrors are discarded, never sized.
   grams: z.number().min(0).max(2000).nullable().optional(),
 });
 
@@ -152,13 +152,19 @@ export function turnStepCandidate(
   }
   if (wire.text) candidate.text = wire.text;
   const suggestions = named(wire.suggestions);
-  if (suggestions.length) candidate.suggestions = suggestions;
+  const mealItemNames = new Set<string>();
+  const nameKey = (name: string) => name.toLowerCase().trim().replace(/\s+/g, " ");
   if (wire.actions?.length) {
     const actionSchema = coachActionWireSchemaFor(today);
     const kept: unknown[] = [];
     for (const [index, action] of wire.actions.entries()) {
       const parsed = actionSchema.safeParse(action);
-      if (parsed.success) kept.push(parsed.data);
+      if (parsed.success) {
+        kept.push(parsed.data);
+        if (parsed.data.kind === "set_slot_meal") {
+          for (const item of parsed.data.items) mealItemNames.add(nameKey(item.name));
+        }
+      }
       // W087: a refused action with nothing in it is the model filling the required array, like
       // a blank-named suggestion. Dropping it keeps the reply; refusing it threw the whole turn
       // away as "coach unavailable". A refused action with any content still refuses the turn.
@@ -169,6 +175,11 @@ export function turnStepCandidate(
     }
     if (kept.length) candidate.actions = kept;
   }
+  // A flat provider response can repeat a meal's foods as zero-gram UI placeholders.
+  // Drop only those duplicates after structural action validation; never infer an amount or ref.
+  const cards = suggestions.filter((item) => !(item.grams === 0 && item.foodRefId == null
+    && mealItemNames.has(nameKey(item.name))));
+  if (cards.length) candidate.suggestions = cards;
   if (wire.memory?.length) candidate.memory = wire.memory;
   const parsed = turnStepSchema.safeParse(candidate);
   if (parsed.success) return { ok: true, step: parsed.data };

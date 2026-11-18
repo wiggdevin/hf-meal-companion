@@ -474,7 +474,7 @@ describe("coach mechanical intent fast path", () => {
         newId: () => "id-1",
       });
 
-    expect(result.messages.at(-1)?.content).toBe(note);
+    expect(result.messages.at(-1)?.content).toBe(`Here is 1 option to review. ${note}.`);
     expect(result.composed).toHaveLength(1);
   });
 

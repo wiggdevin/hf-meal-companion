@@ -17,6 +17,8 @@ import { COACH_MODEL_ID } from "@/lib/ai/models";
 import type { buildCoachContext } from "@/lib/server/coach-context";
 import { REPLY_CHECK_BUDGET_MS, startReplyScan, type ReplyScan } from "@/lib/server/reply-check";
 import type { LoggedIdentities } from "@/lib/coach/reply-check";
+import { mergeFoodEvidence } from "@/lib/coach/food-evidence";
+import { planReadsForRequest, type PlanRead } from "@/lib/coach/plan-report";
 import type { TurnKit } from "@/lib/server/coach-turn/kit";
 import type { OpenTurn } from "@/lib/server/coach-turn/types";
 
@@ -54,6 +56,7 @@ export type ModelState = {
   blocks: UiBlock[];
   /** Entries `get_entries` returned during this turn, so a later action may name one of them. */
   seenEntries: Map<string, string>;
+  planReads: PlanRead[];
   step: TurnStep;
   actions: CoachAction[];
   actionClarifications: string[];
@@ -101,6 +104,7 @@ export function newModelState(transcript: string[], preGroundMs: number): ModelS
     composed: [],
     blocks: [],
     seenEntries: new Map<string, string>(),
+    planReads: [],
     step: { kind: "abort", reason: "empty_tool_step" },
     actions: [],
     actionClarifications: [],
@@ -135,12 +139,21 @@ export function scanReply(
 ): { text: string; scan: Promise<ReplyScan> } {
   const { userId, replyDeadlineAt } = turn;
   const { profile, replyPorts } = kit;
+  const evidence = mergeFoodEvidence(state.evidence, kit.foodEvidence);
+  // Grounding runs beside this scan. Refresh only after its real lookups settled, before
+  // the scanner judges held names; a failed or missing lookup contributes no identity.
+  const completedGrounding = groundedLogged?.then((logged) => {
+    Object.assign(evidence, mergeFoodEvidence(evidence, kit.foodEvidence));
+    return logged;
+  });
   return {
-    text, scan: startReplyScan({ userId, text, named, evidence: { ...state.evidence }, profile,
+    text, scan: startReplyScan({ userId, text, named, evidence, profile,
+      logNotices: state.logPolicyNotices,
+      planReads: state.planReads.length ? planReadsForRequest(state.planReads, turn.req.text, turn.clock.date) : [],
       blockFoods: state.draft?.items.map(({ name, foodRefId }) => ({ name, foodRefId })) ?? [],
       // finding #6: this turn's own log_meal items are the user's record of what they ate, not
       // advice — the scan exempts them from the hard-rule prose check.
-      actions: state.actions, loggedNames, groundedLogged, pendingActions },
+      actions: state.actions, loggedNames, groundedLogged: completedGrounding, pendingActions },
       replyPorts, Math.min(replyDeadlineAt, Date.now() + REPLY_CHECK_BUDGET_MS)),
   };
 }

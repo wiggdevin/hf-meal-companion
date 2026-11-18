@@ -213,7 +213,7 @@ export function hydrateResolvedTool(
     } };
   }
   if (name === "suggest_options" || name === "compose_meal") {
-    if (name === "suggest_options" && (args as { kind?: string }).kind === "recipe") {
+    if (name === "suggest_options" && (args as { kind?: string }).kind === "recipe" && !Array.isArray(data)) {
       const result = data as RecipeSuggestionResult;
       const block = validBlock(hydrateRecipeResults(ctx.newId(), result));
       return { block, data: { ok: true, block: "recipe_results",
@@ -223,7 +223,12 @@ export function hydrateResolvedTool(
         ...(typeof result.exactMatch === "boolean" ? { exactMatch: result.exactMatch } : {}) } };
     }
     const block = validBlock(hydrateFoodIdeas(ctx.newId(), name === "compose_meal" ? [data] : data));
-    return { block, data: block?.kind === "food_ideas" ? foodIdeasAck(block) : {
+    const message = (data as { message?: unknown })?.message;
+    return { block, data: block?.kind === "food_ideas" ? { ...foodIdeasAck(block),
+      ...(typeof message === "string" && message.trim() ? { message } : {}),
+      ...((args as { kind?: string }).kind === "recipe" ? {
+        notice: "Shared recipe discovery is unavailable. These are checked meal ideas instead, not complete recipes.",
+      } : {}) } : {
       ok: true, block: "food_ideas", ideas: [],
     } };
   }

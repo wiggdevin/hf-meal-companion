@@ -39,6 +39,9 @@ export function headOf(lower: string): string {
 }
 
 const HEAD_FAT = /\b(?:oils?|ghee|lard|butter|cheese)$/;
+// Plain cooked porridge only. The bundled oatmeal-cooked cup is 234 g, rounded to a 5 g step.
+// Closed forms keep dry/instant products, mixes, desserts and added ingredients on their old rules.
+const COOKED_OATMEAL = /^(?:cooked (?:oats|oatmeal)|(?:oats|oatmeal)(?:,\s*|\s+)cooked)(?: with water)?(?:, without salt)?$|^cereals,\s*oats,\s*(?:regular and quick,\s*)?(?:unenriched,\s*)?cooked with water(?: \(includes boiling and microwaving\))?(?:,\s*without salt)?$/;
 
 /** First match wins; tested against the lower-cased name, or its head for a `head` rule. */
 const RULES: readonly Rule[] = [
@@ -57,6 +60,7 @@ const RULES: readonly Rule[] = [
   { test: /\bjerky\b/, band: band(15, 30, 60) },
   { test: /\b(?:milk|kefir)\b/, band: band(100, 250, 350, 10) },
   { test: /\bgranola\b|\bmuesli\b/, band: band(20, 45, 70) },
+  { test: COOKED_OATMEAL, band: band(150, 235, 350) },
   { test: /\boat(?:s|meal)?\b/, band: band(30, 50, 90) },
   { test: /\b(?:bread|toast|bagel|english muffin|pita|naan|tortilla|wrap)\b/, band: band(30, 70, 120) },
   { test: /\b(?:crackers?|rice cakes?|pretzels?)\b/, band: band(15, 30, 50) },

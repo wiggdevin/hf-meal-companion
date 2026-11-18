@@ -16,7 +16,7 @@ import { activeTargets } from "@/lib/server/targets";
 import { addIsoDays, resolveAccountDay } from "@/lib/server/account-day";
 import { isMealSlot } from "@/lib/meals";
 import { mapCatalogFoodHit } from "@/lib/server/coach";
-import { eatsOwnFood } from "@/lib/server/eats-own-food";
+import { observedOwnFood, type FoodLookupObserver } from "@/lib/server/coach-turn/food-evidence";
 import type { ExecutorPorts } from "@/lib/coach/executors";
 import type { FoodHit } from "@/lib/coach/executors";
 import { clampMealTarget } from "@/lib/coach/compose";
@@ -24,7 +24,6 @@ import type { SuggestInput } from "@/lib/coach/suggest";
 import { runLookup } from "@/lib/server/lookup-lane";
 import type { DayContext } from "@/lib/server/day-context";
 import { viewedDay } from "@/lib/server/viewed-day";
-import { recipeSearchFromWish } from "@/lib/coach/recipe-query";
 import type { SkipPreview } from "@/lib/plan/skip-preview";
 import type { SlotId, Store } from "@/lib/types";
 
@@ -235,11 +234,7 @@ async function pendingMealSlots(
 export function defaultPorts(
   client: SupabaseClient, admin: SupabaseClient, newId: () => string,
   clock: { tz: string; date: string; now?: string },
-  /**
-   * `signal` aborts once the turn has stopped waiting (review r2): a lookup still in flight then
-   * does not go on to mint food refs for an answer nobody will read.
-   */
-  opts: { signal?: AbortSignal; profile?: StoredProfile } = {},
+  opts: FoodLookupObserver & { profile?: StoredProfile } = {},
 ): ExecutorPorts {
   const tz = clock.tz;
   /** The turn's own policy profile (constraint row + confirmed profile rules), already read once
@@ -277,7 +272,10 @@ export function defaultPorts(
         ]);
         return mapCatalogFoodHit(hit, detail, typeof data === "string" ? data : null);
       }));
-      return [...(custom ? [custom] : []), ...catalog].slice(0, limit);
+      const hits = [...(custom ? [custom] : []), ...catalog].slice(0, limit);
+      opts.signal?.throwIfAborted();
+      opts.onFoodHits?.(userId, hits);
+      return hits;
     },
     // Phase 13 §4, §9 R5 (owner ruling 2026-10-02): the confirmed profile hard rules travel with
     // the constraint row here too, the same as every other policy call site — a model that calls
@@ -319,19 +317,8 @@ export function defaultPorts(
     },
     suggest: async (userId, args) => {
       if (args.kind === "recipe") {
-        const { recipeAccessEnabled } = await import("@/lib/server/recipe-access");
-        if (!recipeAccessEnabled(userId)) return { candidates: [], noResultReasons: [
-          "Shared recipe discovery is not available for this account yet.",
-        ] };
-        const { loadRecipeCandidates } = await import("@/lib/server/recipe-candidates");
-        const { search, unsupportedExclusion } = recipeSearchFromWish(args.wish ?? "", args.count ?? 3);
-        if (unsupportedExclusion) return { candidates: [], noResultReasons: [
-          "This search cannot check a one-off ingredient exclusion. Add the ingredient to Avoids, then search again.",
-        ] };
-        const result = await loadRecipeCandidates(client, userId,
-          search, clock.now ? new Date(clock.now) : new Date());
-        return { candidates: result.candidates, noResultReasons: result.noResultReasons,
-          exactMatch: result.exactMatch };
+        const { coachRecipeSuggestions } = await import("@/lib/server/coach-recipe-suggestions");
+        return coachRecipeSuggestions(client, userId, args, clock.now, ports.suggest);
       }
       const { suggestOptions } = await import("@/lib/coach/suggest");
       const { eatsForSuggestions } = await import("@/lib/server/coach-context");
@@ -349,8 +336,8 @@ export function defaultPorts(
         profile,
         target: async () => target,
         searchFoods: ports.searchFoods,
-        ownFood: eatsOwnFood(client, (uid, name, signal) =>
-          searchExactUserFood(admin, uid, name, signal ?? opts.signal)),
+        ownFood: observedOwnFood(client, (uid, name, signal) =>
+          searchExactUserFood(admin, uid, name, signal ?? opts.signal), opts),
         eatsNames: async (uid) => (await suggestionEats(uid)).all,
         eatsAnchors: async (uid) => (await suggestionEats(uid)).anchors,
         ...composePoolPorts(client, admin, clock.now, clock.date),

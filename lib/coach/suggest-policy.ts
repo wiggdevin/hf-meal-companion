@@ -40,11 +40,7 @@ export type SuggestionFilterResult = {
   requiresPreparation: number;
 };
 
-const NO_COOK_WISH = /\b(?:no[- ]cook(?:ing)?|without (?:any )?cook(?:ing)?|ready[- ]to[- ]eat)\b/i;
-
-export function asksForNoCook(wish: string | undefined): boolean {
-  return NO_COOK_WISH.test(wish ?? "");
-}
+export { asksForNoCook } from "@/lib/coach/no-cook-wish";
 
 /** Excludes deterministic, cached-facet, and applicable unknown results before ranking. */
 export function filterSuggestionCandidates(

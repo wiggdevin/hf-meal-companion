@@ -51,13 +51,13 @@ export async function runFastPath(
 ): Promise<TurnOutcome | FastPathMiss> {
   const { client, admin, userId, req, newId, today } = turn;
   const { profile, turnPorts } = kit;
-  const { intentResult, intentMs, structuredPlan, recordIntent } = intent;
+  const { intentResult, intentMs, structuredPlan, recordIntent, localAvoid } = intent;
   let { intentReason } = intent;
   let preGroundMs = 0;
 
   // A Plan sheet photo or link carries its foods in `planSource`, and a refill its declined cards
   // in `planSkipped`; only the model turn reads them, so neither takes the fast path.
-  if (!req.planSource && !req.planSkipped?.length && (structuredPlan || (intentResult && intentReason === "none"
+  if (!req.planSource && !req.planSkipped?.length && (localAvoid || structuredPlan || (intentResult && intentReason === "none"
     && isFastPathEligible(intentResult, req.text)))) {
     if (intentResult?.intent === "show_chart" && intentResult.args.chart) {
       return chartFastPath(turn, kit, intent, intentResult);
@@ -82,11 +82,13 @@ export async function runFastPath(
     }
     // The recipe widget never applies a coach action (it logs only through its own "Log it" tap),
     // so a mutating fast path there would only say "Logging…" over nothing.
-    const candidate = intentResult && req.surface !== "recipes"
-      ? fastPathAction(intentResult, today) : null;
+    const candidate = req.surface === "recipes" ? null : localAvoid
+      ? { kind: "add_to_avoid" as const, name: localAvoid }
+      : intentResult ? fastPathAction(intentResult, today) : null;
     // Out of scope (lib/coach/scope.ts): no fast path; the model turn explains where it belongs.
     const input = candidate && actionsInScope([candidate], req.scope).length === 1 ? candidate : null;
-    if (input && intentResult) {
+    if (input && (intentResult || localAvoid)) {
+      const actionIntent = localAvoid ? "add_to_avoid" : intentResult!.intent;
       const groundStarted = Date.now();
       try {
         const { policy } = await inTime(turn, kit, async () => {
@@ -109,16 +111,16 @@ export async function runFastPath(
           if (actions.length === 1 && policy.recipeRefusals.length === 0) {
             const content = [fastPathReply(actions[0]), ...policy.logNotices].join(" ");
             return {
-              kind: "fast_path", content, messages: "plain", provenance: JEV_INTENT,
+              kind: "fast_path", content, messages: "plain", provenance: localAvoid ? BY_APP : JEV_INTENT,
               toolCalls: {
                 calls: [], actions, suggestions: [], composed: [],
-                fastPath: true, intent: intentResult.intent,
+                fastPath: true, intent: actionIntent,
               },
               telemetry: () => recordIntent(true, "none"),
               body: {
                 suggestions: [], actions, draft: null, composed: [],
                 fastPath: true,
-                intent: intentResult.intent === "show_chart" ? undefined : intentResult.intent,
+                intent: actionIntent === "show_chart" ? undefined : actionIntent,
                 deflected: false, toolsUsed: [],
                 model: { provider: "gemini", modelId: "" },
                 timings: { intent: intentMs, model: 0, ground: preGroundMs },
@@ -209,7 +211,7 @@ async function suggestionFastPath(
   try {
     const result = await inTime(turn, kit, () => executors.suggest_options(userId, validatedArgs));
     preGroundMs = Date.now() - groundStarted;
-    if (suggestionArgs.kind === "recipe") {
+    if (suggestionArgs.kind === "recipe" && !Array.isArray(result)) {
       const found = result as RecipeSuggestionResult;
       const blocks = validatedBlocks(hydrateRecipeResults(newId(), found));
       const content = found.candidates.length

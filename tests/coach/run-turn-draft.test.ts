@@ -83,6 +83,26 @@ describe("a coach turn with a draft sink", () => {
     expect(result.messages[1]?.content).toBe(reply);
   });
 
+  it("holds a canonical alias learned through the completed active lookup ledger", async () => {
+    const drafts: string[] = [];
+    const generate = streamingModel([
+      { kind: "tool", calls: [{ name: "draft_log_entry", args: { slot: "meal-2", items: [{ name: "tofu", grams: 100 }] } }] },
+      { kind: "final", text: "Try tofu." },
+      { kind: "final", text: "Try tofu." },
+    ]);
+    await runTurn(db(), db(), "u1", { ...REQ, text: "tell me about tofu" }, {
+      classifyIntent: vi.fn().mockResolvedValue(null) as never,
+      generate: generate as never, ports: { ...ports, searchFoods: async () => [{
+        foodRefId: "3f1b1a2c-0000-4000-8000-000000000012", name: "Tofu, firm", brand: null,
+        kcalPer100g: 80, prefStatus: "avoid", allergenTags: [], category: [],
+        catalogFoodRevisionId: 1, checkedAllergens: [], portionGrams: 100,
+      }] } as never,
+      replyCheck: { searchFoods: async () => [], profileRules: async () => null, hasAvoidFoods: async () => true },
+      now: () => 0, newId: () => "id-1", draft: (text) => drafts.push(text),
+    });
+    expect(drafts.some((text) => /tofu/i.test(text))).toBe(false);
+  });
+
   it("changes nothing without a sink", async () => {
     const generate = streamingModel([{ kind: "final", text: "Oats." }]);
     const result = await runTurn(db(), db(), "u1", REQ, {

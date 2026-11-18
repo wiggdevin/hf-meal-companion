@@ -3,7 +3,7 @@ import { parseOccasionPhrase } from "@/lib/meals/occasion-phrase";
 
 /** Effort phrases. One source for both the effort filter and the exclusion check, so "without
  *  any cooking" is read as no-cook, never as a one-off ingredient exclusion (audit 2026-10-01). */
-const NO_COOK = String.raw`\b(?:(?:with\s+)?no[- ]cook(?:ing)?|without\s+(?:any\s+|needing\s+to\s+|having\s+to\s+)?cook(?:ing)?)\b`;
+import { NO_COOK_PATTERN as NO_COOK } from "@/lib/coach/no-cook-wish";
 const MINIMAL_COOK = String.raw`\b(?:minimal|little|without\s+much)\s+cooking\b`;
 
 /**

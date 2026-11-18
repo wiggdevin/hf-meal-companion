@@ -866,10 +866,13 @@ describe("runTurn", () => {
     const res = await runTurn(db(RESTRICTED, writes), db(RESTRICTED, writes), "u1",
       { ...REQ, text: "can I have cheese" },
       { generate: generate as never, ports: cheesePorts(), now: () => 0, newId: () => "id-1" });
-    // Phase 13 §6 row 5, §9 R7: the prose names the blocked food, so the reply is a re-ask; the
-    // re-ask replaces the reply, not the verdict, so the card stays on screen as blocked (Phase 7).
+    // The pure guard checks named foods in the prose too. A hard hit replaces that advice with
+    // a re-ask and clears its cards; the persisted policy checks still explain the dairy block.
     expect(isReask(res.messages.at(-1)!.content)).toBe(true);
-    expect(res.suggestions).toEqual([expect.objectContaining({ name: "cheese", verdict: "blocked" })]);
+    expect(res.messages.at(-1)!.content).toContain("dairy");
+    expect(res.messages.at(-1)!.content).not.toContain("cheese on the side");
+    expect(res.suggestions).toEqual([]);
+    expect(res.actions).toEqual([]);
     expect(policyChecks(writes).some((c) => c.verdict === "blocked"
       && /^allergen:dairy/.test(c.reason ?? ""))).toBe(true);
   });
@@ -885,8 +888,9 @@ describe("runTurn", () => {
       { ...REQ, text: "can I have raw onion" },
       { generate: generate as never, ports: onionPorts(), now: () => 0, newId: () => "id-1" });
     expect(isReask(res.messages.at(-1)!.content)).toBe(true);
-    expect(res.suggestions).toEqual([expect.objectContaining({
-      name: "Onions, raw", verdict: "blocked", reason: "category:onion_garlic" })]);
+    expect(res.suggestions).toEqual([]);
+    expect(res.actions).toEqual([]);
+    expect(res.messages.at(-1)!.content).not.toContain("raw onion works");
     expect(policyChecks(writes).some((c) => c.verdict === "blocked"
       && c.reason === "category:onion_garlic")).toBe(true);
   });

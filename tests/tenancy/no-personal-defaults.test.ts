@@ -69,6 +69,7 @@ describe("tenant-neutral active source", () => {
       "components/week/WeekGrid.tsx": "keeps an optional saved slot from blocking a done day",
       "lib/catalog/category-map.ts": FOOD_TEXT,
       "lib/units.ts": FOOD_TEXT,
+      "lib/profile/local-avoid-command.ts": FOOD_TEXT,
       "lib/coach/profile-synonyms.generated.ts": FOOD_TEXT,
       "lib/log/contract.ts": SLOT_ALLOWLIST,
       "lib/log/reconcile.ts": SLOT_ALLOWLIST,

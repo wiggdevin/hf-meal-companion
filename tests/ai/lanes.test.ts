@@ -131,21 +131,21 @@ describe("the lane table (Phase 13 §3)", () => {
 
   it("pins the production OpenRouter ids in the one pin table", () => {
     expect(OPENROUTER_PINS).toEqual({
-      coach: "google/gemini-2.5-flash",
+      coach: "google/gemini-3-flash-preview",
       coachFallback: "google/gemini-3-flash-preview",
       planPhoto: "google/gemini-3-flash-preview",
       planDocument: "google/gemini-3-flash-preview",
-      capture: "google/gemini-2.5-flash",
-      onboardingExtract: "google/gemini-2.5-flash",
+      capture: "google/gemini-3-flash-preview",
+      onboardingExtract: "google/gemini-3-flash-preview",
       // 2026-10-06 (Gemini project denial): voice capture and the coach's transcribe fallback
       // reuse the SAME already-vetted slug as `capture` above, not a separately-pinned model.
-      captureVoice: "google/gemini-2.5-flash",
+      captureVoice: "google/gemini-3-flash-preview",
     });
     expect(coachOpenRouterFallbackModel()).toBe("google/gemini-3-flash-preview");
     expect(planPhotoModel()).toBe("google/gemini-3-flash-preview");
     expect(planDocumentModel()).toBe("google/gemini-3-flash-preview");
-    expect(captureOpenRouterModel()).toBe("google/gemini-2.5-flash");
-    expect(captureVoiceOpenRouterModel()).toBe("google/gemini-2.5-flash");
+    expect(captureOpenRouterModel()).toBe("google/gemini-3-flash-preview");
+    expect(captureVoiceOpenRouterModel()).toBe("google/gemini-3-flash-preview");
   });
 
   it("reads none of the retired model-id env vars in runtime or scripts", () => {

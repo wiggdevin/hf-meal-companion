@@ -149,6 +149,18 @@ describe("coach turn deadline (review r2)", () => {
   beforeEach(() => { vi.stubEnv("COACH_ENABLED", "1"); });
   afterEach(() => { vi.unstubAllEnvs(); });
 
+  it("starts no model after a shorter fast-path reply deadline aborts the turn", async () => {
+    const generate = vi.fn();
+    const slowPorts = { ...ports, searchFoods: async () => { await sleep(400); return []; } };
+    const classifyIntent = vi.fn(async () => ({ intent: "add_to_eats", confidence: 0.99,
+      args: { name: "kale" }, argConfidence: {} }));
+    await expect(runTurn(db(), db(), "u1", { ...REQ, text: "add kale to my eats" },
+      { generate: generate as never, ports: slowPorts, now: () => 0, newId: () => "id-1",
+        classifyIntent: classifyIntent as never, wallClockMs: 10_000, replyDeadlineMs: 50 }))
+      .rejects.toMatchObject({ code: "coach_unavailable" });
+    expect(generate).not.toHaveBeenCalled();
+  });
+
   it("bounds fast-path grounding by the reply deadline (BLOCK 1)", async () => {
     const generate = vi.fn();
     const slowPorts = { ...ports, searchFoods: async () => { await sleep(400); return []; } };

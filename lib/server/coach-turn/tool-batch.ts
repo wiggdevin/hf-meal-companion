@@ -11,14 +11,16 @@ import { validateToolCall, type ArgIssue, type ToolResult } from "@/lib/coach/di
 import { renderToolResult, wrapUntrusted } from "@/lib/coach/envelope";
 import type { DraftResult, FoodHit } from "@/lib/coach/executors";
 import { lookupSourcesOf } from "@/lib/coach/lookup-sources";
-import { allergenFacts } from "@/lib/coach/policy";
+import { recordFoodHits } from "@/lib/server/coach-turn/food-evidence";
 import { filterRecipeMeal, recipeToolResult } from "@/lib/coach/recipe-policy";
 import { lookupTool, type ToolName } from "@/lib/coach/registry";
 import { collectComposed } from "@/lib/coach/turn";
+import { planRead } from "@/lib/coach/plan-report";
+import { catalogReviewIntent } from "@/lib/coach/catalog-review";
 
 /** The explanation suggest_options attaches to an empty result (lib/coach/suggest.ts messageResult). */
 function emptySuggestMessage(data: unknown): string | null {
-  if (!Array.isArray(data) || data.length > 0) return null;
+  if (!Array.isArray(data)) return null;
   const message = (data as unknown[] & { message?: unknown }).message;
   return typeof message === "string" && message.trim() ? message : null;
 }
@@ -48,6 +50,8 @@ async function runTool(
   const validated = validateToolCall(call.name, call.args);
   if (!validated.ok) return { kind: "invalid", name: call.name, error: validated.error, issues: validated.issues };
   const name = validated.tool.name;
+  const reviewIntent = name === "search_foods" ? catalogReviewIntent(turn.req.text, (validated.args as { query: string }).query) : null;
+  if (reviewIntent) validated.args = { ...(validated.args as object), intent: reviewIntent };
   // A tool that throws must not escape the turn. Before this, a catalog 503 (or any
   // transient read failure) propagated out of runTurn, past every write below, so the
   // thread row created at the top of the turn was left with zero messages and the client
@@ -170,6 +174,10 @@ export async function runToolBatch(
     state.toolCalls.push(persistResult ? { name, ok: true, result: data } : { name, ok: true });
     if (state.blocks.length === 0 && outcome.block) state.blocks = validatedBlocks(outcome.block);
     const internalData = resolvedData ?? data;
+    if (name === "get_plan") {
+      const read = planRead(internalData);
+      if (read) state.planReads.push(read);
+    }
     if (name === "draft_log_entry") state.draft = (internalData as DraftResult).draft;
     if (name === "lookup") {
       state.lookupSources = [...state.lookupSources, ...lookupSourcesOf(internalData)];
@@ -183,15 +191,7 @@ export async function runToolBatch(
         if (entry.entryId) state.seenEntries.set(entry.entryId, `${entry.name ?? "an entry"} at ${entry.at ?? "?"}`);
       }
     }
-    if (name === "search_foods") {
-      for (const hit of internalData as FoodHit[]) {
-        state.evidence[hit.name] = {
-          foodRefId: hit.foodRefId, allergenTags: hit.allergenTags ?? null, ...allergenFacts(hit),
-          category: hit.category ?? null, onEatsList: hit.prefStatus === "eats",
-          onAvoidList: hit.prefStatus === "avoid",
-        };
-      }
-    }
+    if (name === "search_foods") recordFoodHits(state.evidence, internalData as FoodHit[]);
     const result: ToolResult = { name: name as ToolName, ok: true, data: wrapUntrusted(data) };
     state.transcript.push(renderToolResult(result));
   }
