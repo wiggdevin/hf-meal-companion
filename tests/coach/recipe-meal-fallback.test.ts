@@ -4,6 +4,7 @@ import { hydrateResolvedTool } from "@/lib/coach/blocks";
 import { fastSuggestionReply } from "@/lib/server/coach-turn/fast-path-copy";
 import { EMPTY_PROFILE } from "@/lib/policy/constraints";
 import type { ComposedMeal } from "@/lib/coach/compose";
+import { REQUIRES_PREPARATION_MESSAGE } from "@/lib/coach/suggest-messages";
 
 vi.mock("@/lib/server/recipe-access", () => ({ recipeAccessEnabled: () => false }));
 const meal: ComposedMeal = { wish: "no-cook", slot: null, items: [{ name: "Avocado",
@@ -29,10 +30,10 @@ describe("gated no-cook recipe discovery offers only checked meal ideas", () => 
     const ports = defaultPorts({} as never, {} as never, () => "id", { date: "2026-11-15", tz: "UTC" });
     const recipe = ports.suggest;
     ports.suggest = vi.fn().mockResolvedValue(Object.assign([], {
-      message: "Every verified option I found needs preparation, so I don't have an honest no-cook option yet.",
+      message: REQUIRES_PREPARATION_MESSAGE,
     }));
     expect(await recipe("owner", { kind: "recipe", wish: "no cooking" })).toMatchObject({
-      candidates: [], noResultReasons: [expect.stringContaining("needs preparation")],
+      candidates: [], noResultReasons: [expect.stringContaining(REQUIRES_PREPARATION_MESSAGE)],
     });
   });
 
