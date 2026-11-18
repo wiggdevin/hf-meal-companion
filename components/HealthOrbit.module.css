@@ -1,5 +1,5 @@
 /* Health Overview Orbit (components/HealthOrbit.tsx, 2026-09-30; Harvest retint 2026-10-01). The
-   card is the shared ivory card; this file owns the fixed stage, the unframed overview orb, the seven borderless entities,
+   card is the shared white card; this file owns the fixed stage, the unframed overview orb, the seven borderless entities,
    their motion, and the detail that fills the stage under a chosen entity. Colour comes from tokens only: the five gauge hues, the blue data accent, the
    steel, and the orb's three roles (--orb-core-rgb, --orb-rim-rgb, --orb-fire-rgb in app/globals.css). */
 
@@ -62,9 +62,9 @@
   position: absolute;
   inset: 8%;
   border-radius: 9999px;
-  /* Harvest: an ivory sphere marbled in olive and sage — the look the shader draws, so no flash. */
+  /* High Frequency: a white sphere marbled in clay and ash — the look the shader draws, so no flash. */
   background:
-    radial-gradient(circle at 34% 30%, #fbf8f1 0%, transparent 38%),
+    radial-gradient(circle at 34% 30%, #ffffff 0%, transparent 38%),
     radial-gradient(circle at 60% 65%, rgb(var(--orb-fire-rgb) / 0.35) 0%, transparent 55%),
     radial-gradient(circle at 50% 50%, rgb(var(--orb-rim-rgb) / 0.45) 0%, rgb(var(--orb-core-rgb) / 0.55) 70%);
   box-shadow: 0 6px 14px -8px rgb(var(--orb-core-rgb) / 0.6);
@@ -295,7 +295,7 @@
 }
 
 /* ---- The living entities (components/HealthOrbitMarks.tsx) ---- */
-/* Harvest: flat-lit food colours on ivory. No glow — a soft contact shadow in the entity's own hue,
+/* Harvest: flat-lit food colours on white. No glow — a soft contact shadow in the entity's own hue,
    a light tint for the lit side, a deeper shade for the far side. A CSS drop-shadow, never an SVG
    blur filter (WebKit rasterises those at 1× and smeared every entity on a phone, 2026-09-30). */
 .mark {

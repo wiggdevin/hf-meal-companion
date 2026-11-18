@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { APP_NAME } from "@/lib/brand";
+import HfLogo from "@/components/brand/HfLogo";
 import Button, { buttonClasses } from "@/components/ui/Button";
 
 /** The neutral full-screen shell. No tabs, no data, no name — D1 §1.2 and §6.6. */
@@ -13,7 +14,7 @@ export function GateShell({ body, children }: { body: string; children?: ReactNo
     >
       <div className="shell w-full max-w-sm">
         <div className="surface flex flex-col gap-3.5 p-6">
-          <p className="ground-muted m-0 text-tiny uppercase tracking-[0.08em]">{APP_NAME}</p>
+          <HfLogo variant="horizontal" tone="light" height={26} />
           <p className="m-0 text-caption font-normal text-graphite">{body}</p>
           {children}
         </div>

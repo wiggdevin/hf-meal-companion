@@ -28,8 +28,7 @@ const CAPTION = "text-tiny font-normal leading-body-sm text-muted";
 
 /* The one-tap offer a bad note earns. Same glass grey as the sheet's close
    button; its class carries the 44 px target. */
-const OFFER: React.CSSProperties = { borderRadius: 12, background: "rgba(0,0,0,0.05)" };
-const OFFER_CLASS = "text-charcoal text-caption font-normal text-left";
+const OFFER_CLASS = "rounded-xl bg-fog text-charcoal text-caption font-normal text-left";
 
 type Setters = {
   onSetStatus: (status: Food["status"]) => void;
@@ -76,7 +75,6 @@ function AvoidOffer({ food, note, onSetStatus, onSetNote, disabled }: Setters & 
         onSetStatus(moved.status);
       }}
       className={`tap w-full px-4 ${OFFER_CLASS}`}
-      style={OFFER}
     >
       Sounds like this one hurt. Move to Avoid?
     </button>
@@ -350,7 +348,7 @@ export function LabelCheck({ food }: { food: Food }) {
               + "read it. A food already confirmed to contain one of them stays blocked either way."}
           </p>
           <button type="button" onClick={mark} disabled={state === "saving" || !ready}
-            className={`tap h-11 self-start px-3 ${OFFER_CLASS}`} style={OFFER}>
+            className={`tap h-11 self-start px-3 ${OFFER_CLASS}`}>
             {state === "saving" ? "Saving" : "I checked the label"}
           </button>
           {lookupFailed && !ready && (
@@ -359,7 +357,7 @@ export function LabelCheck({ food }: { food: Food }) {
                 Can&apos;t confirm this product right now.
               </p>
               <button type="button" onClick={() => setAttempt((n) => n + 1)}
-                className={`tap h-11 self-start px-3 ${OFFER_CLASS}`} style={OFFER}>
+                className={`tap h-11 self-start px-3 ${OFFER_CLASS}`}>
                 Try again
               </button>
             </div>

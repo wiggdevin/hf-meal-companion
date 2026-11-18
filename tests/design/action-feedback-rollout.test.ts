@@ -111,11 +111,11 @@ describe("blockers", () => {
 });
 
 describe("the outcome roles", () => {
-  it("keeps pending amber, failure red, change ink and success sage (Porcelain 2026-11-17)", () => {
+  it("keeps pending amber, failure red, change ink and success sage (High Frequency 2026-11-18)", () => {
     const globals = source("app/globals.css");
     expect(globals).toMatch(/--color-feedback-pending: var\(--color-warning\)/);
     expect(globals).toMatch(/--color-feedback-failure: var\(--color-alert\)/);
-    expect(globals).toMatch(/--color-feedback-change: #111110/);
+    expect(globals).toMatch(/--color-feedback-change: #141a19/);
     expect(globals).toMatch(/--color-feedback-success: var\(--color-sage\)/);
     const css = source("components/ui/ActionFeedback.module.css");
     expect(css).toMatch(/\[data-feedback-state="pending"\][^}]*--color-feedback-pending/);

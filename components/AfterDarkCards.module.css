@@ -11,7 +11,7 @@
   /* The card-wide tap target (data-card-edit) sits under this surface, eaten or not; taps fall
      through to it everywhere except the real controls re-enabled below. */
   pointer-events: none;
-  border-radius: 32px;
+  border-radius: 28px;
   overflow: clip; /* clip, not hidden: a hidden box can be scrolled by focus and shift the card */
   background: var(--grad-card);
   /* Porcelain: an 8 % ink hairline and the soft card shadow; the white card stands on the ground. */
@@ -65,7 +65,7 @@
   font-family: var(--font-display);
   font-size: 20px;
   /* The meal title role (lib/design/meal-type.ts MEAL_TITLE.hero): Newsreader 500, the 20 px step. */
-  font-weight: 500;
+  font-weight: 700;
   line-height: 1.05;
   letter-spacing: -.015em;
   color: var(--color-text-primary);

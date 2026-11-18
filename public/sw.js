@@ -1,7 +1,7 @@
 /**
- * Service worker for Sasha.
+ * Service worker for High Frequency.
  *
- * Offline-capable app shell (PRD acceptance criterion 4). All of Sasha's data
+ * Offline-capable app shell (PRD acceptance criterion 4). All of High Frequency's data
  * lives in localStorage, which this worker never touches — only network
  * responses (HTML, JS/CSS chunks, icons, manifest) are cached here.
  *

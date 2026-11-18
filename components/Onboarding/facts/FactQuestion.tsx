@@ -49,7 +49,7 @@ export const QUESTION: Partial<Record<OnboardingFactKey, string>> = {
 };
 
 function Question({ id, children }: { id?: string; children: ReactNode }) {
-  return <p id={id} className="m-0 font-serif text-heading-sm text-charcoal">{children}</p>;
+  return <p id={id} className="m-0 font-display text-[28px] leading-[1.1] tracking-display-md text-charcoal">{children}</p>;
 }
 
 function TextAnswer({ label, value, onChange, suffix, placeholder, inputMode, hint }: {

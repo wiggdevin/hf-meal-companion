@@ -47,7 +47,7 @@ describe("verified affected meal replacements", () => {
   });
 });
 
-describe("Ask Sasha payload", () => {
+describe("Ask High Frequency payload", () => {
   it("carries the user's own trimmed wording with the affected ids, deduplicated", () => {
     expect(askSashaPayload("  Can I keep the pasta?  ",
       ["2026-10-01:meal-1", "2026-10-02:meal-2", "2026-10-01:meal-1"])).toEqual({
@@ -76,7 +76,7 @@ describe("Ask Sasha payload", () => {
   });
 });
 
-describe("Ask Sasha request text", () => {
+describe("Ask High Frequency request text", () => {
   const long = (label: string, n: number) => `${label} `.padEnd(n, "x");
   const items = (n: number, title = 120) => Array.from({ length: n }, (_, i) => ({
     date: `2026-10-${String(i + 1).padStart(2, "0")}`, slot: "meal-1",

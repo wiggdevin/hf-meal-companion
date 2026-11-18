@@ -251,7 +251,7 @@ describe("a model with no capacity", () => {
 });
 
 // Live smoke, 2026-10-02: an OpenRouter model answered an abort whose reason ran past 200
-// characters, and the whole turn failed the schema ("Sasha is unavailable right now"). A long
+// characters, and the whole turn failed the schema ("High Frequency is unavailable right now"). A long
 // reason is trimmed to its limit, never a reason to fail the reply.
 describe("over-long free-text fields", () => {
   it("trims a long abort reason instead of rejecting the step", async () => {

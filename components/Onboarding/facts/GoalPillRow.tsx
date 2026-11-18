@@ -33,7 +33,7 @@ export function GoalPillRow({
 }) {
   return (
     <div className="flex w-full flex-col gap-3">
-      <p className="m-0 font-serif text-heading-sm text-charcoal">
+      <p className="m-0 font-display text-[28px] leading-[1.1] tracking-display-md text-charcoal">
         {question ?? <>Hey. I&rsquo;m {APP_NAME}. What&rsquo;s your main goal right now?</>}
       </p>
       <div className="flex flex-wrap gap-2" role="group" aria-label="Goal">

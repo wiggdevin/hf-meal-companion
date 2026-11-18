@@ -4,10 +4,9 @@ import RootLayout, { metadata } from "./layout";
 
 // lib/capabilities is server-only; the layout reads it once at render.
 vi.mock("server-only", () => ({}));
-// next/font is compiled by Next; outside it the module is empty, so the two families are stubbed.
-vi.mock("next/font/google", () => ({
-  Newsreader: () => ({ variable: "font-display-face", className: "", style: {} }),
-  Geist: () => ({ variable: "font-text-face", className: "", style: {} }),
+// next/font is compiled by Next; outside it the module is empty, so the three families are stubbed.
+vi.mock("next/font/local", () => ({
+  default: () => ({ variable: "font-face", className: "", style: {} }),
 }));
 // AppChrome reads the pathname for its tab allowlist; there is no app router in a static render.
 // The layout reads the request's CSP nonce (middleware.ts, W079).

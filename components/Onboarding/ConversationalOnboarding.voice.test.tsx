@@ -94,7 +94,7 @@ const fakeStream = { getTracks: () => [{ stop: vi.fn() }] };
 /** Calls to the extract route only (the shell also posts step timing and reads food access). */
 const extractCalls = () => account.accountFetch.mock.calls.filter((call) => call[1] === "/api/onboarding/extract");
 
-const box = () => screen.getByRole("textbox", { name: "Tell Sasha" }) as HTMLTextAreaElement;
+const box = () => screen.getByRole("textbox", { name: "Tell High Frequency" }) as HTMLTextAreaElement;
 const mic = () => screen.getByRole("button", { name: "Say it" });
 const pose = () => document.querySelector("[data-pose]")?.getAttribute("data-pose");
 const line = () => screen.queryByTestId("composer-line")?.textContent ?? null;
@@ -155,7 +155,7 @@ describe("onboarding voice", () => {
     expect(box().value).toBe("lose fat and I'm 34 years old");
     expect(box().readOnly).toBe(false);
     expect(extractCalls()).toEqual([]);
-    expect(screen.getByRole("textbox", { name: "Tell Sasha" })).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Tell High Frequency" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByRole("button", { name: "Prefer not to say" });

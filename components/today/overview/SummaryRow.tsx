@@ -49,6 +49,7 @@ export default function SummaryRow({ targets, consumed, partial }: {
   return <CardFrame size="sm" as="section" onClick={toNutrients}
     aria-label={summarySpoken(targets, consumed, partial)}>
     <div className={styles.summary} aria-hidden="true" data-over={kcal.over || undefined}>
+      <span className={styles.eyebrow}>Energy</span>
       <div className={styles.lead}>
         <span className={`${styles.numeral} font-display`}>{formatMacro(kcal.amount)}</span>
         <span className={styles.leadText}>
@@ -64,7 +65,7 @@ export default function SummaryRow({ targets, consumed, partial }: {
       <ul className={styles.macros}>
         {GRAM_MACROS.map((key) => <li key={key} className={styles.macro} data-macro={key}>
           <span className={styles.macroHead}>
-            <span className={styles.macroLabel}>{MACRO_SPEC[key].letter}</span>
+            <span className={styles.macroLabel}>{MACRO_SPEC[key].label}</span>
             <span className={styles.macroValue}>
               <span className={`${MACRO_SPEC[key].ink} ${styles.macroNow}`}>{formatMacro(consumed[key])}</span>
               /{formatMacro(targets[key])} g

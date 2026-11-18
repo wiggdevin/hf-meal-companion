@@ -14,7 +14,7 @@ function tabCount(markup: string): number {
 describe("TabBar with NEXT_PUBLIC_COACH_ENABLED unset", () => {
   const markup = renderToStaticMarkup(<TabBar />);
 
-  it("keeps four stable capsule destinations and the Sasha bubble beside them", () => {
+  it("keeps four stable capsule destinations and the High Frequency bubble beside them", () => {
     expect(tabCount(markup)).toBe(4);
     for (const href of ['href="/"', 'href="/body"', 'href="/foods"', 'href="/settings"']) {
       expect(markup).toContain(href);

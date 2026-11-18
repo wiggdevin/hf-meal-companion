@@ -49,11 +49,11 @@ export default function WeightTrend({ status, weighInCount, trendKg, unit, phase
   return (
     <section className="shell">
       <div className="surface flex flex-col gap-3 p-4">
-        <h2 className=" text-heading-sm font-medium leading-heading-sm tracking-heading-sm text-charcoal">
+        <h2 className="m-0 font-display text-heading-sm font-semibold leading-heading-sm tracking-heading-sm text-charcoal">
           Weight trend
         </h2>
         <Sparkline points={toWeightUnit(trendKg, displayUnit)} label={`Weight trend in ${unitName}`}
-          stroke="rgb(var(--section-rgb))" />
+          stroke="var(--color-gauge-calories)" />
         {/* exp-3 fits a line through the window it used (14 or 28 days); exp-2 stored a 20-day average. */}
         <p className="text-tiny font-normal text-muted">
           {phased ? `The line through your weigh-ins, in ${unitName}.` : `A 20-day average, in ${unitName}.`}

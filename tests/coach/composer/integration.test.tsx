@@ -54,7 +54,7 @@ describe("coach composer integration", () => {
       <CoachScreen />
     </CapabilitiesProvider>);
 
-    const heading = screen.getByRole("heading", { name: "Sasha" });
+    const heading = screen.getByRole("heading", { name: "High Frequency" });
     expect(heading.closest('[data-testid="coach-shell"]')).toBeTruthy();
   });
 });

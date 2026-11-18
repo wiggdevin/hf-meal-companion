@@ -123,7 +123,7 @@ describe("the dock's bubble", () => {
     mocks.list.mockResolvedValue([chat, review(true)]);
     await renderDock();
     act(() => markAccountReady(bindAccount(A)));
-    const bubble = await screen.findByRole("button", { name: "Ask Sasha, new weekly review" });
+    const bubble = await screen.findByRole("button", { name: "Ask High Frequency, new weekly review" });
     expect(bubble.querySelector("[data-unread-dot]")).not.toBeNull();
     expect(mocks.list).toHaveBeenCalledTimes(1);
 
@@ -142,7 +142,7 @@ describe("the dock's bubble", () => {
     await renderDock();
     act(() => markAccountReady(bindAccount(A)));
     await waitFor(() => expect(mocks.list).toHaveBeenCalledTimes(1));
-    expect(screen.getByRole("button", { name: "Ask Sasha" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Ask High Frequency" })).toBeTruthy();
     expect(document.querySelector("[data-unread-dot]")).toBeNull();
   });
 
@@ -151,7 +151,7 @@ describe("the dock's bubble", () => {
     await renderDock();
     act(() => markAccountReady(bindAccount(A)));
     await waitFor(() => expect(mocks.list).toHaveBeenCalledTimes(1));
-    expect(screen.getByRole("button", { name: "Ask Sasha" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Ask High Frequency" })).toBeTruthy();
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
@@ -161,7 +161,7 @@ describe("the dock's bubble", () => {
     act(() => markAccountReady(bindAccount(A)));
     await waitFor(() => expect(mocks.count).toHaveBeenCalledTimes(1));
     expect(mocks.list).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Ask Sasha" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Ask High Frequency" })).toBeTruthy();
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
@@ -169,9 +169,9 @@ describe("the dock's bubble", () => {
     mocks.list.mockResolvedValue([review(true)]);
     await renderDock();
     act(() => markAccountReady(bindAccount(A)));
-    await screen.findByRole("button", { name: "Ask Sasha, new weekly review" });
+    await screen.findByRole("button", { name: "Ask High Frequency, new weekly review" });
     act(() => { unbindAccount(); });
-    expect(screen.getByRole("button", { name: "Ask Sasha" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Ask High Frequency" })).toBeTruthy();
   });
 });
 

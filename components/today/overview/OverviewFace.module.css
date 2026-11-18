@@ -38,11 +38,22 @@
   min-width: 0;
 }
 
+/* The mockup's caps eyebrow: Archivo, wide tracking. */
+.eyebrow {
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 14px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
 .numeral {
-  font-size: 40px;
-  font-weight: 600;
-  line-height: 40px;
-  letter-spacing: -0.03em;
+  font-size: 56px;
+  font-weight: 800;
+  line-height: 52px;
+  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
   color: var(--color-text-primary);
 }
@@ -85,7 +96,7 @@
 }
 
 .kcalTrack {
-  height: 8px;
+  height: 12px;
 }
 
 .macroTrack {
@@ -101,7 +112,7 @@
 }
 
 .kcalFill {
-  background: linear-gradient(90deg, var(--color-gauge-calories), var(--color-gauge-calories-end));
+  background: var(--color-gauge-calories);
 }
 
 .macros {
@@ -122,15 +133,16 @@
 
 .macroHead {
   display: flex;
-  align-items: baseline;
-  gap: 4px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
   min-width: 0;
   white-space: nowrap;
 }
 
 .macroLabel {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 600;
   line-height: 16px;
   color: var(--color-text-muted);
 }

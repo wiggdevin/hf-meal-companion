@@ -1,13 +1,13 @@
 {
-  "name": "Sasha",
-  "short_name": "Sasha",
-  "description": "What to eat, and when.",
+  "name": "High Frequency",
+  "short_name": "HF",
+  "description": "Fuel for the work.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F2F2EF",
-  "theme_color": "#F2F2EF",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FFFFFF",
   "icons": [
     {
       "src": "/icon-192.png",

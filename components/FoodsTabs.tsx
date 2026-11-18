@@ -83,7 +83,7 @@ export default function FoodsTabs() {
   return (
     <>
       <PageTitle title="Foods" />
-      <div className="flex px-1">
+      <div className="flex">
         <Segmented label="Foods" options={shopping ? TABS : [
           { value: "eats", label: "Favorites" }, { value: "avoids", label: "Avoids" },
         ]}

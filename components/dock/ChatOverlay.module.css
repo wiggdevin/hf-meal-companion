@@ -1,4 +1,4 @@
-/* The dock's chat overlay (U22, DESIGN.md §Components › Chat overlay, 2026-10-04): an ivory E2 card
+/* The dock's chat overlay (U22, DESIGN.md §Components › Chat overlay, 2026-10-04): a white E2 card
    rising from the dock over the page, which stays where it was under a charcoal scrim. */
 
 .root {
@@ -34,7 +34,7 @@
   overflow: hidden;
   border-radius: 32px;
   background: var(--grad-sheet);
-  border: 1px solid rgb(var(--ink-rgb) / 0.06);
+  border: 1px solid rgb(var(--ink-rgb) / 0.08);
   box-shadow: var(--shadow-float);
   transform-origin: 50% 100%;
   overscroll-behavior: contain;

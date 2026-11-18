@@ -456,10 +456,10 @@ describe("Today plan sheet", () => {
   });
 
   it("shows the server's own words for a timeout or a rate limit, with a retry", async () => {
-    postTurn.mockReset().mockRejectedValue(new CoachError(503, "timeout", "Sasha did not answer in time. Try again."));
+    postTurn.mockReset().mockRejectedValue(new CoachError(503, "timeout", "High Frequency did not answer in time. Try again."));
     open();
     await sendWish();
-    expect((await screen.findByRole("alert")).textContent).toContain("Sasha did not answer in time.");
+    expect((await screen.findByRole("alert")).textContent).toContain("High Frequency did not answer in time.");
     expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
     cleanup();
     postTurn.mockReset().mockRejectedValue(new CoachError(429, "rate_limited", "You have asked a lot today. Try again in a few minutes.", 120));

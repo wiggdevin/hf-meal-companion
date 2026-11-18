@@ -1,7 +1,9 @@
 /**
- * Split audit, finding 1: DESIGN.md keeps the four gauge colours fixed per macro. The four T11a
- * cards own them; the three T11b cards (resting heart rate, HRV, readiness) are not macros and must
- * stroke in the neutral secondary text token instead of borrowing one.
+ * Split audit, finding 1: the four T11a cards own their series colours; the three T11b cards
+ * (resting heart rate, HRV, readiness) are not macros and must stroke in the neutral secondary text
+ * token instead of borrowing one. High Frequency palette (2026-11-18): weight is ink, sleep clay,
+ * steps water slate, device energy the carbs clay; teal is the protein bar's colour and no body
+ * card draws it.
  *
  * Rendered statically, because the stroke is an attribute of the drawn path and that is the thing
  * the audit is about — the series' own colour string, not a class name that could be remapped.
@@ -11,13 +13,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import BodyDashboard from "@/components/BodyDashboard";
 import type { DailyHealthRow } from "@/lib/health/contract";
 
-const GAUGE_COLOURS = ["var(--color-gauge-calories)", "var(--color-gauge-protein)",
-  "var(--color-gauge-carbs)", "var(--color-gauge-fat)"];
+const SERIES_COLOURS = ["var(--color-gauge-calories)", "var(--color-clay)",
+  "var(--color-gauge-water)", "var(--color-gauge-carbs)"];
 const NEUTRAL = "var(--color-text-secondary)";
 const NEW_CARDS = ["Resting heart rate", "HRV", "Readiness"];
-const T11A_CARDS = [["Weight", "var(--color-gauge-protein)"], ["Sleep", "var(--color-gauge-carbs)"],
-  ["Steps", "var(--color-gauge-fat)"],
-  ["Device active energy estimate", "var(--color-gauge-calories)"]] as const;
+const T11A_CARDS = [["Weight", "var(--color-gauge-calories)"], ["Sleep", "var(--color-clay)"],
+  ["Steps", "var(--color-gauge-water)"],
+  ["Device active energy estimate", "var(--color-gauge-carbs)"]] as const;
 
 const row = (local_date: string, over: Partial<DailyHealthRow> = {}): DailyHealthRow => ({
   local_date, steps: null, active_kcal: null, sleep_minutes: null, body_mass_kg: null,
@@ -49,14 +51,16 @@ describe("the metric cards' strokes", () => {
   });
 
   it("never lets the three new cards borrow one of the four macro gauge colours", () => {
-    for (const eyebrow of NEW_CARDS) expect(GAUGE_COLOURS).not.toContain(strokeOf(eyebrow));
-    // The gauge tokens appear once each, on the four T11a cards — no card draws a second one.
-    expect(allStrokes.filter((stroke) => GAUGE_COLOURS.includes(stroke)))
+    for (const eyebrow of NEW_CARDS) expect(SERIES_COLOURS).not.toContain(strokeOf(eyebrow));
+    // The series colours appear once each, on the four T11a cards — no card draws a second one.
+    expect(allStrokes.filter((stroke) => SERIES_COLOURS.includes(stroke)))
       .toHaveLength(T11A_CARDS.length);
+    // Teal belongs to the protein bar alone.
+    expect(allStrokes).not.toContain("var(--color-gauge-protein)");
   });
 
   // These four landed on main this way (T11a) and are not this round's to change.
-  it("leaves the four T11a cards on their fixed macro colours", () => {
+  it("leaves the four T11a cards on their own series colours", () => {
     for (const [eyebrow, colour] of T11A_CARDS) expect(strokeOf(eyebrow)).toBe(colour);
   });
 });

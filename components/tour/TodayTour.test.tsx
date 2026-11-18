@@ -28,7 +28,7 @@ afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 const ONBOARDED = "2026-10-08T12:00:00Z";
 const wait = () => act(() => { vi.advanceTimersByTime(AUTO_OPEN_DELAY_MS + 50); });
-const tour = () => screen.queryByRole("dialog", { name: "Meet Sasha" });
+const tour = () => screen.queryByRole("dialog", { name: "Meet High Frequency" });
 
 function mount(onboardedAt: string | null) {
   return render(<MotionConfig reducedMotion="always"><TodayTour onboardedAt={onboardedAt} /></MotionConfig>);
@@ -80,7 +80,7 @@ describe("TodayTour", () => {
     // The tap keeps its hello and offers the overview beside the pet; the offer opens it.
     expect(tour()).toBeNull();
     expect(screen.getByText("Sprout says hello back.")).toBeTruthy();
-    const offer = screen.getByRole("button", { name: "How Sasha works?" });
+    const offer = screen.getByRole("button", { name: "How High Frequency works?" });
     act(() => { offer.focus(); fireEvent.click(offer); });
     expect(tour()).toBeTruthy();
     fireEvent.keyDown(document, { key: "Escape" });
@@ -95,7 +95,7 @@ describe("TodayTour", () => {
     // Before the auto-open fires: open from the companion, then Skip.
     act(() => { vi.advanceTimersByTime(AUTO_OPEN_DELAY_MS / 2); });
     fireEvent.click(screen.getByRole("button", { name: "Sprout. Say hello" }));
-    fireEvent.click(screen.getByRole("button", { name: "How Sasha works?" }));
+    fireEvent.click(screen.getByRole("button", { name: "How High Frequency works?" }));
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
     const shown = screen.queryAllByRole("dialog").length;
@@ -119,10 +119,10 @@ describe("TodayTour", () => {
       <SproutStage state={{ mood: "content", vitality: 0.7, line: "Sprout is doing fine." }} glance={null} bounce={0} />
     </MotionConfig>);
     fireEvent.click(screen.getByRole("button", { name: "Sprout. Say hello" }));
-    expect(screen.getByRole("button", { name: "How Sasha works?" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "How High Frequency works?" })).toBeTruthy();
     act(() => { vi.advanceTimersByTime(OFFER_MS + 100); });
     act(() => { vi.runOnlyPendingTimers(); });
-    expect(screen.queryByRole("button", { name: "How Sasha works?" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "How High Frequency works?" })).toBeNull();
   });
 
   it("never opens by itself when storage cannot be read, and the companion still opens it", () => {
@@ -135,7 +135,7 @@ describe("TodayTour", () => {
     wait();
     expect(tour()).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Sprout. Say hello" }));
-    fireEvent.click(screen.getByRole("button", { name: "How Sasha works?" }));
+    fireEvent.click(screen.getByRole("button", { name: "How High Frequency works?" }));
     expect(tour()).toBeTruthy();
     spy.mockRestore();
   });

@@ -79,7 +79,7 @@ export default function ShoppingPreview({ current, basket, confirmedPantry = [],
     finally { setBusy(false); }
   }
   return <section className="shell" aria-label="Plan and shopping preview"><div className="surface flex flex-col gap-3 p-4">
-    <h2 className="m-0 text-lg font-semibold">Review the list change</h2>
+    <h2 className="m-0 text-title font-semibold">Review the list change</h2>
     <p className="ground-muted m-0 text-sm">Nothing changes until you accept. Your own items, ticks and notes are kept.</p>
     {blockingIssues.length > 0 && <div role="alert"><h3 className="mb-1 text-sm font-semibold">Fix these before accepting</h3>
       <ul className="m-0 list-disc pl-5 text-sm">{blockingIssues.map((issue, index) => <li key={index}>{issue}</li>)}</ul>

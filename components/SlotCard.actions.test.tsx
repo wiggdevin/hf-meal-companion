@@ -181,7 +181,7 @@ describe("SlotCard compact detail", () => {
   it("renders a flow the card started inside the card's own tray, never as a modal or a second card", () => {
     const onClose = vi.fn();
     const { container } = renderDetailed({ attachment: <Sheet title="Plan Meal 1" onClose={onClose}
-      header={<p>PLAN · MEAL 1 Breakfast 12:30 pm</p>} inset={{ label: "Plan with Sasha" }}>
+      header={<p>PLAN · MEAL 1 Breakfast 12:30 pm</p>} inset={{ label: "Plan with High Frequency" }}>
       <p>Ideas</p></Sheet> });
     expect(screen.queryByRole("dialog")).toBeNull();
     const panel = screen.getByRole("region", { name: "Plan Meal 1" });
@@ -191,7 +191,7 @@ describe("SlotCard compact detail", () => {
     expect(container.querySelector("[data-attached-sheet]")).toBeNull();
     expect(screen.queryByRole("button", { name: "Expand Meal 1" })).toBeNull();
     // A slim mode row, not the repeated header: the card above already names the meal and its time.
-    expect(within(panel).getByRole("heading", { name: "Plan with Sasha" })).toBeTruthy();
+    expect(within(panel).getByRole("heading", { name: "Plan with High Frequency" })).toBeTruthy();
     expect(screen.queryByText(/PLAN · MEAL 1/)).toBeNull();
     // It grows with the card; it never scrolls inside.
     expect(panel.querySelector(".overflow-y-auto, .overscroll-contain")).toBeNull();

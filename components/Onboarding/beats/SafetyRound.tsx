@@ -135,7 +135,7 @@ export default function SafetyRound({ initial, note, onDone, busy = false }: {
     </Reveal>
     <Reveal id="safety-condition" open={has("condition")}>
       <div className="-mx-1 flex flex-col gap-2 px-1 py-1">
-        <label htmlFor={conditionId} className="font-serif text-heading-sm text-charcoal">
+        <label htmlFor={conditionId} className="font-display text-[28px] leading-[1.1] tracking-display-md text-charcoal">
           Thanks. Want to name it? This is optional.
         </label>
         <input id={conditionId} type="text" maxLength={CONDITION_MAX} value={conditionText}

@@ -72,7 +72,7 @@ function ProfileStat({ label, value, unit, ink }: { label: string; value: string
     <div className={`${styles.stat} flex min-w-0 flex-col items-center gap-2 px-2 py-4 text-center`}>
       <p className="m-0 whitespace-nowrap text-caption font-medium text-muted">{label}</p>
       <p className="m-0 flex items-baseline gap-1 whitespace-nowrap leading-none tabular-nums">
-        <span className={`text-subheading font-medium tracking-tight ${ink ?? "text-charcoal"}`}>{value}</span>
+        <span className={`numeral text-numeral-md ${ink ?? "text-charcoal"}`}>{value}</span>
         {unit && <span className="text-caption font-medium text-muted">{unit}</span>}
       </p>
     </div>
@@ -140,14 +140,14 @@ export default function AppProfileCard({
             <div aria-label={ready ? "Profile ready" : "Profile setup needed"}
               className={`${styles.avatarRing} grid size-16 shrink-0 place-items-center rounded-full p-[3px]`}
               style={{ "--profile-progress": progress } as React.CSSProperties}>
-              <span className={`${styles.avatarCore} grid size-full place-items-center rounded-full text-heading font-light text-charcoal`}>
+              <span className={`${styles.avatarCore} grid size-full place-items-center rounded-full font-display text-heading font-semibold text-charcoal`}>
                 {identityInitial(email)}
               </span>
             </div>
 
             <div className="min-w-0 flex-1 pt-0.5">
               <div className="flex items-center justify-between gap-3">
-                <h3 className="m-0 min-w-0 text-subheading font-medium leading-tight tracking-tight text-charcoal [text-wrap:balance]">
+                <h3 className="m-0 min-w-0 font-display text-subheading font-semibold leading-tight tracking-heading-sm text-charcoal [text-wrap:balance]">
                   Your profile
                 </h3>
                 {statusLabel && (

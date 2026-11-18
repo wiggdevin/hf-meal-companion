@@ -145,7 +145,7 @@ describe("the coach's OpenRouter capacity fallback (owner request 2026-10-02)", 
   });
 
   // Live 2026-10-02: gemini-3.6-flash "did not answer within 4972ms" and the turn ended with
-  // "Sasha is unavailable" although OpenRouter was configured: a timeout was not a capacity failure.
+  // "High Frequency is unavailable" although OpenRouter was configured: a timeout was not a capacity failure.
   it("a Gemini timeout goes to the configured OpenRouter fallback instead of ending the turn", async () => {
     readyEnv();
     const writes = { rows: [] as { table: string; row: unknown }[] };

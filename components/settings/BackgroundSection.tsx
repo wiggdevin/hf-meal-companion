@@ -9,7 +9,7 @@ import SettingsSection from "./Section";
 import { CAPTION } from "./settings-styles";
 
 /**
- * Settings › Background: four grounds for the page behind the cards. The choice is kept on this
+ * Settings › Background: two grounds, White and Black, for the page behind the cards. The choice is kept on this
  * phone for this account and painted at once; cards, the meal card and the dock do not change.
  */
 export default function BackgroundSection() {
@@ -39,7 +39,7 @@ export default function BackgroundSection() {
   return <SettingsSection title="Background">
     <Card>
       <p className={`m-0 ${CAPTION}`}>The colour behind your cards. It stays on this phone.</p>
-      <div role="radiogroup" aria-label="Background" className="grid grid-cols-4 gap-3">
+      <div role="radiogroup" aria-label="Background" className="grid grid-cols-2 gap-3">
         {GROUNDS.map((g, i) => {
           const on = g.id === value;
           return <button key={g.id} id={`ground-${g.id}`} type="button" role="radio" aria-checked={on}

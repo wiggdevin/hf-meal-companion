@@ -2,11 +2,15 @@
 @import "./design-tokens.css";
 
 /*
-  Sasha — theme "Porcelain" (2026-11-17; DESIGN.md). A cool porcelain ground, pure white cards with
-  hairline edges and no grain, near-black ink for text and every action (ink pill buttons, ink dock),
-  food photography as the only large colour, and one tomato accent for calories, the brand mark and
-  the dock's log button. Newsreader over Geist (tabular figures). It replaces "Harvest" (archived at
-  docs/design/archive/harvest-2026-10-01/); Natural stays archived at docs/design/archive/natural-2026-09-22/.
+  High Frequency (2026-11-18; DESIGN.md). Devin's approved HF app mockup (brand v2, Patchwork H): the
+  page is pure white (or pure black, the second ground), cards are white with a #e6e6e3 hairline and a
+  very soft shadow, and basalt black is kept for the hero surfaces: the dock, the Today hero card and
+  sheet hero areas. Ink #141a19 is the action colour (a flat ink pill). Clay #b5562f is the warm
+  accent. Teal is NOT a main colour: the logo piece, the protein bar, small link text (#1c716e on
+  white, #52c0bc on black) and focus rings. No green and no purple anywhere. Archivo (display,
+  numerals, tabular) over Inter, with Instrument Serif italic as the accent word. It replaces
+  "Porcelain" (2026-11-17), "Harvest" (archived at docs/design/archive/harvest-2026-10-01/) and
+  Natural (docs/design/archive/natural-2026-09-22/). No brown, oat or beige anywhere.
 
   `app/design-tokens.css` (imported above) is exported from DESIGN.md. This file's @theme comes
   after it, so its values win where names collide. The legacy Foodnoms names (paper, fog,
@@ -21,43 +25,46 @@
 
 @theme {
   /* ---- Neutrals ---- */
-  --color-paper: #f2f2ef; /* the porcelain ground; also the light text on an ink (charcoal) fill */
-  --color-fog: #e9e9e5; /* the tray: skeletons, tracks */
-  --color-graphite: #2e2e2b; /* secondary text */
-  --color-charcoal: #111110; /* primary ink text; the ink button fill */
-  --color-muted: #575752;
-  --color-hairline: rgba(17, 17, 16, 0.1);
-  --color-scrim: rgba(10, 10, 9, 0.42); /* behind an open sheet */
+  --color-paper: #ffffff; /* the white ground; also the light text on an ink (charcoal) fill */
+  --color-fog: #f2f2f0; /* the tray: skeletons, tracks */
+  --color-graphite: #3a403e; /* secondary text */
+  --color-charcoal: #141a19; /* primary ink text; the ink button fill */
+  --color-muted: #5b5f5b;
+  --color-hairline: rgba(20, 26, 25, 0.1);
+  --color-scrim: rgba(11, 15, 14, 0.5); /* behind an open sheet */
 
   /* ---- Actions ---- */
-  --color-tangerine: #2f5bc4; /* legacy names: slate data colour, never a fill */
-  --color-signal: #2f5bc4;
+  --color-tangerine: #8e3f1f; /* legacy names: clay-700, the warm accent as text, never a fill */
+  --color-signal: #8e3f1f;
 
   /* ---- Macro + status (data colours) ---- */
-  --color-green: #f2b527;
-  --color-sky: #34b37a;
-  --color-slate-ink: #2f5bc4; /* recipe time facet glyph: the data slate, deepened for 3:1 on its wash */
-  --color-rosewood-ink: #b3380f; /* recipe servings facet glyph */
-  --color-plum: #5443d1; /* protein / coach ink as text: ≥ 4.5:1 on porcelain (DESIGN.md §Contrast) */
-  --color-amber: #7a5300; /* the amber ink (DESIGN.md §Contrast) */
-  --color-alert: #b42318; /* the red ink (DESIGN.md §Colors) */
-  --color-clay: var(--color-tertiary);
+  --color-green: #d9a23a; /* legacy name: the warning amber, a rim stop */
+  --color-sky: #5f86a3; /* legacy name: water slate blue */
+  --color-slate-ink: #1c716e; /* recipe time facet glyph: teal-700 on its wash */
+  --color-rosewood-ink: #8e3f1f; /* recipe servings facet glyph: clay-700 */
+  --color-plum: #1c716e; /* protein ink as text (teal-700): ≥ 4.5:1 on white (DESIGN.md §Contrast) */
+  --color-amber: #8a5a0b; /* the warning ink (DESIGN.md §Contrast) */
+  --color-alert: #b3261e; /* the danger ink (DESIGN.md §Colors) */
+  --color-clay: #b5562f; /* the warm accent (clay-500) */
+  --color-clay-300: #e3a383;
+  --color-clay-100: #f4e1d5;
+  --color-link: #1c716e; /* small link text on white (teal-700); #52c0bc on black */
 
   /* ---- Role colours ---- */
   --color-on-primary: #ffffff; /* white text and icons on the ink primary fill */
-  --color-icon: #4a4a46; /* line icons in sheets */
-  --color-icon-off: #85857f; /* an unset toggle icon (favourite off) */
-  --color-text-hint: #575752; /* the quietest label on the ground, 6.5:1 */
-  --color-warning: #7a5300; /* unverified / needs-a-look text */
-  --color-caution: #7a5300; /* off-plan flags */
+  --color-icon: #454b49; /* line icons in sheets */
+  --color-icon-off: #80857f; /* an unset toggle icon (favourite off) */
+  --color-text-hint: #5b5f5b; /* the quietest label on the ground, 6.5:1 */
+  --color-warning: #8a5a0b; /* unverified / needs-a-look text */
+  --color-caution: #8a5a0b; /* off-plan flags */
   --color-feedback-pending: var(--color-warning);
   --color-feedback-failure: var(--color-alert);
-  --color-feedback-change: #111110; /* ink: a change that holds (Porcelain 2026-11-17; was olive) */
-  --color-feedback-success: var(--color-sage); /* sage: a commit that landed (the Button tick, a ring) */
-  --color-well-dark: #050505; /* the camera viewfinder well */
-  --color-selected: #111110; /* a chosen chip (unit, weekday): the ink primary fill */
+  --color-feedback-change: #141a19; /* ink: a change that holds (High Frequency 2026-11-18) */
+  --color-feedback-success: var(--color-sage); /* ink: a commit that landed (the Button tick, a ring); never green */
+  --color-well-dark: #0b0f0e; /* the camera viewfinder well */
+  --color-selected: #141a19; /* a chosen chip (unit, weekday): the ink primary fill */
   --color-on-selected: #ffffff; /* its label */
-  --color-selected-soft: rgba(17, 17, 16, 0.06); /* a chosen option card, text unchanged */
+  --color-selected-soft: rgba(20, 26, 25, 0.06); /* a chosen option card, text unchanged */
 
   /* design-tokens.css exports --spacing-{xs..xl}; Tailwind 4 resolves
      max-w-md / w-sm etc. through that namespace, so main.max-w-md became
@@ -74,7 +81,9 @@
 
   /* ---- Type ---- */
   --font-sans: var(--font-text-face), system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: var(--font-display-face), "Iowan Old Style", Georgia, serif;
+  --font-display: var(--font-display-face), "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* The rare accent (Instrument Serif italic): one phrase per screen at most. */
+  --font-accent: var(--font-accent-face), "Iowan Old Style", Georgia, serif;
 
   --text-tiny: 12px;
   --text-caption: 14px;
@@ -120,7 +129,7 @@
   /* Floating chrome that is not the dock (the update notice, toasts): ivory, lightly frosted. */
   --glass-bg: rgba(255, 255, 255, 0.8);
   --glass-blur: 20px;
-  --glass-border: rgba(17, 17, 16, 0.08);
+  --glass-border: rgba(20, 26, 25, 0.08);
   --highlight: rgba(255, 255, 255, 0.9); /* the inner top edge on a raised light surface */
 
   /* The reference's matte finish: fractal noise, drawn once as an inline SVG and laid at 3 %. */
@@ -131,33 +140,33 @@
   /* ---- Role recipes: whole gradients and shadows components name by role ---- */
   /* Section hue: each tab colours its headings and eaten tint; components/SectionHue.tsx writes
      <html data-section>. Olive is the default (Today). */
-  --section-rgb: 17 17 16;
+  --section-rgb: 20 26 25;
   /* The ground's lighter top wash and lower-corner shade (Oat; the other grounds follow). */
-  --ground-lift-rgb: 248 248 246;
-  --ground-shade-rgb: 232 232 228;
+  --ground-lift-rgb: 255 255 255;
+  --ground-shade-rgb: 255 255 255;
   /* The overview orb (components/PhosphorOrb.tsx): an ivory sphere marbled in olive, sage and
      wheat, fixed so it reads the same on every tab. */
-  --orb-core-rgb: 96 104 78;
-  --orb-rim-rgb: 138 162 110;
-  --orb-fire-rgb: 201 162 78;
+  --orb-core-rgb: 181 86 47;
+  --orb-rim-rgb: 227 163 131;
+  --orb-fire-rgb: 244 225 213;
 
-  --ink-rgb: 17 17 16; /* the hairline ring in card and button shadows: ink on light */
-  --on-olive-rgb: 17 17 16;
-  --charcoal-deep-rgb: 17 17 16;
-  --primary-rgb: 17 17 16;
+  --ink-rgb: 20 26 25; /* the hairline ring in card and button shadows: ink on light */
+  --on-olive-rgb: 20 26 25;
+  --charcoal-deep-rgb: 20 26 25;
+  --primary-rgb: 20 26 25;
   --cream-rgb: 255 255 255;
-  --grad-ink: linear-gradient(180deg, #2a2a28 0%, #111110 100%); /* primary fill: ink */
+  --grad-ink: linear-gradient(180deg, #141a19 0%, #141a19 100%); /* primary fill: flat ink, no bevel */
   /* Ivory card body. A literal copy of the --grad-card stops (the contrast tables parse literals). */
   --grad-panel: linear-gradient(180deg, #ffffff 0%, #ffffff 100%);
-  --grad-recess: linear-gradient(180deg, #ecece8 0%, #e9e9e5 100%); /* trays inside a card */
+  --grad-recess: linear-gradient(180deg, #f2f2f0 0%, #f2f2f0 100%); /* trays inside a card */
   /* The card face, lifted (2026-10-19, UI makeover §3; brighter in Bold): at least 1.20:1 off every
      ground at every stop, so a card never blends into what is behind it (DESIGN.md §Elevation). */
   --grad-card: linear-gradient(180deg, #ffffff 0%, #ffffff 100%);
   /* A card inside a card: one clear step down from the card (1.20:1 or more at every stop), no shadow. */
-  --grad-card-inset: linear-gradient(180deg, #f0f0ec 0%, #eeeeea 100%);
+  --grad-card-inset: linear-gradient(180deg, #f2f2f0 0%, #f2f2f0 100%);
   /* The ink card (CardFrame tone="ink", Bold 2026-10-19) is --grad-matte; a card inside it steps DOWN
      into the charcoal (1.10:1 or more at every stop), so cream text and the persimmon figure gain. */
-  --grad-card-ink-inset: linear-gradient(180deg, #060605 0%, #050505 100%);
+  --grad-card-ink-inset: linear-gradient(180deg, #000000 0%, #000000 100%);
   /* The edge of a nested card (E0): an ink hairline at 16 % (cream inside an ink card). */
   --hairline-card: rgb(var(--ink-rgb) / 0.08);
   /* CardFrame sizes (components/ui/CardFrame.tsx): padding on the 4 px rhythm, radii on the scale. */
@@ -167,30 +176,30 @@
   --card-radius-sm: 16px;
   --card-radius-md: 24px;
   --card-radius-lg: 32px;
-  --grad-sheet: linear-gradient(180deg, #ffffff 0%, #fafaf8 100%);
-  --grad-matte: linear-gradient(180deg, #1c1c1a 0%, #161615 100%); /* the dock and the ink hero card */
-  --grad-sheet-shell: linear-gradient(180deg, rgba(17, 17, 16, 0.1) 0%, rgba(17, 17, 16, 0.05) 50%,
-    rgba(17, 17, 16, 0.02) 100%);
+  --grad-sheet: linear-gradient(180deg, #ffffff 0%, #fbfbfa 100%);
+  --grad-matte: linear-gradient(180deg, #1c2220 0%, #141917 100%); /* the dock and the ink hero card */
+  --grad-sheet-shell: linear-gradient(180deg, rgba(20, 26, 25, 0.1) 0%, rgba(20, 26, 25, 0.05) 50%,
+    rgba(20, 26, 25, 0.02) 100%);
   --grad-bubble: linear-gradient(180deg, rgb(var(--section-rgb) / 0.06) 0%, rgb(var(--section-rgb) / 0.04) 100%); /* the coach's bubble */
-  --grad-coach-composer-rim: linear-gradient(90deg, #f2542d 0%, #7b6cf6 55%, #3b9bea 100%);
-  --grad-coach-composer-fill: linear-gradient(180deg, #ffffff 0%, #fafaf8 100%);
-  --coach-composer-control-bg: rgba(17, 17, 16, 0.04);
-  --coach-composer-control-border: rgba(17, 17, 16, 0.08);
-  --shadow-coach-composer: 0 1px 2px rgba(17, 17, 16, 0.06), 0 16px 36px -20px rgba(17, 17, 16, 0.3);
-  --shadow-coach-composer-focus: 0 1px 2px rgba(17, 17, 16, 0.06), 0 16px 36px -20px rgba(17, 17, 16, 0.3), 0 0 0 3px rgba(17, 17, 16, 0.12);
-  --shadow-coach-menu: 0 24px 48px -24px rgba(17, 17, 16, 0.35), 0 0 0 1px rgba(17, 17, 16, 0.06);
-  --grad-olive: linear-gradient(180deg, rgba(29, 29, 28, 0.12) 0%, rgba(29, 29, 28, 0.06) 50%,
-    rgba(29, 29, 28, 0.03) 100%); /* the proposal card's hairline shell */
-  --grad-gold: linear-gradient(180deg, #f8d57a 0%, #f2b527 100%); /* training-day tile: amber */
-  --grad-fab: linear-gradient(180deg, #f46a47 0%, #f2542d 100%); /* the dock log button: tomato, ink glyph (5.47:1) */
-  --grad-produce: radial-gradient(110% 90% at 15% 0%, rgba(242, 84, 45, 0.1) 0%, transparent 60%),
-    radial-gradient(90% 80% at 100% 100%, rgba(123, 108, 246, 0.08) 0%, transparent 60%),
-    #e9e9e5; /* the tile for an unknown dish: tray with a whisper of tomato and iris */
-  --shadow-button: 0 0 0 1px rgba(17, 17, 16, 0.1);
-  --shadow-card: 0 0 0 1px rgba(17, 17, 16, 0.05), 0 1px 2px rgba(17, 17, 16, 0.04),
-    0 8px 24px -16px rgba(17, 17, 16, 0.12);
-  --shadow-float: 0 1px 2px rgba(17, 17, 16, 0.08), 0 16px 40px -16px rgba(17, 17, 16, 0.35);
-  --shadow-hero: 0 1px 2px rgba(17, 17, 16, 0.1), 0 24px 48px -20px rgba(17, 17, 16, 0.45);
+  --grad-coach-composer-rim: linear-gradient(90deg, #141a19 0%, #5b5f5b 100%);
+  --grad-coach-composer-fill: linear-gradient(180deg, #ffffff 0%, #fbfbfa 100%);
+  --coach-composer-control-bg: rgba(20, 26, 25, 0.04);
+  --coach-composer-control-border: rgba(20, 26, 25, 0.08);
+  --shadow-coach-composer: 0 1px 2px rgba(20, 26, 25, 0.06), 0 16px 36px -20px rgba(20, 26, 25, 0.3);
+  --shadow-coach-composer-focus: 0 1px 2px rgba(20, 26, 25, 0.06), 0 16px 36px -20px rgba(20, 26, 25, 0.3), 0 0 0 3px rgba(20, 26, 25, 0.12);
+  --shadow-coach-menu: 0 24px 48px -24px rgba(20, 26, 25, 0.35), 0 0 0 1px rgba(20, 26, 25, 0.06);
+  --grad-olive: linear-gradient(180deg, rgba(20, 26, 25, 0.12) 0%, rgba(20, 26, 25, 0.06) 50%,
+    rgba(20, 26, 25, 0.03) 100%); /* the proposal card's hairline shell */
+  --grad-gold: linear-gradient(180deg, #ebc47a 0%, #d9a23a 100%); /* training-day tile: amber */
+  --grad-fab: linear-gradient(180deg, #141a19 0%, #141a19 100%); /* the dock log button: flat ink (bone glyph) */
+  --grad-produce: radial-gradient(110% 90% at 15% 0%, rgba(227, 163, 131, 0.14) 0%, transparent 60%),
+    radial-gradient(90% 80% at 100% 100%, rgba(154, 161, 156, 0.12) 0%, transparent 60%),
+    #f2f2f0; /* the tile for an unknown dish: tray with a whisper of clay and ash */
+  --shadow-button: 0 0 0 1px rgba(20, 26, 25, 0.1);
+  --shadow-card: 0 0 0 1px rgba(20, 26, 25, 0.05), 0 1px 2px rgba(20, 26, 25, 0.04),
+    0 8px 24px -16px rgba(20, 26, 25, 0.12);
+  --shadow-float: 0 1px 2px rgba(20, 26, 25, 0.08), 0 16px 40px -16px rgba(20, 26, 25, 0.35);
+  --shadow-hero: 0 1px 2px rgba(20, 26, 25, 0.1), 0 24px 48px -20px rgba(20, 26, 25, 0.45);
 
   /* iOS safe areas */
   --safe-top: env(safe-area-inset-top, 0px);
@@ -214,47 +223,53 @@
   color-scheme: light;
 }
 /* Section hues: headings, the eaten tint, the coach bubble. Muted, readable as text on oat. */
-[data-section="body"] { --section-rgb: 31 94 122; }
-[data-section="foods"] { --section-rgb: 179 56 15; }
-[data-section="coach"] { --section-rgb: 84 67 209; }
-[data-section="settings"] { --section-rgb: 61 61 57; }
-[data-section="today"] { --section-rgb: 17 17 16; }
+[data-section="body"] { --section-rgb: 20 26 25; }
+[data-section="foods"] { --section-rgb: 20 26 25; }
+[data-section="coach"] { --section-rgb: 20 26 25; }
+[data-section="settings"] { --section-rgb: 58 64 62; }
+[data-section="today"] { --section-rgb: 20 26 25; }
 
 /* The matte scope (DESIGN.md §Colors): inside the meal card and the dock the text roles turn cream,
    so components keep their class names. `.matte-reset` (the beige tray) maps them back to ink. */
 .matte {
-  --color-charcoal: #ffffff;
-  --color-graphite: #e4e4e0;
-  --color-muted: #ababa5;
-  --color-text-primary: #ffffff;
-  --color-text-secondary: #e4e4e0;
-  --color-text-muted: #ababa5;
-  --color-text-faint: #8f8f89;
-  --color-text-hint: #ababa5;
-  --color-on-olive: #ffffff;
-  --color-on-charcoal: #ffffff;
-  --color-icon: #b8b8b2;
+  --color-charcoal: #f2ede4;
+  --color-graphite: #d9d4ca;
+  --color-muted: #9aa19c;
+  --color-text-primary: #f2ede4;
+  --color-text-secondary: #d9d4ca;
+  --color-text-muted: #9aa19c;
+  --color-text-faint: #8a918c;
+  --color-text-hint: #9aa19c;
+  --color-on-olive: #f2ede4;
+  --color-on-charcoal: #f2ede4;
+  --color-icon: #c9ccc6;
   --color-hairline: rgba(255, 255, 255, 0.12);
-  --ink-rgb: 255 255 255;
-  --primary-rgb: 255 255 255; /* caret and focus ring stay visible on the charcoal */
+  --ink-rgb: 242 237 228;
+  --primary-rgb: 242 237 228; /* caret and focus ring stay visible on the charcoal */
+  --color-link: #52c0bc; /* link text on black */
+  --color-gauge-calories: #f2ede4; /* the calorie bar is bone on black */
+  --color-gauge-calories-end: #d9d4ca;
   color: var(--color-charcoal);
 }
 .matte-reset,
 .notice {
-  --color-charcoal: #111110;
-  --color-graphite: #2e2e2b;
-  --color-muted: #575752;
-  --color-text-primary: #111110;
-  --color-text-secondary: #2e2e2b;
-  --color-text-muted: #575752;
-  --color-text-faint: #6b6b65;
-  --color-text-hint: #575752;
-  --color-on-olive: #111110;
-  --color-on-charcoal: #111110;
-  --color-icon: #4a4a46;
-  --color-hairline: rgba(17, 17, 16, 0.1);
-  --ink-rgb: 17 17 16;
-  --primary-rgb: 17 17 16;
+  --color-charcoal: #141a19;
+  --color-graphite: #3a403e;
+  --color-muted: #5b5f5b;
+  --color-text-primary: #141a19;
+  --color-text-secondary: #3a403e;
+  --color-text-muted: #5b5f5b;
+  --color-text-faint: #6a6e6a;
+  --color-text-hint: #5b5f5b;
+  --color-on-olive: #141a19;
+  --color-on-charcoal: #141a19;
+  --color-icon: #454b49;
+  --color-hairline: rgba(20, 26, 25, 0.1);
+  --ink-rgb: 20 26 25;
+  --primary-rgb: 20 26 25;
+  --color-link: #1c716e;
+  --color-gauge-calories: #141a19;
+  --color-gauge-calories-end: #141a19;
   color: var(--color-charcoal);
 }
 /* The matte grain over a charcoal surface. */
@@ -270,7 +285,7 @@
   border-radius: inherit;
   pointer-events: none;
   background-image: var(--grain);
-  opacity: 0; /* Porcelain: no grain (the token stays) */
+  opacity: 0; /* no grain (the token stays) */
 }
 
 html,
@@ -316,12 +331,11 @@ body {
   overscroll-behavior-y: none;
 }
 
-/* Titles speak in the editorial voice (DESIGN.md §Typography): Newsreader, optical sizes on. */
+/* Titles speak in the display voice (DESIGN.md §Typography): Archivo 600 with tight tracking. */
 h1,
 .font-display {
   font-family: var(--font-display);
-  font-optical-sizing: auto;
-  font-weight: 400;
+  font-weight: 700;
   letter-spacing: -0.025em;
   line-height: 1.05;
 }
@@ -448,9 +462,15 @@ html[data-card-step] .surface.card-ink .surface :where(.surface):not(.matte, .me
 .numeral,
 .kcal,
 [data-figure] {
-  font-family: var(--font-sans);
+  font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum", "ss01"; /* Geist ss01: open digits */
+  font-feature-settings: "tnum"; /* Archivo tabular figures */
+}
+/* The accent voice: Instrument Serif italic, used rarely (a phrase, never a label or a number). */
+.font-accent {
+  font-family: var(--font-accent);
+  font-style: italic;
+  font-weight: 400;
 }
 
 .pill {
@@ -502,7 +522,7 @@ input.well,
 select.well,
 textarea.well,
 .well:has(> :is(input, textarea, select)) {
-  background: #f7f7f5;
+  background: #f6f6f4;
   box-shadow:
     inset 0 1px 2px rgb(var(--ink-rgb) / 0.06),
     0 0 0 1px rgb(var(--ink-rgb) / 0.14);
@@ -540,7 +560,7 @@ textarea.well:focus,
     min-height: 44px;
     padding: 0 4px 0 14px;
     border-radius: 16px;
-    background: #f7f7f5;
+    background: #f6f6f4;
     color: var(--color-charcoal);
     box-shadow:
       inset 0 1px 2px rgb(var(--ink-rgb) / 0.06),
@@ -654,7 +674,7 @@ button.well {
 }
 @media (hover: hover) {
   button.well:hover:not(:disabled) {
-    background: #e3e3de;
+    background: #e6e6e3;
   }
 }
 
@@ -705,7 +725,7 @@ button.well:disabled {
   a.btn { text-decoration: none; }
   .btn:disabled:not([data-status]) { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
 
-  /* Primary: ink with white content, no bevel (Porcelain) — the one action that completes a flow. */
+  /* Primary: ink with white content, no bevel (High Frequency) — the one action that completes a flow. */
   .btn-primary {
     background: var(--grad-ink);
     color: var(--color-on-primary);
@@ -727,6 +747,9 @@ button.well:disabled {
   /* Tertiary: the tray well. */
   .btn-tertiary { background: var(--color-fog); box-shadow: inset 0 0 0 1px rgb(var(--ink-rgb) / 0.05); }
   .matte .btn-tertiary { background: rgb(var(--ink-rgb) / 0.08); box-shadow: none; }
+  /* On a black hero surface the primary pill is the light one: bone with ink text (the mockup's hero buttons). */
+  .matte .btn-primary { background: #f2ede4; color: #141a19; }
+  .matte-reset .btn-primary { background: var(--grad-ink); color: var(--color-on-primary); }
   /* Ghost: words only, a soft wash under the finger. */
   .btn-ghost { padding: 0 12px; font-weight: 600; }
   /* Danger: red ink on a faint red wash; the fill deepens at the confirm step (data-armed). */
@@ -737,9 +760,9 @@ button.well:disabled {
   }
   .btn-danger[data-armed="true"] { background: var(--color-red-ink); color: var(--color-surface); box-shadow: none; }
   @media (hover: hover) {
-    .btn-primary:hover:not(:disabled) { background: linear-gradient(180deg, #1c1c1a 0%, #050505 100%); }
+    .btn-primary:hover:not(:disabled) { filter: brightness(1.25); }
     .btn-secondary:hover:not(:disabled) { background: rgb(var(--ink-rgb) / 0.07); }
-    .btn-tertiary:hover:not(:disabled) { background: #e3e3de; }
+    .btn-tertiary:hover:not(:disabled) { background: #e6e6e3; }
     .matte .btn-tertiary:hover:not(:disabled) { background: rgb(var(--ink-rgb) / 0.12); }
     .btn-ghost:hover:not(:disabled) { background: rgb(var(--ink-rgb) / 0.06); }
     .btn-danger:not([data-armed="true"]):hover:not(:disabled) { background: var(--color-red-wash); }
@@ -828,7 +851,7 @@ button.well:disabled {
   background: var(--grad-ink);
   color: var(--color-on-primary);
   border-radius: 9999px;
-  box-shadow: var(--bevel), 0 8px 18px -10px rgba(17, 17, 16, 0.5);
+  box-shadow: var(--bevel), 0 8px 18px -10px rgba(20, 26, 25, 0.5);
 }
 /* Chip: one choice in a pill-in row (components/ui/Chip). */
 .chip-on {
@@ -934,7 +957,7 @@ button.well:disabled {
 /* A raised ivory card inside the panel (owner, 2026-10-04: it read as part of the panel behind it):
    the meal tint washes across a lifted surface with a tinted hairline and the card shadow. */
 .plan-head {
-  --meal-rgb: 79 83 67;
+  --meal-rgb: 91 95 91;
   --meal-ink: var(--color-primary);
   border-radius: 18px;
   /* The tint stays at 0.12: every text role on it keeps 4.5:1 (tests/design/contrast-table.ts). */
@@ -942,11 +965,11 @@ button.well:disabled {
     var(--grad-card);
   box-shadow: inset 0 0 0 1px rgb(var(--meal-rgb) / 0.24), var(--shadow-card);
 }
-.plan-head[data-meal="breakfast"] { --meal-rgb: 242 181 39; --meal-ink: var(--color-yellow-ink); }
-.plan-head[data-meal="lunch"] { --meal-rgb: 52 179 122; --meal-ink: var(--color-sage-ink); }
-.plan-head[data-meal="dinner"] { --meal-rgb: 17 17 16; --meal-ink: var(--color-primary); }
-.plan-head[data-meal="snack"] { --meal-rgb: 123 108 246; --meal-ink: var(--color-plum); }
-.plan-head[data-meal="other"] { --meal-rgb: 107 107 101; --meal-ink: var(--color-text-muted); }
+.plan-head[data-meal="breakfast"] { --meal-rgb: 217 162 58; --meal-ink: var(--color-yellow-ink); }
+.plan-head[data-meal="lunch"] { --meal-rgb: 227 163 131; --meal-ink: var(--color-sage-ink); }
+.plan-head[data-meal="dinner"] { --meal-rgb: 20 26 25; --meal-ink: var(--color-primary); }
+.plan-head[data-meal="snack"] { --meal-rgb: 95 134 163; --meal-ink: var(--color-plum); }
+.plan-head[data-meal="other"] { --meal-rgb: 91 95 91; --meal-ink: var(--color-text-muted); }
 .plan-head-glyph {
   display: inline-flex;
   flex: none;
@@ -961,19 +984,19 @@ button.well:disabled {
 /* Recipe facets (components/nutrition/RecipeFacets.tsx, owner 2026-10-04): cuisine olive, time slate,
    servings rosewood, three hues kept apart from the four macro hues so a facet never reads as a
    nutrient. The hue tints the pill and colours the glyph; the words stay graphite (well over 4.5:1). */
-[data-facet] { --facet-rgb: 17 17 16; --facet-ink: var(--color-primary); }
-[data-facet="time"] { --facet-rgb: 47 91 196; --facet-ink: var(--color-slate-ink); }
-[data-facet="servings"] { --facet-rgb: 179 56 15; --facet-ink: var(--color-rosewood-ink); }
+[data-facet] { --facet-rgb: 20 26 25; --facet-ink: var(--color-primary); }
+[data-facet="time"] { --facet-rgb: 28 113 110; --facet-ink: var(--color-slate-ink); }
+[data-facet="servings"] { --facet-rgb: 142 63 31; --facet-ink: var(--color-rosewood-ink); }
 .facet { background: rgb(var(--facet-rgb) / 0.12); }
 .facet-glyph { color: var(--facet-ink); }
 /* Method steps (components/RecipeDetails.tsx, owner 2026-10-04): each step a different soft wash so
    neighbours read apart, starting grey and cycling slate, rosewood, olive (the facet hues, never a
    macro's; grey and olive, the closest pair, never sit side by side). The number badge takes a
    stronger wash of the same hue and its ink. */
-.step-card { --step-rgb: 107 107 101; --step-ink: var(--color-graphite); background: rgb(var(--step-rgb) / 0.1); }
-.step-card[data-step-tone="1"] { --step-rgb: 47 91 196; --step-ink: var(--color-slate-ink); background: rgb(var(--step-rgb) / 0.16); }
-.step-card[data-step-tone="2"] { --step-rgb: 179 56 15; --step-ink: var(--color-rosewood-ink); background: rgb(var(--step-rgb) / 0.15); }
-.step-card[data-step-tone="3"] { --step-rgb: 52 179 122; --step-ink: var(--color-primary); background: rgb(var(--step-rgb) / 0.16); }
+.step-card { --step-rgb: 91 95 91; --step-ink: var(--color-graphite); background: rgb(var(--step-rgb) / 0.1); }
+.step-card[data-step-tone="1"] { --step-rgb: 28 113 110; --step-ink: var(--color-slate-ink); background: rgb(var(--step-rgb) / 0.16); }
+.step-card[data-step-tone="2"] { --step-rgb: 142 63 31; --step-ink: var(--color-rosewood-ink); background: rgb(var(--step-rgb) / 0.15); }
+.step-card[data-step-tone="3"] { --step-rgb: 227 163 131; --step-ink: var(--color-primary); background: rgb(var(--step-rgb) / 0.16); }
 .step-num { background: rgb(var(--step-rgb) / 0.22); color: var(--step-ink); }
 .plan-chip {
   border-radius: 9999px;
@@ -986,16 +1009,16 @@ button.well:disabled {
    dots (`bg-current`), never small text: sage carbs is 2.5:1 on ivory (DESIGN.md §Contrast). */
 .macro-ink-kcal { color: var(--color-orange-ink); }
 .macro-ink-protein { color: var(--color-plum); }
-.macro-ink-carbs { color: var(--color-sage-ink); }
-.macro-ink-fat { color: var(--color-yellow-ink); }
+.macro-ink-carbs { color: var(--color-orange-ink); }
+.macro-ink-fat { color: var(--color-graphite); }
 .matte .macro-ink-kcal { color: var(--color-kcal-on-ink); }
 .matte .macro-ink-protein { color: var(--color-protein-on-ink); }
 .matte .macro-ink-carbs { color: var(--color-gauge-carbs); }
 .matte .macro-ink-fat { color: var(--color-gauge-fat); }
 .matte-reset .macro-ink-kcal { color: var(--color-orange-ink); }
 .matte-reset .macro-ink-protein { color: var(--color-plum); }
-.matte-reset .macro-ink-carbs { color: var(--color-sage-ink); }
-.matte-reset .macro-ink-fat { color: var(--color-yellow-ink); }
+.matte-reset .macro-ink-carbs { color: var(--color-orange-ink); }
+.matte-reset .macro-ink-fat { color: var(--color-graphite); }
 
 /* List row: a hairline between rows, none after the last (components/ui/ListRow). */
 .list-row + .list-row {
@@ -1022,7 +1045,7 @@ body[data-typing="field"] .sheet-popover-root {
   padding-bottom: var(--safe-bottom);
 }
 .sheet-popover-scrim {
-  background: rgba(10, 10, 9, 0.34); /* fixed ink: a sheet opened inside a matte card keeps it */
+  background: rgba(11, 15, 14, 0.4); /* fixed ink: a sheet opened inside a matte card keeps it */
 }
 /* A sheet opened from a meal card renders as its own rounded card right under that card
    (components/Sheet AttachedSheet), so the flow stays on the card and reads like the cards around
@@ -1052,8 +1075,8 @@ body[data-typing="field"] .sheet-popover-root {
 /* The sheet's close button, ink on ivory. */
 .sheet-close {
   width: 44px; height: 44px; border-radius: 9999px;
-  background: transparent;
-  border: 1px solid rgb(var(--ink-rgb) / 0.2);
+  background: var(--color-fog);
+  border: 0;
   color: var(--color-text-primary);
 }
 /* The close × over a card's photo (CloseButton onPhoto; KIT §14): a 44 px target holding a 32 px,
@@ -1087,7 +1110,7 @@ body[data-typing="field"] .sheet-popover-root {
   border-color: rgba(255, 255, 255, 0.08);
   --color-charcoal: #ffffff;
   --color-text-primary: #ffffff;
-  --color-muted: #ababa5;
+  --color-muted: #9aa19c;
   color: #ffffff;
   box-shadow: var(--bevel), var(--shadow-float);
 }
@@ -1104,7 +1127,7 @@ body[data-typing="field"] .sheet-popover-root {
 .section-title {
   color: rgb(var(--section-rgb));
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -0.015em;
 }
 
@@ -1162,73 +1185,101 @@ button,
   touch-action: manipulation;
 }
 
-/* Ground (DESIGN.md §Techniques): still, pure CSS. Oat stone with a lighter wash at the top and
-   the reference's 3 % matte grain. */
+/* Ground (DESIGN.md §Grounds): flat and still. White by default; <html data-ground="black"> is the
+   second ground. No grain, no wash. */
 .harvest-ground {
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background:
-    radial-gradient(120% 50% at 50% -10%, rgb(var(--ground-lift-rgb) / 0.9) 0%, transparent 65%),
-    radial-gradient(90% 60% at 100% 110%, rgb(var(--ground-shade-rgb) / 0.6) 0%, transparent 70%),
-    var(--color-paper);
+  background: var(--color-paper);
 }
 .harvest-ground::after {
   content: "";
   position: absolute;
   inset: 0;
   background-image: var(--grain);
-  opacity: 0; /* Porcelain: no grain */
+  opacity: 0; /* no grain */
 }
 
 /* The selectable grounds (DESIGN.md §Grounds, lib/design/grounds.ts): only the bare page moves.
-   Oat is the default above; <html data-ground> is written by components/GroundTheme.tsx. */
-html[data-ground="sage"] {
-  --color-paper: #edf0eb;
-  --color-background: #edf0eb;
-  --ground-lift-rgb: 245 247 243;
-  --ground-shade-rgb: 232 236 229;
+   White is the default above; <html data-ground> is written by components/GroundTheme.tsx. Black
+   turns the text roles white for text that sits on the bare page; every surface that keeps its own
+   light face (cards, sheets, wells, notices, anything with a white or tray fill) maps them back to
+   ink below, and the matte scope (the dock, the hero cards) is untouched. */
+html[data-ground="black"] {
+  --color-paper: #000000;
+  --color-background: #000000;
+  --ground-lift-rgb: 0 0 0;
+  --ground-shade-rgb: 0 0 0;
+  --color-charcoal: #f2ede4;
+  --color-graphite: #d9d4ca;
+  --color-muted: #9aa19c;
+  --color-text-primary: #f2ede4;
+  --color-text-secondary: #d9d4ca;
+  --color-text-muted: #9aa19c;
+  --color-text-faint: #8a918c;
+  --color-text-hint: #9aa19c;
+  --color-on-charcoal: #f2ede4;
+  --color-on-charcoal-muted: #9aa19c;
+  --color-icon: #c9ccc6;
+  --color-hairline: rgba(255, 255, 255, 0.14);
+  --ink-rgb: 242 237 228;
+  --primary-rgb: 242 237 228;
+  --grad-ink: linear-gradient(180deg, #f2ede4 0%, #f2ede4 100%); /* primary fill on the black page: a bone pill */
+  --color-on-primary: #141a19;
+  --color-selected: #f2ede4;
+  --color-on-selected: #141a19;
+  --color-link: #52c0bc;
+  --color-gauge-calories: #f2ede4;
+  --color-gauge-calories-end: #d9d4ca;
+  color-scheme: dark;
 }
-html[data-ground="clay"] {
-  --color-paper: #f3eeeb;
-  --color-background: #f3eeeb;
-  --ground-lift-rgb: 248 245 243;
-  --ground-shade-rgb: 239 233 229;
+/* The black hero surfaces keep their ink fill and white content on the black page. */
+html[data-ground="black"] :is(.matte, .card-olive, .card-ink) {
+  --grad-ink: linear-gradient(180deg, #141a19 0%, #141a19 100%);
+  --color-on-primary: #ffffff;
 }
-html[data-ground="mist"] {
-  --color-paper: #eceff2;
-  --color-background: #eceff2;
-  --ground-lift-rgb: 244 246 248;
-  --ground-shade-rgb: 231 235 239;
+html[data-ground="black"] :is(.surface, .sheet-surface, .time-sheet-surface, .attached-sheet, .menu-glass, .well,
+  .meal-card-in, .logged-card-in, .notice, .matte-reset, .field, .glass,
+  [class*="bg-surface"], [class*="bg-fog"], [class*="bg-field"], [class*="bg-white"]):not(.matte, .card-olive, .card-ink) {
+  --color-charcoal: #141a19;
+  --color-graphite: #3a403e;
+  --color-muted: #5b5f5b;
+  --color-text-primary: #141a19;
+  --color-text-secondary: #3a403e;
+  --color-text-muted: #5b5f5b;
+  --color-text-faint: #6a6e6a;
+  --color-text-hint: #5b5f5b;
+  --color-on-charcoal: #141a19;
+  --color-on-charcoal-muted: #5b5f5b;
+  --color-icon: #454b49;
+  --color-hairline: rgba(20, 26, 25, 0.1);
+  --ink-rgb: 20 26 25;
+  --primary-rgb: 20 26 25;
+  --grad-ink: linear-gradient(180deg, #141a19 0%, #141a19 100%); /* primary fill: flat ink, no bevel */
+  --color-on-primary: #ffffff;
+  --color-selected: #141a19;
+  --color-on-selected: #ffffff;
+  --color-link: #1c716e;
+  --color-gauge-calories: #141a19;
+  --color-gauge-calories-end: #141a19;
+  color: var(--color-charcoal);
 }
 
 /* The picker's swatches: each draws its own ground, whatever ground is on now. */
-.ground-swatch-oat {
-  background:
-    radial-gradient(120% 90% at 50% -20%, rgb(248 248 246 / 0.9) 0%, transparent 70%),
-    radial-gradient(90% 90% at 100% 120%, rgb(232 232 228 / 0.6) 0%, transparent 70%),
-    #f2f2ef;
-}
-.ground-swatch-sage {
-  background:
-    radial-gradient(120% 90% at 50% -20%, rgb(245 247 243 / 0.9) 0%, transparent 70%),
-    radial-gradient(90% 90% at 100% 120%, rgb(232 236 229 / 0.6) 0%, transparent 70%),
-    #edf0eb;
-}
-.ground-swatch-clay {
-  background:
-    radial-gradient(120% 90% at 50% -20%, rgb(248 245 243 / 0.9) 0%, transparent 70%),
-    radial-gradient(90% 90% at 100% 120%, rgb(239 233 229 / 0.6) 0%, transparent 70%),
-    #f3eeeb;
-}
-.ground-swatch-mist {
-  background:
-    radial-gradient(120% 90% at 50% -20%, rgb(244 246 248 / 0.9) 0%, transparent 70%),
-    radial-gradient(90% 90% at 100% 120%, rgb(231 235 239 / 0.6) 0%, transparent 70%),
-    #eceff2;
-}
+/* HfLogo tone="auto": both files are drawn, the chosen ground shows one (components/brand/HfLogo.tsx). */
+.hf-logo-auto { display: inline-flex; line-height: 0; }
+.hf-logo-auto .hf-logo-on-dark { display: none; }
+html[data-ground="black"] .hf-logo-auto .hf-logo-on-light { display: none; }
+html[data-ground="black"] .hf-logo-auto .hf-logo-on-dark { display: block; }
 
+.ground-swatch-white {
+  background: #ffffff;
+}
+.ground-swatch-black {
+  background: #000000;
+}
 
 /* The Motion ribbon clip (components/GroundVideo.tsx) is retired since Fresh; the class stays so the
    component still renders a calm ground if anything mounts it. */
@@ -1294,11 +1345,11 @@ a.btn:active,
    stands out"): persimmon ink on ivory (≥ 4.5:1), the brighter persimmon base inside the matte
    (charcoal) scope. Pair with font-semibold or bolder. */
 .kcal { color: var(--color-orange-ink); }
-.matte .kcal { color: var(--color-gauge-calories); }
+.matte .kcal { color: var(--color-kcal-on-ink); }
 /* A section-tinted panel inside the matte lifts the ground a step, so its calorie figures take the
    lighter persimmon (the base is 4.3:1 there; DESIGN.md §Contrast). */
 .matte .olive-panel .kcal,
-.matte .olive-panel .macro-ink-kcal { color: var(--color-gauge-calories-end); }
+.matte .olive-panel .macro-ink-kcal { color: var(--color-kcal-on-ink); }
 .matte-reset .kcal { color: var(--color-orange-ink); }
 .macro-protein { color: var(--color-gauge-protein); }
 .macro-carbs { color: var(--color-gauge-carbs); }
@@ -1435,7 +1486,7 @@ a.btn:active,
 .day-lens {
   border-radius: 9999px;
   background: var(--grad-ink);
-  box-shadow: var(--bevel), 0 6px 14px -8px rgba(40, 42, 32, 0.6);
+  box-shadow: var(--bevel), 0 6px 14px -8px rgba(20, 26, 25, 0.6);
 }
 
 /* The Day card orb's box (components/today/DayCard.tsx): an ivory disc. The orb shows only in the
@@ -1443,11 +1494,11 @@ a.btn:active,
    only for the moment the orb steps back, unseen, on the other faces. */
 .orb-dock {
   border-radius: 9999px;
-  background: radial-gradient(circle at 50% 35%, #ffffff 0%, #f0f0ec 80%);
+  background: radial-gradient(circle at 50% 35%, #ffffff 0%, #f2f2f0 80%);
   border: 1px solid rgb(var(--ink-rgb) / 0.08);
   box-shadow:
     inset 0 1px 1px rgba(255, 255, 255, 0.8),
-    0 12px 24px -12px rgba(40, 36, 26, 0.5),
+    0 12px 24px -12px rgba(20, 26, 25, 0.5),
     0 0 0 4px rgb(var(--primary-rgb) / 0.06);
 }
 
@@ -1506,7 +1557,7 @@ a.btn:active,
   border-radius: 16px;
   background:
     linear-gradient(160deg, rgb(255 255 255 / 0.075), rgb(0 0 0 / 0.2) 72%),
-    color-mix(in srgb, var(--color-paper) 6%, #161615);
+    color-mix(in srgb, var(--color-paper) 6%, #141917);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.13),
     inset 0 -1px 0 rgb(0 0 0 / 0.35),

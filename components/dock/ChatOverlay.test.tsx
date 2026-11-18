@@ -41,15 +41,15 @@ afterEach(() => {
 
 /** Closed for the user: hidden from assistive tech at once (its exit may still be playing). */
 async function closed() {
-  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Chat with Sasha" })).toBeNull(), { timeout: 3000 });
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Chat with High Frequency" })).toBeNull(), { timeout: 3000 });
 }
 
 function openChat() {
   render(<><main data-testid="page">Foods</main><TabBar /></>);
-  fireEvent.click(screen.getByRole("button", { name: "Ask Sasha" }));
+  fireEvent.click(screen.getByRole("button", { name: "Ask High Frequency" }));
   fireEvent.click(screen.getByRole("button", { name: "Attach" }));
   fireEvent.click(screen.getByRole("button", { name: "Open chat" }));
-  return screen.getByRole("dialog", { name: "Chat with Sasha" });
+  return screen.getByRole("dialog", { name: "Chat with High Frequency" });
 }
 
 describe("the chat overlay", () => {

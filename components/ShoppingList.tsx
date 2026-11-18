@@ -140,13 +140,13 @@ export default function ShoppingList({ title, lines, actions, switcher, empty,
 
   return <section className="shell" aria-label="Shopping list"><div className="surface flex flex-col gap-3 p-4">
     <div className="flex items-start justify-between gap-2">
-      <div className="min-w-0"><h2 className="m-0 text-lg font-semibold">Your list</h2>
+      <div className="min-w-0"><h2 className="m-0 text-title font-semibold">Your list</h2>
         <p className="m-0 text-tiny text-muted">{shown.length === 0 ? title
           : `${done.length} of ${shown.length} in cart · ${title}`}</p></div>
       {shown.length > 0 && <Button variant="icon" aria-label="Share or copy this list" onClick={() => void share()}>
         <Share size={18} aria-hidden="true" /></Button>}
     </div>
-    {shown.length > 0 && <div className="pill-in h-1.5 overflow-hidden" aria-hidden="true">
+    {shown.length > 0 && <div className="pill-in h-2.5 overflow-hidden" aria-hidden="true">
       <div className="btn-primary h-full rounded-full transition-[width] duration-300"
         style={{ width: `${Math.round((done.length / shown.length) * 100)}%` }} /></div>}
     {switcher}
@@ -154,7 +154,7 @@ export default function ShoppingList({ title, lines, actions, switcher, empty,
     {shown.length === 0 ? empty : <>
       {groupByAisle(open, (line) => aisleOf({ name: line.name, bundledId: line.identity?.foodDbId ?? null }))
         .map((group) => <section key={group.aisle} aria-label={group.label} className="flex flex-col">
-          <h3 className="m-0 pb-1 text-tiny font-medium uppercase tracking-wide text-muted">{group.label}</h3>
+          <h3 className="m-0 pb-1 text-overline uppercase text-muted">{group.label}</h3>
           <ul className="m-0 flex list-none flex-col p-0">{group.items.map(row)}</ul>
         </section>)}
       {open.length === 0 && <Notice tone="success" title="Everything is in the cart." />}

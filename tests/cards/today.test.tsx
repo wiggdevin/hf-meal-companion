@@ -174,7 +174,7 @@ describe("SlotCard", () => {
     const markup = slotCard(EMPTY_SLOT);
     expect(markup).toContain("Breakfast");
     expect(markup).toContain("Nothing planned yet.");
-    expect(markup).toContain("Plan with Sasha");
+    expect(markup).toContain("Plan with High Frequency");
     expect(markup).toContain("Log what you ate");
   });
 
@@ -312,7 +312,7 @@ describe("Today, the page", () => {
   it("draws empty slots, each with its two ways in, on a day with nothing planned", async () => {
     await renderToday({ day: { slots: [EMPTY_SLOT] } });
     expect(screen.getAllByText("Nothing planned yet.").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Plan with Sasha").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Plan with High Frequency").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Log what you ate").length).toBeGreaterThan(0);
     expect(screen.queryByText(/That is not fat/)).toBeNull();
   });
@@ -358,7 +358,7 @@ describe("Today, the page", () => {
   it("opens the planning sheet over an empty meal without routing to Coach", async () => {
     navigation.push.mockClear();
     await renderToday({ day: { slots: [EMPTY_SLOT] } });
-    fireEvent.click(screen.getByRole("button", { name: "Plan with Sasha" }));
+    fireEvent.click(screen.getByRole("button", { name: "Plan with High Frequency" }));
     expect(screen.getByRole("region", { name: /Plan Meal 1 · 8:00 am/ })).toBeTruthy();
     expect(screen.getByRole("region", { name: "Today's plan" })).toBeTruthy();
     expect(navigation.push).not.toHaveBeenCalled();
@@ -375,8 +375,8 @@ describe("Today, the page", () => {
         "meal-4": { baseMealId: null, components: [], cleared: true },
       } } } },
     day: { slots: [{ ...EMPTY_SLOT, slot: "meal-4", label: "Meal 4", time: "20:00" }] } });
-    expect(screen.getByRole("button", { name: "Plan with Sasha" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Plan with Sasha" }));
+    expect(screen.getByRole("button", { name: "Plan with High Frequency" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Plan with High Frequency" }));
     // Room left, never as the meal's own numbers; no target chips inside the card.
     expect(await screen.findByText(/room left for this meal: about 450 kcal and 30 g protein/, {}, SLOW)).toBeTruthy();
     expect(screen.queryByRole("list", { name: "Target for this meal" })).toBeNull();

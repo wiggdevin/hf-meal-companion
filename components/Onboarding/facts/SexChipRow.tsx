@@ -30,7 +30,7 @@ export function SexChipRow({
 }) {
   return (
     <div className="flex w-full flex-col gap-3">
-      <p className={question ? "m-0 font-serif text-heading-sm text-charcoal" : "m-0 text-body text-charcoal"}>
+      <p className={question ? "m-0 font-display text-[28px] leading-[1.1] tracking-display-md text-charcoal" : "m-0 text-body text-charcoal"}>
         {question ?? "Now the boring part, for the math — are you male or female?"}
       </p>
       <div className="flex flex-wrap gap-2" role="group" aria-label="Sex">

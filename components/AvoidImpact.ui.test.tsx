@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
  * FluidVoice A09: the affected-meals review keeps its count, its instance list with Edit, Remove and
- * Remix, and its eaten-history protection, and gains a free-text Ask Sasha field that sends the
+ * Remix, and its eaten-history protection, and gains a free-text Ask High Frequency field that sends the
  * user's own wording with the bounded affected-meal ids. The fixed shortcut still works.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -67,8 +67,8 @@ async function openAffected() {
   return screen.getByRole("dialog", { name: "Affected saved meals" });
 }
 
-const question = () => screen.getByRole("textbox", { name: "Ask Sasha about these meals" });
-const send = () => screen.getByRole("button", { name: "Send to Sasha" });
+const question = () => screen.getByRole("textbox", { name: "Ask High Frequency about these meals" });
+const send = () => screen.getByRole("button", { name: "Send to High Frequency" });
 
 describe("affected meals review", () => {
   it("opens the matching instance list with Edit, Remove and Remix on each", async () => {
@@ -117,7 +117,7 @@ describe("affected meals review", () => {
   it("keeps the fixed shortcut working without any typed question", async () => {
     await openAffected();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Ask Sasha about selected" }));
+      fireEvent.click(screen.getByRole("button", { name: "Ask High Frequency about selected" }));
     });
     expect(io.postTurn).toHaveBeenCalledTimes(1);
     const text = (io.postTurn.mock.calls[0][0] as { text: string }).text;
@@ -146,7 +146,7 @@ describe("affected meals review", () => {
  * 500-character question, 12 meals with long titles and two long verified options each — must
  * still validate, with the question and every id intact.
  */
-describe("the Ask Sasha request at its worst case", () => {
+describe("the Ask High Frequency request at its worst case", () => {
   const long = (label: string, n: number) => `${label} `.padEnd(n, "x");
   const option = (i: number) => ({ recipeId: `r${i}`, revisionId: `r${i}-v1`,
     name: long(`Lemon chicken and rice bowl ${i}`, 120), cuisine: "American", dishTags: [],
@@ -175,7 +175,7 @@ describe("the Ask Sasha request at its worst case", () => {
   it("keeps the fixed shortcut inside the limit too", async () => {
     await openAffected();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Ask Sasha about selected" }));
+      fireEvent.click(screen.getByRole("button", { name: "Ask High Frequency about selected" }));
     });
     const request = io.postTurn.mock.calls[0][0] as { text: string };
     expect(coachTurnRequestSchema.safeParse(request).success).toBe(true);

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import Button, { buttonClasses } from "@/components/ui/Button";
 import Surface from "@/components/ui/Surface";
+import HfLogo from "@/components/brand/HfLogo";
 import { reportClientError } from "@/lib/client-error-reporter";
 import type { ClientErrorSource } from "@/lib/client-errors";
 
@@ -20,8 +21,9 @@ export default function ErrorScreen({ error, onRetry, source }: {
   useEffect(() => { reportClientError(error, source); }, [error, source]);
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-4 py-8">
-      <Surface className="flex flex-col gap-3 p-5">
-        <h1 className="m-0 text-heading-sm font-semibold leading-heading-sm tracking-heading-sm text-charcoal">
+      <Surface className="flex flex-col gap-3 p-6">
+        <HfLogo variant="monogram" tone="light" height={32} decorative />
+        <h1 className="m-0 mt-3 text-heading leading-[1.05] tracking-display-md text-charcoal">
           Something went wrong
         </h1>
         <p className="m-0 text-caption text-graphite">

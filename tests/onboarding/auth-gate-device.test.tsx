@@ -315,7 +315,7 @@ describe("<AuthGate> binds, adopts and readies the account (Phase 9 §0.1)", () 
       supabase.client = client({ user: { id: "user-a" } }, DONE);
       const { root } = await mount();
       await flush();
-      expect(container.textContent).toContain("Sasha is open in another tab.");
+      expect(container.textContent).toContain("High Frequency is open in another tab.");
       expect(container.querySelector("[data-testid='today']")).toBeNull();
       expect(localStorage.getItem("meal-companion:onboarding-disposition:user-a")).toBeNull();
       expect(Object.keys(localStorage).filter((k) => k.startsWith("smc:u:"))).toEqual([]);

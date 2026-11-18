@@ -15,7 +15,7 @@ const parse = (text: string) => { const r = parseCuisinesText(text); return { id
 function renderBeat(onDone = vi.fn()) {
   render(<PrefsBeat question="Which cuisines do you love?" helper="Pick up to 6." inputLabel="Cuisines"
     placeholder="e.g. Thai" tiles={tiles} labelFor={label} parse={parse} initial={null} max={6}
-    unreadNote="Sasha didn’t catch a cuisine there." onDone={onDone} />);
+    unreadNote="High Frequency didn’t catch a cuisine there." onDone={onDone} />);
   return onDone;
 }
 
@@ -39,7 +39,7 @@ describe("PrefsBeat", () => {
     screen.getByText(/health or allergy detail/);
     expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(screen.getByLabelText("Cuisines"), { target: { value: "spicy stuff" } });
-    screen.getByText("Sasha didn’t catch a cuisine there.");
+    screen.getByText("High Frequency didn’t catch a cuisine there.");
     fireEvent.change(screen.getByLabelText("Cuisines"), { target: { value: "" } });
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(onDone).toHaveBeenCalledWith([]);

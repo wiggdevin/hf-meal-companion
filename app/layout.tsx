@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import { Geist, Newsreader } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import AppChrome from "@/components/AppChrome";
 import { CapabilitiesProvider } from "@/components/CapabilitiesProvider";
@@ -17,28 +17,35 @@ import GroundTheme from "@/components/GroundTheme";
 import { THEME_COLOR } from "@/lib/design/theme-color";
 import { readAppCapabilities } from "@/lib/capabilities";
 import SectionHue from "@/components/SectionHue";
-import { APP_NAME } from "@/lib/brand";
+import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 
-// Porcelain theme type (DESIGN.md §Typography, 2026-11-17): Newsreader for the one state sentence and
-// titles, Geist for everything else and every number (tabular figures). Newsreader carries its
-// optical-size axis, so a 64 px wordmark and a 20 px card title each get their own cut. next/font
-// self-hosts both, so the browser never calls Google.
-const display = Newsreader({
-  subsets: ["latin"],
-  axes: ["opsz"],
-  style: ["normal", "italic"],
+// High Frequency type (DESIGN.md §Typography, 2026-11-18): Archivo (weight 600, tight tracking) for
+// headings and every numeral, Inter for body and labels, Instrument Serif italic as a rare accent.
+// next/font/local self-hosts the three files in app/fonts, so the browser never calls Google and a
+// build needs no network. Archivo and Inter are variable fonts (one file, every weight).
+const display = localFont({
+  src: "./fonts/Archivo-Variable.ttf",
+  weight: "100 900",
   variable: "--font-display-face",
   display: "swap",
 });
-const sans = Geist({
-  subsets: ["latin"],
+const sans = localFont({
+  src: "./fonts/Inter-Variable.ttf",
+  weight: "100 900",
   variable: "--font-text-face",
+  display: "swap",
+});
+const accent = localFont({
+  src: "./fonts/InstrumentSerif-Italic.ttf",
+  weight: "400",
+  style: "italic",
+  variable: "--font-accent-face",
   display: "swap",
 });
 
 export const metadata: Metadata = {
   title: APP_NAME,
-  description: "What to eat, and when.",
+  description: APP_TAGLINE,
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
@@ -47,6 +54,7 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
       { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
       { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
     ],
@@ -74,7 +82,7 @@ export default async function RootLayout({
   return (
     // `data-card-step` turns on the contrast step for legacy nested cards (app/globals.css, DESIGN.md
     // §Elevation): a `.surface` inside a `.surface` takes the inset face. Remove it to revert them all.
-    <html lang="en" suppressHydrationWarning data-card-step="" className={`${display.variable} ${sans.variable}`}>
+    <html lang="en" suppressHydrationWarning data-card-step="" className={`${display.variable} ${sans.variable} ${accent.variable}`}>
       <body className="bg-paper text-charcoal antialiased">
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: GROUND_BOOT_SCRIPT }} />
         <ZodJitless />

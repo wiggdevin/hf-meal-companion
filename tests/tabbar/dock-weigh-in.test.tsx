@@ -38,7 +38,7 @@ afterEach(() => {
   store.weightUnit = "lb";
 });
 
-const form = () => screen.getByRole("searchbox", { name: "Ask Sasha" }).closest("form")!;
+const form = () => screen.getByRole("searchbox", { name: "Ask High Frequency" }).closest("form")!;
 
 describe("the dock's Weigh-in popover", () => {
   it("reads the preferred weight unit again each time it opens", async () => {
@@ -48,7 +48,7 @@ describe("the dock's Weigh-in popover", () => {
     expect(screen.getByRole("textbox", { name: "Weight in lb" })).toBeTruthy();
 
     // Close the popover (Escape, with the tray already folded), change the setting, reopen it.
-    fireEvent.keyDown(screen.getByRole("searchbox", { name: "Ask Sasha" }), { key: "Escape" });
+    fireEvent.keyDown(screen.getByRole("searchbox", { name: "Ask High Frequency" }), { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("textbox", { name: /Weight in/ })).toBeNull());
     store.weightUnit = "kg";
     fireEvent.click(screen.getByRole("button", { name: "Attach" }));
@@ -59,7 +59,7 @@ describe("the dock's Weigh-in popover", () => {
   it("closes the weigh-in popover when the field itself folds back to a bubble", async () => {
     nav.path = "/";
     render(<TabBar />);
-    fireEvent.click(screen.getByRole("button", { name: "Ask Sasha" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ask High Frequency" }));
     fireEvent.click(screen.getByRole("button", { name: "Attach" }));
     fireEvent.click(screen.getByRole("button", { name: "Weigh in" }));
     expect(screen.getByRole("textbox", { name: /Weight in/ })).toBeTruthy();
@@ -88,11 +88,11 @@ describe("the dock's Weigh-in popover", () => {
   it("opens fresh after a fold: no weigh-in and no tray left over", async () => {
     nav.path = "/";
     render(<TabBar />);
-    fireEvent.click(screen.getByRole("button", { name: "Ask Sasha" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ask High Frequency" }));
     fireEvent.click(screen.getByRole("button", { name: "Attach" }));
     fireEvent.click(screen.getByRole("button", { name: "Weigh in" }));
     fireEvent.click(screen.getByRole("button", { name: "Show all tabs" }));
-    fireEvent.click(screen.getByRole("button", { name: "Ask Sasha" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ask High Frequency" }));
     // The card that was open folds away on its spring; it is not opened again.
     await waitFor(() => expect(screen.queryByRole("textbox", { name: /Weight in/ })).toBeNull());
     expect(screen.getByRole("button", { name: "Attach" }).getAttribute("aria-expanded")).toBe("false");

@@ -275,7 +275,7 @@ describe("generateWeekSummary — exact PRD §8 shape", () => {
 
     expect(text).toBe(
       [
-        "Sasha — Sep 14–20",
+        "High Frequency — Sep 14–20",
         "Meals hit: 19/21 (90%)",
         "Protein: avg 121g (target 125)",
         "Calories: avg 1,886 (target 1,700)",

@@ -11,15 +11,15 @@ import SashaMark from "@/components/coach/SashaMark";
 
 afterEach(() => { cleanup(); motion.reduce = false; });
 
-/** U21 (2026-10-04): the living mark breathes at rest, speeds up while Sasha works, and is a still
+/** U21 (2026-10-04): the living mark (the HF monogram) breathes at rest, speeds up while High Frequency works, and is a still
  *  emblem under reduced motion. It is decoration: the transcript's thinking line announces. */
 describe("the living mark", () => {
-  it("is decorative and says when Sasha is working", () => {
+  it("is decorative and says when High Frequency is working", () => {
     const { container, rerender } = render(<SashaMark />);
     const mark = container.firstElementChild!;
     expect(mark.getAttribute("aria-hidden")).toBe("true");
     expect(mark.getAttribute("data-thinking")).toBeNull();
-    expect(mark.querySelectorAll("circle")).toHaveLength(3);
+    expect(mark.querySelectorAll("img")).toHaveLength(1);
     rerender(<SashaMark thinking />);
     expect(mark.getAttribute("data-thinking")).toBe("true");
   });

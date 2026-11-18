@@ -127,22 +127,22 @@ describe("meal card notes and the open card", () => {
     expect(miss.closest("[data-card-tray]")).not.toBeNull();
   });
 
-  it("offers Ask Sasha for preparation and fits the daily share title", () => {
+  it("offers Ask High Frequency for preparation and fits the daily share title", () => {
     const onPlanWithCoach = vi.fn();
     render(<Card onPlanWithCoach={onPlanWithCoach}
       dayTotals={{ consumed: { kcal: 0, protein: 0, carbs: 0, fat: 0 },
         targets: { kcal: 1900, protein: 150, carbs: 190, fat: 60 } }} />);
     fireEvent.click(screen.getByRole("button", { name: "Expand Meal 2" }));
     fireEvent.click(screen.getByRole("button", { name: /Preparation/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Ask Sasha how to make it" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ask High Frequency how to make it" }));
     expect(onPlanWithCoach).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("button", { name: /Daily share/ })).toBeTruthy();
   });
 
-  it("names Sasha on an empty focus slot and leads with its status", () => {
+  it("names High Frequency on an empty focus slot and leads with its status", () => {
     render(<Card slot={{ ...lunch, meal: null, components: [], macros: { kcal: 0, protein: 0, carbs: 0, fat: 0 } }}
       variant="focus" focusLabel="Next" />);
-    expect(screen.getByRole("button", { name: "Plan with Sasha" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Plan with High Frequency" })).toBeTruthy();
     expect(document.body.textContent).toContain("Next");
   });
 });

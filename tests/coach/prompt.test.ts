@@ -155,7 +155,7 @@ describe("buildSystemPrompt", () => {
     // is exempted here; the guard still holds for anything that would leak the user's own name
     // or gender into the prompt.
     expect(prompt).not.toMatch(/\b(?:devin|she|her|hers|herself)\b/i);
-    expect(prompt).toContain("You are Sasha (Supportive Assistant for Smart Health Awareness)");
+    expect(prompt).toContain("You are High Frequency");
     expect(prompt).toContain("YOUR DAY");
   });
 

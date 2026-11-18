@@ -40,7 +40,7 @@ vi.mock("next/navigation", () => ({
 // opens (U22, 2026-10-04: the dock's ask opens the chat over the page instead of routing).
 vi.mock("@/components/dock/ChatOverlay", () => ({
   default: ({ scope }: { scope: unknown }) =>
-    <div role="dialog" aria-label="Chat with Sasha" data-scope={JSON.stringify(scope)} />,
+    <div role="dialog" aria-label="Chat with High Frequency" data-scope={JSON.stringify(scope)} />,
 }));
 
 /** A stand-in for a mounted chat: it takes the dock's event and says so, as useCoachDockSubmit
@@ -71,17 +71,17 @@ afterEach(() => {
   nav.push.mockReset();
 });
 
-const field = () => screen.getByRole("searchbox", { name: "Ask Sasha" }) as HTMLTextAreaElement;
+const field = () => screen.getByRole("searchbox", { name: "Ask High Frequency" }) as HTMLTextAreaElement;
 const form = () => field().closest("form")!;
 
-describe("the Sasha bubble on /coach", () => {
+describe("the High Frequency bubble on /coach", () => {
   it("says nothing about thinking while the transcript above shows the turn, and carries no spark logo", () => {
     broadcastDockState({ disabled: true, scanDisabled: false, offline: false, thinking: true });
     render(<TabBar />);
     // The transcript's own line and the header mark say it; the field keeps its placeholder (Kimi K5).
     expect(document.querySelector("[data-dock-thinking]")).toBeNull();
     expect(screen.queryByText(/is thinking/)).toBeNull();
-    expect(field().placeholder).toBe("Ask Sasha");
+    expect(field().placeholder).toBe("Ask High Frequency");
     // No spark before the words (owner, 2026-10-04): the field's only glyphs are its controls'.
     const glyphs = form().querySelectorAll("svg");
     for (const svg of Array.from(glyphs)) expect(svg.closest("button")).not.toBeNull();
@@ -300,14 +300,14 @@ describe("the Sasha bubble on /coach", () => {
     act(() => broadcast.rerender(<Broadcaster
       state={{ disabled: false, scanDisabled: false, offline: false }} />));
     expect(field().disabled).toBe(false);
-    expect(field().placeholder).toBe("Ask Sasha");
+    expect(field().placeholder).toBe("Ask High Frequency");
   });
 
   it("brings the capsule back from the folded icon and shrinks the field to its bubble", () => {
     render(<TabBar />);
     fireEvent.click(screen.getByRole("button", { name: "Show all tabs" }));
     expect(form().hasAttribute("inert")).toBe(true);
-    expect(screen.getByRole("button", { name: "Ask Sasha" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Ask High Frequency" })).toBeTruthy();
     for (const label of ["Body", "Foods", "Settings"]) {
       expect(screen.getByRole("link", { name: label })).toBeTruthy();
     }
@@ -342,14 +342,14 @@ describe("the Sasha bubble on /coach", () => {
   });
 });
 
-describe("the Sasha bubble on every other screen", () => {
+describe("the High Frequency bubble on every other screen", () => {
   it("rests as a bubble and stretches into a focused field when tapped", () => {
     nav.path = "/";
     render(<TabBar />);
     expect(form().hasAttribute("inert")).toBe(true);
     expect(screen.getByRole("link", { name: "Body" })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Ask Sasha" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ask High Frequency" }));
     expect(form().hasAttribute("inert")).toBe(false);
     expect(document.activeElement).toBe(field());
     expect(screen.getByRole("button", { name: "Show all tabs" })).toBeTruthy();
@@ -358,11 +358,11 @@ describe("the Sasha bubble on every other screen", () => {
   it("opens the chat over the page with the question, page-scoped, and hands it over once the chat can send", () => {
     nav.path = "/foods";
     const { unmount } = render(<TabBar />);
-    fireEvent.click(screen.getByRole("button", { name: "Ask Sasha" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ask High Frequency" }));
     fireEvent.change(field(), { target: { value: "What goes with salmon?" } });
     fireEvent.submit(form());
     expect(nav.push).not.toHaveBeenCalled();
-    const overlay = screen.getByRole("dialog", { name: "Chat with Sasha" });
+    const overlay = screen.getByRole("dialog", { name: "Chat with High Frequency" });
     expect(JSON.parse(overlay.getAttribute("data-scope")!)).toEqual({ kind: "page", page: "foods" });
     unmount();
 
@@ -382,14 +382,14 @@ describe("the Sasha bubble on every other screen", () => {
   it("keeps a meal photo picked on another screen on that screen, in the chat over it", () => {
     nav.path = "/";
     const { container, unmount } = render(<TabBar />);
-    fireEvent.click(screen.getByRole("button", { name: "Ask Sasha" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ask High Frequency" }));
     fireEvent.click(screen.getByRole("button", { name: "Attach" }));
     fireEvent.click(screen.getByRole("button", { name: "Take a photo" }));
     const camera = container.querySelector<HTMLInputElement>('input[type="file"][capture]')!;
     const photo = new File(["x"], "plate.jpg", { type: "image/jpeg" });
     fireEvent.change(camera, { target: { files: [photo] } });
     expect(nav.push).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog", { name: "Chat with Sasha" })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Chat with High Frequency" })).toBeTruthy();
     unmount();
 
     const received: DockIntent[] = [];
@@ -401,22 +401,22 @@ describe("the Sasha bubble on every other screen", () => {
   it("opens the chat over the page when Chat is tapped in the attach tray", () => {
     nav.path = "/foods";
     render(<TabBar />);
-    fireEvent.click(screen.getByRole("button", { name: "Ask Sasha" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ask High Frequency" }));
     fireEvent.click(screen.getByRole("button", { name: "Attach" }));
     fireEvent.click(screen.getByRole("button", { name: "Open chat" }));
     expect(nav.push).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog", { name: "Chat with Sasha" })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Chat with High Frequency" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Attach" }).getAttribute("aria-expanded")).toBe("false");
   });
 
   it("carries a typed draft to the chat over the page when Chat is tapped instead of Send", () => {
     nav.path = "/foods";
     const { unmount } = render(<TabBar />);
-    fireEvent.click(screen.getByRole("button", { name: "Ask Sasha" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ask High Frequency" }));
     fireEvent.change(field(), { target: { value: "What goes with salmon?" } });
     fireEvent.click(screen.getByRole("button", { name: "Attach" }));
     fireEvent.click(screen.getByRole("button", { name: "Open chat" }));
-    expect(screen.getByRole("dialog", { name: "Chat with Sasha" })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Chat with High Frequency" })).toBeTruthy();
     unmount();
 
     const sent: string[] = [];
@@ -442,7 +442,7 @@ describe("the Sasha bubble on every other screen", () => {
   it("folds back when Escape is pressed on an empty field", () => {
     nav.path = "/";
     render(<TabBar />);
-    fireEvent.click(screen.getByRole("button", { name: "Ask Sasha" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ask High Frequency" }));
     fireEvent.keyDown(field(), { key: "Escape" });
     expect(form().hasAttribute("inert")).toBe(true);
   });
@@ -450,12 +450,12 @@ describe("the Sasha bubble on every other screen", () => {
   it("ignores the coach's disabled broadcast away from /coach", () => {
     nav.path = "/foods";
     render(<TabBar />);
-    fireEvent.click(screen.getByRole("button", { name: "Ask Sasha" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ask High Frequency" }));
 
     broadcastDockState({ disabled: true, scanDisabled: true, offline: true });
 
     expect(field().disabled).toBe(false);
-    expect(field().placeholder).toBe("Ask Sasha");
+    expect(field().placeholder).toBe("Ask High Frequency");
   });
 
 });

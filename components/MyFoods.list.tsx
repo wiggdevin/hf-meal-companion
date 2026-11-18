@@ -74,7 +74,7 @@ export default function CappedList<T>({ items, keyOf, render, limit = LIST_LIMIT
 /**
  * The one footer a Foods category card ends with (U14): a full-width hairline over a 44 px row.
  * "Show all N" holds the left half and Add the right, split by a hairline; with nothing to show,
- * Add takes the whole row. Add is the card's verb, so it is the olive ink and the heavier weight;
+ * Add takes the whole row. Add is the card's verb, so it is the teal link text (as "Plan" in the HF mockup) in the heavier weight;
  * "Show all N" is muted navigation. Exported so an empty card ends the same way.
  */
 export function ListFooter({ toggle = null, add }: { toggle?: ReactNode; add: ListAdd }) {
@@ -83,7 +83,7 @@ export function ListFooter({ toggle = null, add }: { toggle?: ReactNode; add: Li
       className={`grid min-h-11 border-t border-hairline ${toggle ? "grid-cols-2" : "grid-cols-1"}`}>
       {toggle}
       <button type="button" data-category-add aria-label={add.label} onClick={add.onAdd}
-        className={`tap flex min-h-11 w-full items-center justify-center text-caption font-semibold text-primary ${
+        className={`tap flex min-h-11 w-full items-center justify-center text-caption font-semibold text-link ${
           toggle ? "border-l border-hairline" : ""}`}>
         Add
       </button>

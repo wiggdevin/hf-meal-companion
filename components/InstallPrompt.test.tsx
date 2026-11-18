@@ -16,7 +16,7 @@ import type { Store } from "@/lib/types";
 
 const source = readFileSync(path.join(__dirname, "InstallPrompt.tsx"), "utf-8");
 
-// Finding #17 (audit 2026-09-13): the banner told Sasha that installing to
+// Finding #17 (audit 2026-09-13): the banner told High Frequency that installing to
 // the Home Screen "also turns on the meal reminders." Reminders are wired up
 // entirely separately, via ScheduleSection's explicit "Add to Calendar" button
 // on the Settings page (a manual share-sheet "Add All" step) — nothing ties
@@ -167,7 +167,7 @@ describe("InstallPrompt", () => {
     it("shows once a meal has been logged, regardless of the open count", () => {
       asAgent(IPHONE_SAFARI);
       render(<InstallPrompt store={STORE_WITH_LOGGED_MEAL} />);
-      expect(screen.getByText("Install Sasha")).toBeTruthy();
+      expect(screen.getByText("Install High Frequency")).toBeTruthy();
     });
 
     // Sol review round 3, 2026-10-08, BLOCK: the card only ever READS the open count now —
@@ -178,7 +178,7 @@ describe("InstallPrompt", () => {
       asAgent(IPHONE_SAFARI);
       localStorage.setItem(OPEN_COUNT_KEY, "2");
       render(<InstallPrompt store={EMPTY_STORE} />);
-      expect(screen.getByText("Install Sasha")).toBeTruthy();
+      expect(screen.getByText("Install High Frequency")).toBeTruthy();
     });
 
     it("never itself writes the open count — only reads it", () => {
@@ -189,14 +189,14 @@ describe("InstallPrompt", () => {
         rerender(<InstallPrompt store={{ days: {} }} />);
       }
       expect(localStorage.getItem(OPEN_COUNT_KEY)).toBeNull();
-      expect(screen.queryByText("Install Sasha")).toBeNull();
+      expect(screen.queryByText("Install High Frequency")).toBeNull();
     });
 
     it("picks up a count written elsewhere (InstallPromptCapture) once told it changed", () => {
       asAgent(IPHONE_SAFARI);
       localStorage.setItem(OPEN_COUNT_KEY, "1");
       render(<InstallPrompt store={EMPTY_STORE} />);
-      expect(screen.queryByText("Install Sasha")).toBeNull();
+      expect(screen.queryByText("Install High Frequency")).toBeNull();
 
       // Simulates InstallPromptCapture recording the second open (e.g. from a visibilitychange
       // it saw while this card was not even mounted) and announcing it.
@@ -204,7 +204,7 @@ describe("InstallPrompt", () => {
       act(() => {
         window.dispatchEvent(new Event(OPEN_COUNT_CHANGED_EVENT));
       });
-      expect(screen.getByText("Install Sasha")).toBeTruthy();
+      expect(screen.getByText("Install High Frequency")).toBeTruthy();
     });
   });
 
@@ -224,7 +224,7 @@ describe("InstallPrompt", () => {
       expect(preventDefault).toHaveBeenCalledOnce();
       const button = await screen.findByRole("button", { name: "Install" });
       fireEvent.click(button);
-      await waitFor(() => expect(screen.queryByText("Install Sasha")).toBeNull());
+      await waitFor(() => expect(screen.queryByText("Install High Frequency")).toBeNull());
       expect(localStorage.getItem(DISMISSED_KEY)).toBe("1");
     });
 
@@ -233,9 +233,9 @@ describe("InstallPrompt", () => {
       attachAndroidInstallCapture();
       fireBeforeInstallPrompt("accepted");
       render(<InstallPrompt store={STORE_WITH_LOGGED_MEAL} />);
-      await screen.findByText("Install Sasha");
+      await screen.findByText("Install High Frequency");
       window.dispatchEvent(new Event(ANDROID_INSTALLED_EVENT));
-      await waitFor(() => expect(screen.queryByText("Install Sasha")).toBeNull());
+      await waitFor(() => expect(screen.queryByText("Install High Frequency")).toBeNull());
     });
 
     it("catches an event fired before the card mounted, via the module-level capture", async () => {
@@ -266,7 +266,7 @@ describe("InstallPrompt", () => {
       await screen.findByText(/isn.t available right now/i);
       expect(screen.queryByText(/Installing…/)).toBeNull();
       expect(screen.queryByRole("button", { name: "Install" })).toBeNull();
-      expect(screen.getByText("Install Sasha")).toBeTruthy();
+      expect(screen.getByText("Install High Frequency")).toBeTruthy();
       expect(localStorage.getItem(DISMISSED_KEY)).toBeNull();
     });
 
@@ -352,7 +352,7 @@ describe("InstallPrompt", () => {
         const rendered = render(<InstallPrompt store={STORE_WITH_LOGGED_MEAL} />);
         const button = await screen.findByRole("button", { name: "Install" });
         fireEvent.click(button);
-        await waitFor(() => expect(screen.queryByText("Install Sasha")).toBeNull());
+        await waitFor(() => expect(screen.queryByText("Install High Frequency")).toBeNull());
         const declinedAt = Date.now();
         rendered.unmount();
         return declinedAt;
@@ -370,7 +370,7 @@ describe("InstallPrompt", () => {
         attachAndroidInstallCapture();
         fireBeforeInstallPrompt("dismissed");
         render(<InstallPrompt store={STORE_WITH_LOGGED_MEAL} />);
-        expect(screen.queryByText("Install Sasha")).toBeNull();
+        expect(screen.queryByText("Install High Frequency")).toBeNull();
       });
 
       it("reappears once a new meal is logged, even inside the cooldown", async () => {
@@ -388,7 +388,7 @@ describe("InstallPrompt", () => {
         attachAndroidInstallCapture();
         fireBeforeInstallPrompt("dismissed");
         render(<InstallPrompt store={anotherMealLogged} />);
-        expect(screen.getByText("Install Sasha")).toBeTruthy();
+        expect(screen.getByText("Install High Frequency")).toBeTruthy();
       });
 
       it("reappears once the cooldown passes, with nothing new logged", async () => {
@@ -398,7 +398,7 @@ describe("InstallPrompt", () => {
         attachAndroidInstallCapture();
         fireBeforeInstallPrompt("dismissed");
         render(<InstallPrompt store={STORE_WITH_LOGGED_MEAL} />);
-        expect(screen.getByText("Install Sasha")).toBeTruthy();
+        expect(screen.getByText("Install High Frequency")).toBeTruthy();
       });
     });
   });

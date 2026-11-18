@@ -1,7 +1,7 @@
 /**
  * Seven-day sparkline, hand-written SVG, no dependency (contracts §1). A null point is a GAP: the
  * path breaks rather than dipping to zero, because a missing observation is not a zero (§9).
- * Stroke widths and the muted colour come from DESIGN.md; the default stroke is the olive accent.
+ * Stroke widths and the muted colour come from DESIGN.md; the default stroke is the ink primary.
  *
  * A contiguous run of two or more observations draws a line. A lone observation draws a dot — as a
  * zero-length subpath, which a round line cap renders as a circle — so a real reading between two
@@ -37,12 +37,15 @@ export function sparklineSegments(points: (number | null)[], width: number, heig
     : points.map((c, i) => `${i === 0 ? "M" : "L"}${c.x},${c.y}`).join(" "));
 }
 
-export default function Sparkline({ points, width = 120, height = 28, stroke = "var(--color-primary)", label }: {
+export default function Sparkline({ points, width = 120, height = 28, stroke = "var(--color-primary)", label,
+  className }: {
   points: (number | null)[]; width?: number; height?: number; stroke?: string; label: string;
+  /** Layout only (a fluid width over the same viewBox): never colour. */
+  className?: string;
 }) {
   const segments = sparklineSegments(points, width, height);
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img"
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" className={className}
       aria-label={label} style={{ overflow: "visible" }}>
       {segments.map((d) => (
         <path key={d} d={d} fill="none" stroke={stroke} strokeWidth={1.5} strokeLinecap="round"

@@ -6,8 +6,8 @@
    Design-system utility className strings, not inline style objects
    (tests/design/inline-style.test.ts) — each still carries its original
    fontSize/fontWeight/letterSpacing/color recipe as the comment above it. */
-/** 20px / 400 / -0.01em */
-export const CARD_TITLE = "text-subheading font-normal tracking-heading-sm";
+/** Archivo 20px / 600 / -0.01em */
+export const CARD_TITLE = "font-display text-subheading font-semibold tracking-heading-sm text-charcoal";
 /** 14px / 400 / text-muted */
 export const CAPTION = "text-caption font-normal text-muted";
 /** 16px / 400 / text-primary */
@@ -19,9 +19,9 @@ export const FIELD_LABEL = "text-caption font-medium text-charcoal";
 export const ROW_VALUE = "text-caption font-normal text-charcoal";
 /** 12px / 400 / alert */
 export const ALERT = "text-tiny font-normal text-alert";
-/** Text inside an `.olive-panel` (a 7 % section tint on the ivory card): ink, never cream
+/** Text inside an `.olive-panel` (an 8 % section tint on the white card): ink, never cream
  *  (2026-10-04 contrast fix; DESIGN.md §Contrast). 14px / 400 / line-height 1.6 / text-primary */
 export const PANEL_TEXT = "text-caption font-normal leading-relaxed text-charcoal";
-/** 12px / 500 / 0.2em / uppercase / text-muted */
-export const EYEBROW = "text-overline uppercase text-muted";
+/** Wide-tracked caps eyebrow, the High Frequency label voice: 10px / 0.2em / uppercase / text-muted */
+export const EYEBROW = "eyebrow text-muted";
 /* Buttons are `components/ui/Button` (2026-10-04); the PILL_LABEL and INK_BUTTON recipes are gone. */

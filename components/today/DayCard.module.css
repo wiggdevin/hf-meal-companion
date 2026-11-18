@@ -6,11 +6,11 @@
 
 .card {
   position: relative;
-  border-radius: 32px;
+  border-radius: 28px;
 }
 
 .surface {
-  border-radius: 32px;
+  border-radius: 28px;
   overflow: hidden;
 }
 
