@@ -42,7 +42,7 @@ export const SETTINGS_CARDS: CardManifestEntry[] = [
     states: ["is hidden while the account cannot open", "turns the open food list on", "switches back off"],
     renderTest: "components/settings/FoodWorldSection.test.tsx" },
   { path: "components/settings/BackgroundSection.tsx", card: "BackgroundSection",
-    states: ["Oat on", "paints and keeps the choice", "moves with the arrow keys"],
+    states: ["Porcelain on", "paints and keeps the choice", "moves with the arrow keys"],
     renderTest: "components/settings/BackgroundSection.test.tsx" },
   { path: "components/settings/SignOutCard.tsx", card: "SignOutCard",
     states: ["default", "unsent notice"],
