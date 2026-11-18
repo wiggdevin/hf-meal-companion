@@ -4,7 +4,7 @@
  * the draft; every failed outcome shows why and keeps the typed text; the screen switch sends the
  * shown path only when it is on.
  */
-import { useState, type SetStateAction } from "react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -145,13 +145,12 @@ describe("draft recovery and the send race", () => {
   it("sent after an edit: a newer draft is kept, and Cancel is off while sending", async () => {
     let finish: (o: FeedbackOutcome) => void = () => {};
     const send = vi.fn(() => new Promise<FeedbackOutcome>((r) => { finish = r; }));
-    let setOuter: (next: SetStateAction<string>) => void = () => {};
     function Race() {
       const [draft, setDraft] = useState("");
-      setOuter = setDraft;
       return (
         <>
           <output data-testid="draft">{draft}</output>
+          <button type="button" onClick={() => setDraft("second note")}>edit elsewhere</button>
           <FeedbackSheet draft={draft} onDraft={setDraft} screen={null} send={send} onClose={() => {}} />
         </>
       );
@@ -159,7 +158,7 @@ describe("draft recovery and the send race", () => {
     render(<Race />);
     await typeAndSend("first note");
     expect((screen.getByRole("button", { name: "Cancel" }) as HTMLButtonElement).disabled).toBe(true);
-    act(() => { setOuter("second note"); });
+    fireEvent.click(screen.getByRole("button", { name: "edit elsewhere" }));
     await act(async () => { finish("sent"); });
     expect(screen.getByTestId("draft").textContent).toBe("second note");
   });
