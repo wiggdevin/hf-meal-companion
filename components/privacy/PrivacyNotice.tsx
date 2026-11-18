@@ -103,7 +103,7 @@ export default function PrivacyNotice({ deletionEnabled }: { deletionEnabled: bo
         </p>
       </Section>
 
-      <Link href="/" className="self-center text-caption text-muted underline">Back to Sasha</Link>
+      <Link href="/" className="self-center text-caption text-muted underline">Back to {APP_NAME}</Link>
     </main>
   );
 }
