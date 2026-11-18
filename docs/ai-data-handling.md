@@ -168,7 +168,9 @@ clears it as plain likes, dislikes or a whole app command. With the gate on:
   request is made, with no `ai_calls` row. Tests: `tests/ai/jev-health-gate.test.ts`.
 
 Settings lists every third-party processor under "Who handles your data"
-(`components/settings/ProcessorsSection.tsx`); keep it in step with this file.
+(`components/settings/ProcessorsSection.tsx`); keep it in step with this file The public `/privacy` page
+(`components/privacy/PrivacyNotice.tsx`) restates this file in plain words and reads the same
+`PROCESSORS` list; change it in the same PR as any change here.
 
 Retention was checked on 2026-09-19 against TypeSafe's [privacy policy](https://typesafe.ai/legal/privacy-policy),
 last updated 2025-11-19. The page says TypeSafe collects API prompts and other input, does not train

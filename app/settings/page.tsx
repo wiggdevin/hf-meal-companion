@@ -10,6 +10,7 @@ import CaloriesCard from "@/components/settings/CaloriesCard";
 import AppProfileCard from "@/components/settings/AppProfileCard";
 import DataAccountSection from "@/components/settings/DataAccountSection";
 import DeleteAccountCard from "@/components/settings/DeleteAccountCard";
+import FeedbackCard from "@/components/settings/FeedbackCard";
 import SignOutCard from "@/components/settings/SignOutCard";
 import HealthConnectionsSection from "@/components/settings/HealthConnectionsSection";
 import MacroList from "@/components/settings/MacroList";
@@ -172,6 +173,7 @@ export default function SettingsPage() {
       <DataAccountSection>
         <ExportCard />
         <SyncStatus />
+        <FeedbackCard />
         <SignOutCard />
         {/* Hidden until ACCOUNT_DELETION_ENABLED is on (GET /api/account/delete/enabled). */}
         <DeleteAccountCard />

@@ -74,6 +74,8 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
   // Account events and history.
   table("food_signal_events"), table("onboarding_events"), table("coach_intent_events"),
   table("client_timings"),
+  // Tester feedback (A1).
+  table("feedback"),
 ];
 
 /** Tables the dump leaves out on purpose, each with the reason. */

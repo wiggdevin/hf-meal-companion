@@ -315,6 +315,10 @@
     "test": "tests/tenancy/admin-jobs.test.ts",
     "via": "@/app/api/jobs/estimate/route"
   },
+  "lib/server/feedback.ts": {
+    "test": "tests/tenancy/admin-feedback.test.ts",
+    "via": "@/app/api/feedback/route"
+  },
   "lib/server/food-signals.ts": {
     "test": "tests/tenancy/admin-telemetry.test.ts",
     "via": "@/app/api/foods/signals/route"

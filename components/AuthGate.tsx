@@ -49,7 +49,7 @@ export type Gate = "unknown" | "out" | "onboarding" | "in";
  * visitor on /sign-in must reach the magic-link form, not the "Signed out"
  * card whose only link is /sign-in.
  */
-const AUTH_EXEMPT_PATHS = ["/sign-in", "/auth/"];
+const AUTH_EXEMPT_PATHS = ["/sign-in", "/auth/", "/privacy"];
 
 export function isAuthExempt(pathname: string | null): boolean {
   if (!pathname) return false;
