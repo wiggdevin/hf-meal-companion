@@ -96,3 +96,39 @@ export function withoutPlanReports(text: string, reads: readonly PlanRead[], onE
     return true;
   }).join(" ");
 }
+
+/** Words a meal title may add around its own foods: joiners, cooking methods, the dish's shape. */
+const TITLE_FILLER = new Set(("and & with plus on over of a the side bowl plate meal dinner lunch "
+  + "breakfast snack grilled roasted baked steamed boiled fried pan-fried sauteed sautéed scrambled "
+  + "poached toasted cooked raw fresh plain").split(" "));
+
+/**
+ * Weak-spot audit 2026-11-17 item 6: the titles of meals this turn's `set_slot_meal` actions set
+ * ("Grilled chicken and rice"), when every item grounded to an allowed food and every other word
+ * of the title is one of those items' own words or filler. Such a title names the meal, not a
+ * food, so the reply scan does not look it up as one. Mirrors withoutPlanReports above for a plan
+ * read; an ungrounded or unchecked item, or a title word naming any other food, keeps the title.
+ */
+export function plannedMealTitles(actions: readonly { kind: string }[]): string[] {
+  return actions.flatMap((action) => {
+    if (action.kind !== "set_slot_meal") return [];
+    const { title, items } = action as { title?: unknown; items?: unknown };
+    if (typeof title !== "string" || !clean(title) || !Array.isArray(items) || items.length === 0) return [];
+    const checked = items.every((item: { foodRefId?: unknown; verdict?: unknown; name?: unknown }) =>
+      typeof item.foodRefId === "string" && item.verdict === "allowed" && typeof item.name === "string");
+    if (!checked) return [];
+    const words = (s: string) => key(s).split(/[^a-z0-9&'-]+/).filter(Boolean);
+    const singular = (w: string) => w.replace(/(?:es|s)$/, "");
+    const own = new Set(items.flatMap((item: { name: string }) => words(item.name)).flatMap((w) => [w, singular(w)]));
+    return words(title).every((w) => TITLE_FILLER.has(w) || own.has(w) || own.has(singular(w)))
+      ? [title] : [];
+  });
+}
+
+/** Removes each planned meal title (whole phrase, any case) from the text the scan reads. */
+export function withoutPlannedMealTitles(text: string, titles: readonly string[]): string {
+  return titles.reduce((out, title) => {
+    const pattern = key(title).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "\\s+");
+    return out.replace(new RegExp(`(^|[^\\p{L}\\p{N}])${pattern}(?=$|[^\\p{L}\\p{N}])`, "giu"), "$1");
+  }, text);
+}

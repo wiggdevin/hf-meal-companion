@@ -15,6 +15,7 @@ import { hydrateComparison } from "@/lib/coach/blocks/hydrate-comparison";
 import { INVALID_ARGS_PREFIX } from "@/lib/coach/dispatch";
 import { isGenericRefusal, needsRefusalCorrection, REFUSAL_CORRECTION } from "@/lib/coach/refusal-guard";
 import { loggedFoodIdentities, type LoggedIdentities } from "@/lib/coach/reply-check";
+import { plannedMealTitles } from "@/lib/coach/plan-report";
 import { OUT_OF_TIME_GROUNDING, sanitiseReply, TURN_LIMITS, type TurnStep } from "@/lib/coach/turn";
 import { claimsChart, heuristic, verifyReply } from "@/lib/coach/verify";
 import { applyGroundedActionPolicies } from "@/lib/server/coach-role-advice";
@@ -173,7 +174,8 @@ export async function settleFinalStep(
           ? context.day.slots.find((slot) => slot.slot === action.slot)?.time : undefined)) })) : []),
     listMarks: policy.actions.flatMap((action) => "name" in action
       && (LIST_MARK_KINDS as readonly string[]).includes(action.kind)
-      ? [{ kind: action.kind, name: action.name }] : []) });
+      ? [{ kind: action.kind, name: action.name }] : []),
+    mealTitles: plannedMealTitles(policy.actions) });
   state.logPolicyNotices = policy.logNotices;
   state.recipeRefusals = policy.recipeRefusals;
   state.actionClarifications = [...grounded.clarifications, ...policy.recipeRefusals,
