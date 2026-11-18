@@ -7,6 +7,7 @@ import { MASCOTS } from "@/components/today/island/mascots";
 import { useMascot } from "@/components/today/island/well-pet";
 import type { OverviewData } from "@/components/today/overview/types";
 import { setCompanionShown, useCompanionShown } from "@/lib/today/companion-visibility";
+import { COMPANION_UI_ENABLED } from "@/lib/today/companion-ui";
 
 /**
  * The companion's place in the Overview face (UI makeover §4 item 4, §5): the chosen companion's
@@ -19,7 +20,7 @@ export default function CompanionSlot({ data, active }: {
   active: boolean;
 }) {
   const mascot = useMascot();
-  const shown = useCompanionShown(mascot);
+  const shown = useCompanionShown(mascot) && COMPANION_UI_ENABLED;
   const feedback = useActionFeedback();
   const name = MASCOTS[mascot].name;
   const show = (next: boolean) => void feedback.run(() => setCompanionShown(mascot, next), {
