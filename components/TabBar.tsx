@@ -181,7 +181,7 @@ export default function TabBar(_props: { bodyCapability?: BodyCapability } = {})
       {chatOpen && chat && <ChatOverlay key="chat" scope={chat.scope} dock={dock}
         onClose={dismissChat} onOpenFull={openFullChat} />}
     </AnimatePresence>
-    <nav ref={dock} className={`morphing-dock matte ${styles.dock} fixed inset-x-4 z-40`} aria-label="Primary"
+    <nav ref={dock} className={`morphing-dock matte ${styles.dock} fixed inset-x-4 z-40 mx-auto max-w-[26rem]`} aria-label="Primary"
       data-lens={lensing ? "on" : undefined}
       onFocus={() => setTyping(true)} onBlur={() => setTyping(false)}
       style={{ bottom: `calc(var(--safe-bottom) + ${DOCK_BOTTOM_OFFSET}px)` }}>
