@@ -6,6 +6,7 @@ import { AnimatePresence, motion, useIsPresent, useReducedMotionConfig } from "m
 import Button from "@/components/ui/Button";
 import SproutGuide, { type OnboardingPose } from "@/components/Onboarding/SproutGuide";
 import { COMPANION_UI_ENABLED } from "@/lib/today/companion-ui";
+import { APP_NAME } from "@/lib/brand";
 import OnboardingDock, { type OnboardingDockMode } from "@/components/Onboarding/dock/OnboardingDock";
 import { useDockDictation } from "@/components/Onboarding/dock/useDockDictation";
 import WeekBeat from "@/components/Onboarding/beats/WeekBeat";
@@ -115,11 +116,11 @@ export const ONBOARDING_SCOPE = { kind: "page", page: "onboarding" } as const;
 /** Why the plan cannot be used yet, and the one step that fixes it. */
 type PlanNotice = { text: string; actionLabel: string; action: "foods" | "rules" | "facts" | "retry" };
 const RULES_UNCHECKED_NOTICE: PlanNotice = {
-  text: "Sasha couldn't check your food rules yet, so it can't pick foods for you.",
+  text: `${APP_NAME} couldn't check your food rules yet, so it can't pick foods for you.`,
   actionLabel: "Check again", action: "retry",
 };
 const FOODS_SHORT_NOTICE: PlanNotice = {
-  text: "Sasha couldn't fill every group from the foods your rules allow. Tap a few more you'd eat, or adjust your food rules.",
+  text: `${APP_NAME} couldn't fill every group from the foods your rules allow. Tap a few more you'd eat, or adjust your food rules.`,
   actionLabel: "Adjust food rules", action: "rules",
 };
 const PLAN_FOODS_SHORT_NOTICE: PlanNotice = {
@@ -127,7 +128,7 @@ const PLAN_FOODS_SHORT_NOTICE: PlanNotice = {
   actionLabel: "Choose more foods", action: "foods",
 };
 const PROFILE_SHORT_NOTICE: PlanNotice = {
-  text: "A few answers are still missing, so Sasha can't build your plan yet.",
+  text: `A few answers are still missing, so ${APP_NAME} can't build your plan yet.`,
   actionLabel: "Finish your answers", action: "facts",
 };
 
@@ -251,7 +252,7 @@ const SKIP_CONFIRM = "Skip setup? Your answers won’t be saved.";
 const BLOCKED_NOTE = "That sounds like a health or allergy detail. Tap what applies here, so every plan respects it.";
 const RULES_UNVERIFIED = "Couldn’t verify your food rules. Try again.";
 const HEALTH_ANSWERS_UNCHECKED = "Couldn’t check your saved health answers. Check your connection, then try again.";
-const UNREAD_NOTE = "Sasha didn’t catch that. Try a number, like 34 or 5 10, or tap an answer.";
+const UNREAD_NOTE = `${APP_NAME} didn’t catch that. Try a number, like 34 or 5 10, or tap an answer.`;
 
 /** Clear extension points for a caller that wants to render something other than this lane's own
  *  default (tests, mainly): each slot replaces this beat's default content, with no change to the
@@ -1184,20 +1185,20 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
       parse={readPractices}
       initial={plan.practices ?? (facts.dietFlags ?? normalizePreferenceFlags(base?.dietPrefs?.flags))
         .filter((flag): flag is PracticeId => (PRACTICE_IDS as readonly string[]).includes(flag))}
-      unreadNote="Sasha didn’t catch that. Try words like vegetarian or no pork, or pick from the list."
+      unreadNote={`${APP_NAME} didn’t catch that. Try words like vegetarian or no pork, or pick from the list.`}
       onDone={(ids) => answerPlan("practices", { practices: ids as PracticeId[] })} />;
     if (beat === "dislikes") return <PrefsBeat key="dislikes" question="Any foods you’d rather skip?"
-      helper="Sasha will show these less. They are not allergies, and they never rule a food out."
+      helper={`${APP_NAME} will show these less. They are not allergies, and they never rule a food out.`}
       inputLabel="Foods to skip" placeholder="e.g. mushrooms, olives" tiles={DISLIKE_TILES} labelFor={dislikeTileLabel}
       parse={readDislikes} initial={plan.dislikes ?? null}
-      unreadNote="Sasha didn’t catch a food there. Try a food name, like mushrooms, or pick from the list."
+      unreadNote={`${APP_NAME} didn’t catch a food there. Try a food name, like mushrooms, or pick from the list.`}
       onDone={(ids) => answerPlan("dislikes", { dislikes: ids as TasteDislike[] })} />;
     if (beat === "cuisines") return <PrefsBeat key="cuisines" question="Which cuisines do you love?"
       helper={`Pick up to ${CUISINES_MAX}. Food ideas will lean toward them; they never rule a food out.`}
       inputLabel="Cuisines" placeholder="e.g. Mexican, Thai, Italian" tiles={CUISINE_TILES} labelFor={cuisineLabel}
       parse={readCuisines}
       initial={plan.cuisines ?? (base?.cuisines ?? []).filter((key): key is CuisineKey => (CUISINES as readonly string[]).includes(key))} max={CUISINES_MAX}
-      unreadNote="Sasha didn’t catch a cuisine there. Try Mexican, Italian or Thai, or pick from the list."
+      unreadNote={`${APP_NAME} didn’t catch a cuisine there. Try Mexican, Italian or Thai, or pick from the list.`}
       onDone={(ids) => answerPlan("cuisines", { cuisines: ids as CuisineKey[] })} />;
     if (beat === "foods") return slots.foodGame ?? foodsContent;
     return slots.plateReward ?? <RewardPlateCard targets={targets} lovedFoods={lovedFoods} meals={previewMeals}
