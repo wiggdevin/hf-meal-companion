@@ -318,6 +318,21 @@ describe("proposeDraft", () => {
     spy.mockRestore();
   });
 
+  // Weak-spot audit 2026-11-17 item 7: a photo label's cut word moves to notes before grounding.
+  it("searches a photo item by its food, with the cut word moved to notes", async () => {
+    const db = fakeDb();
+    const capture = vi.fn(async () => ({ items: [{ label: "pineapple chunks", grams: 120, qty: 6,
+      unit: "piece", confidence: 0.8 }], notes: [] }));
+    const search = vi.fn(async () => ({ hits: [HIT], queryClass: "generic", autoResolve: null,
+      catalogVersion: "v1" }));
+    const out = await proposeDraft(db.client, db.client, "u1",
+      { ...REQ, method: "photo", text: undefined, mediaPath: "media/u1/a.jpg" } as never,
+      { runCapture: capture as never, searchFoods: search as never,
+        fetchOwnedObject: (async () => ({ bytes: png(10, 10), mimeType: "image/png" })) as never });
+    expect((search.mock.calls[0] as unknown[])[1]).toMatchObject({ q: "pineapple" });
+    expect(out.notes).toContain("pineapple chunks: chunks");
+  });
+
   it("400s an unrecognised tz before any provider call", async () => {
     const db = fakeDb();
     await expect(proposeDraft(db.client, db.client, "u1", { ...REQ, tz: "Nope/Nope" },

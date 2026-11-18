@@ -21,6 +21,7 @@ import { captureOpenRouterPayload, openRouterCapturePurpose } from "@/lib/ai/ope
 import type { CaptureItem, CaptureItems, CapturePurpose, LabelNutrients } from "@/lib/ai/schemas";
 import { capState, hardCap, softCap, type CapState } from "@/lib/ai/spend";
 import { isMethodEnabled } from "@/lib/capture/flags";
+import { withoutCutWords } from "@/lib/capture/photo-names";
 import { pickCandidate, topAlternatives, type ScoredHit } from "@/lib/capture/grounding";
 import { allergenTagsFromIngredients, buildDraft, type GroundedItem } from "@/lib/capture/propose";
 import { gramsFor, matchPortion, parseAmount, type CapturePortion } from "@/lib/capture/quantity";
@@ -591,7 +592,9 @@ export async function proposeDraft(
   if (label?.labelReadable === false) {
     throw new HttpError(422, "schema_invalid", "The model returned a shape we do not accept.");
   }
-  const parsed = itemsFromOutput(label, output);
+  const read = itemsFromOutput(label, output);
+  // Weak-spot audit 2026-11-17 item 7: a photo name's cut word goes to notes before grounding.
+  const parsed = purpose === "photoToItems" ? withoutCutWords(read) : read;
 
   // T0 §4: every item is grounded at the same time, and `Promise.all` preserves the model's
   // order, so what the user reads on the confirm sheet is still the order the model said it in.
