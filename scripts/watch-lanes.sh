@@ -4,7 +4,7 @@
 # claude process alive, open PR + CI conclusions from the API (never the dashboard), merge state.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-REPO="wiggdevin/sasha-meal-companion"
+REPO="wiggdevin/hf-meal-companion"
 echo "== $(date '+%Y-%m-%d %H:%M') · origin/main $(git -C "$ROOT" fetch -q origin main 2>/dev/null; git -C "$ROOT" rev-parse --short origin/main) · battery: $(pmset -g batt | grep -oE '[0-9]+%;[^;]+' | head -1)"
 for s in "$@"; do
   W="$ROOT/../meal-companion-$s"

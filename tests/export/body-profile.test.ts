@@ -282,11 +282,11 @@ const DAY_ROWS: SampleRow[] = [
   sample("step_count", 1000, "count", "2026-09-15T17:00:00Z", "2026-09-15T18:00:00Z",
     "Apple Watch", "health_auto_export"),
   sample("step_count", 600, "count", "2026-09-15T17:30:00Z", "2026-09-15T18:30:00Z",
-    "Sasha's iPhone", "apple_health_shortcut"),
+    "My iPhone", "apple_health_shortcut"),
   sample("active_energy", 300, "kcal", "2026-09-15T17:00:00Z", "2026-09-15T18:00:00Z",
     "Apple Watch", "health_auto_export"),
   sample("active_energy", 120, "kcal", "2026-09-15T17:30:00Z", "2026-09-15T18:30:00Z",
-    "Sasha's iPhone", "apple_health_shortcut"),
+    "My iPhone", "apple_health_shortcut"),
   sample("sleep_asleep", 500, "min", "2026-09-15T04:00:00Z", "2026-09-15T12:20:00Z",
     "Apple Watch", "health_auto_export"),
   // Both start after 04:00Z, i.e. after local midnight in New York — a 03:00Z start would bucket

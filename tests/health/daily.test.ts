@@ -21,12 +21,12 @@ describe("rollUpDay", () => {
   it("prefers the Watch on an overlap and keeps the phone's uncovered span", () => {
     const day = rollUpDay([
       s({ type: "step_count", value: 1000, device_label: "Apple Watch" }),
-      s({ type: "step_count", value: 600, device_label: "Sasha's iPhone",
+      s({ type: "step_count", value: 600, device_label: "My iPhone",
         start_time: "2026-09-15T17:30:00Z", end_time: "2026-09-15T18:30:00Z" }),
     ], TZ);
     expect(day.local_date).toBe("2026-09-15");
     expect(day.steps).toBe(1300);
-    expect(day.sources).toEqual(["Apple Watch", "Sasha's iPhone"]);
+    expect(day.sources).toEqual(["Apple Watch", "My iPhone"]);
   });
 
   it("prefers Oura sleep over Apple and reports minutes", () => {
@@ -41,7 +41,7 @@ describe("rollUpDay", () => {
     const day = rollUpDay([
       s({ type: "step_count", value: 1000, device_label: "Old export",
         source_kind: "health_auto_export" }),
-      s({ type: "step_count", value: 600, device_label: "Sasha's iPhone",
+      s({ type: "step_count", value: 600, device_label: "My iPhone",
         source_kind: "apple_health_shortcut", start_time: "2026-09-15T17:10:00Z",
         end_time: "2026-09-15T17:50:00Z" }),
     ], TZ);
@@ -56,7 +56,7 @@ describe("rollUpDay", () => {
       s({ type: "sleep_asleep", value: 500, unit: "min", device_label: "Old export",
         source_kind: "health_auto_export", start_time: "2026-09-15T11:00:00Z",
         end_time: "2026-09-15T12:00:00Z" }),
-      s({ type: "sleep_asleep", value: 400, unit: "min", device_label: "Sasha's iPhone",
+      s({ type: "sleep_asleep", value: 400, unit: "min", device_label: "My iPhone",
         source_kind: "apple_health_shortcut", start_time: "2026-09-15T13:00:00Z",
         end_time: "2026-09-15T14:00:00Z" }),
     ], TZ);

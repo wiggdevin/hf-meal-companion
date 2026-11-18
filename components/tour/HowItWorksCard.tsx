@@ -9,7 +9,7 @@ import { CAPTION } from "@/components/settings/settings-styles";
 import TourLayer, { type TourOpening } from "@/components/tour/TourLayer";
 
 /** Settings › How the app works: the first-run overview, any time. Opening it here changes nothing stored. */
-export default function HowSashaWorksCard() {
+export default function HowItWorksCard() {
   const [opening, setOpening] = useState<TourOpening | null>(null);
   const button = useRef<HTMLButtonElement>(null);
   const seq = useRef(0);

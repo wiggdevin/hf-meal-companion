@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import SashaMark from "@/components/coach/SashaMark";
+import HfMark from "@/components/coach/HfMark";
 import { scopeLabel, type ChatScope } from "@/components/dock/chat-scope";
 import { ASSISTANT_NAME } from "@/lib/brand";
 import styles from "./CoachHeader.module.css";
@@ -25,7 +25,7 @@ export default function CoachHeader({ variant, scope, thinking, trailing }: {
   const label = scopeLabel(scope);
   const Title = page ? "h1" : "h2";
   return <div className={`${styles.head} ${page ? "" : styles.compact}`.trim()} data-coach-header={variant}>
-    <SashaMark thinking={thinking} size={page ? 32 : 28} />
+    <HfMark thinking={thinking} size={page ? 32 : 28} />
     <div className={styles.titles}>
       <Title className={`${styles.title} ${page ? "ground m-0 font-display text-heading-sm font-extrabold leading-none tracking-display-md"
         : "m-0 font-display text-title font-extrabold leading-none tracking-display-md"}`}>{ASSISTANT_NAME}</Title>

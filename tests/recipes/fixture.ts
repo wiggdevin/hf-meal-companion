@@ -28,7 +28,7 @@ export function recipe(partial: Partial<CatalogRecipe> = {}): CatalogRecipe {
     ingredients: [ingredient({ seq: 1, name: "beans" }), ingredient({ seq: 2, name: "salt" })],
     steps: [{ seq: 1, text: "Simmer the beans with salt." }],
     nutritionPerServing: { kcal: known(100, 1), protein: known(10, 1) },
-    source: { author: "Sasha", sourceUrl: null, rightsKind: "original",
+    source: { author: "HF kitchen", sourceUrl: null, rightsKind: "original",
       rightsRecord: "original-1", sourceRevision: "1", kitchenTested: false },
     ...partial,
   };

@@ -38,7 +38,7 @@ def credentials():
     parsed = urllib.parse.urlsplit(url)
     if not ((parsed.scheme == 'https' and parsed.hostname == f'{PRODUCTION_REF}.supabase.co') or
             (parsed.scheme == 'http' and parsed.hostname in {'127.0.0.1', 'localhost'} and parsed.port == 54331)):
-        raise ValueError('Storage source must be the configured Sasha project or isolated QA service')
+        raise ValueError('Storage source must be the configured app project or isolated QA service')
     if parsed.path or parsed.query or parsed.fragment or parsed.username:
         raise ValueError('Storage source must be a bare origin')
     key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY')

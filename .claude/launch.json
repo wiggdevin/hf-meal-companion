@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "sasha-dev",
+      "name": "hf-dev",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": [
         "dev",
@@ -12,7 +12,7 @@
       "port": 3521
     },
     {
-      "name": "sasha-prod",
+      "name": "hf-prod",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": [
         "exec",

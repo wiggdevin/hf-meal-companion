@@ -47,7 +47,7 @@ function recipe(name: string, kcal: number, over: Partial<RecipeCandidate> = {})
     ],
     steps: [{ seq: 2, text: "Layer and bake." }, { seq: 1, text: "Brown the beef." }],
     nutritionPerServing: { kcal: known(kcal), protein: known(38), carbs: known(40), fat: known(20) },
-    source: { author: "Sasha kitchen", sourceUrl: "https://example.org/r", rightsKind: "original", rightsRecord: "o",
+    source: { author: "HF kitchen", sourceUrl: "https://example.org/r", rightsKind: "original", rightsRecord: "o",
       sourceRevision: "1", kitchenTested: false },
     eligibility: { status: "eligible", reasons: [] }, ...over,
   };

@@ -50,7 +50,7 @@ describe("leaving an account keeps offline resources", () => {
 
   it("leaves the service worker's shell cache in place", async () => {
     const del = vi.fn(async () => true);
-    vi.stubGlobal("caches", { keys: async () => ["sasha-shell-v3"], delete: del });
+    vi.stubGlobal("caches", { keys: async () => ["hf-shell-v3"], delete: del });
     bindAccount(A);
     await leaveTo(B);
     expect(del).not.toHaveBeenCalled();

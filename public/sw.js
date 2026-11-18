@@ -22,7 +22,7 @@
 // v3 (Phase 9 slice 1): a verified offline shell; the worker waits for the old build's tabs to
 // close instead of taking them over (see the activate handler).
 const CACHE_VERSION = "v3";
-const CACHE_NAME = `sasha-shell-${CACHE_VERSION}`;
+const CACHE_NAME = `hf-shell-${CACHE_VERSION}`;
 
 const SHELL_URLS = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 

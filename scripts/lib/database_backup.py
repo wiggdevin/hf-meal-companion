@@ -196,7 +196,7 @@ def restore_identity(env):
         raise BackupError("Could not verify the restore target against Supabase branch metadata") from None
     if not isinstance(branches, list) or not any(isinstance(branch, dict) and branch.get("project_ref") == ref
             and branch.get("parent_project_ref") == PRODUCTION_REF and branch.get("is_default") is False for branch in branches):
-        raise BackupError("Restore target is not a non-default branch of Sasha's production project")
+        raise BackupError("Restore target is not a non-default branch of the app's production project")
     return ref
 
 

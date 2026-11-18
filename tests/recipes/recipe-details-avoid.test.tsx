@@ -26,7 +26,7 @@ const recipe = {
     nutrition: { kcal: known(1000), protein: known(100), carbs: known(0), fat: known(60) }, allergenEvidence: {} }],
   steps: [{ seq: 1, text: "Bake." }],
   nutritionPerServing: { kcal: known(520), protein: known(38), carbs: known(40), fat: known(20) },
-  source: { author: "Sasha kitchen", sourceUrl: "https://example.org/r", rightsKind: "original", rightsRecord: "o",
+  source: { author: "HF kitchen", sourceUrl: "https://example.org/r", rightsKind: "original", rightsRecord: "o",
     sourceRevision: "1", kitchenTested: false },
   eligibility: { status: "eligible", reasons: [] },
 } as unknown as RecipeCandidate;

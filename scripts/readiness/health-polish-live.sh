@@ -12,7 +12,7 @@ set -u
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 PROJECT_ID="prj_qOr6rQOZ5yfCd5VxB227apmg6pvF"
 TEAM_ID="team_ZovXSbiQdKR8CvRpDYfAzbAr"
-PROD_URL="https://sasha-meal-companion.vercel.app"
+PROD_URL="https://hf-meal-companion.vercel.app"
 SUPABASE_REF="fivatgdpuenszxxnijpc"
 fail=0
 ok()   { printf 'PASS  %s\n' "$1"; }
@@ -88,10 +88,10 @@ fi
 # --- 3: production home page 200 with the app's <title> (follows the sign-in redirect) -----
 home_body=$(mktemp)
 home_code=$(curl -sS -L -o "$home_body" -w '%{http_code}' "$PROD_URL/")
-if [ "$home_code" = "200" ] && grep -q '<title>Sasha</title>' "$home_body"; then
-  ok "3 GET $PROD_URL/ -> 200 with <title>Sasha</title>"
+if [ "$home_code" = "200" ] && grep -q '<title>High Frequency</title>' "$home_body"; then
+  ok "3 GET $PROD_URL/ -> 200 with <title>High Frequency</title>"
 else
-  bad "3 GET $PROD_URL/ -> $home_code (want 200 with <title>Sasha</title>)"
+  bad "3 GET $PROD_URL/ -> $home_code (want 200 with <title>High Frequency</title>)"
 fi
 rm -f "$home_body"
 

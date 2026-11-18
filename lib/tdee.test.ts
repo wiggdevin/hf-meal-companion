@@ -109,7 +109,7 @@ describe("the active-energy window", () => {
     const days = ["2026-09-10", "2026-09-11", "2026-09-12"].map((date) => day(date, {
       active_kcal: 400, body_mass_kg: 70,
       // The day also carries Oura sleep, so `sources` names Oura as well.
-      sources: ["Oura", "Sasha's iPhone"],
+      sources: ["Oura", "My iPhone"],
       provenance: { active_energy: { kind: "health_auto_export", end: `${date}T18:00:00Z` },
         sleep_asleep: { kind: "oura", end: `${date}T07:00:00Z` } },
     }));

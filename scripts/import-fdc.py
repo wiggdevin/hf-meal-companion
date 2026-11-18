@@ -29,7 +29,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 DOWNLOAD_ROOT = Path(os.path.expanduser("~/Backups/usda/fdc"))
-USER_AGENT = "sasha-meal-companion/1.0 (catalog import)"
+USER_AGENT = "hf-meal-companion/1.0 (catalog import)"
 
 
 @dataclass(frozen=True)

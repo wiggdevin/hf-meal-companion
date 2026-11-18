@@ -33,25 +33,25 @@ type Impact = { instances: Instance[]; count: number; complete: boolean;
 type Badge = { count: number; complete: boolean };
 
 /** The most affected meals one request to the assistant may name — the shortcut's existing bound. */
-export const ASK_SASHA_MAX_MEALS = 12;
+export const ASK_COACH_MAX_MEALS = 12;
 /** The longest free-text question sent, well inside the coach turn's 2 000-character limit. */
-export const ASK_SASHA_MAX_QUESTION = 500;
+export const ASK_COACH_MAX_QUESTION = 500;
 
 /** `coachTurnRequestSchema` accepts at most this many characters of text; never widen it here. */
-export const ASK_SASHA_MAX_TEXT = 2000;
+export const ASK_COACH_MAX_TEXT = 2000;
 
-export type AskSashaPayload = { question: string; affectedIds: string[] };
+export type AskCoachPayload = { question: string; affectedIds: string[] };
 
-type AskSashaMeal = { date: string; slot: string; title: string };
-type AskSashaOptions = { date: string; slot: string; names: string[] };
+type AskCoachMeal = { date: string; slot: string; title: string };
+type AskCoachOptions = { date: string; slot: string; names: string[] };
 
 /**
  * The coach text for one assistant request, inside the transport limit. The user's question and the
  * meal ids lead and are never cut. Verified options are dropped from the end first; only when they
  * are all gone do the meal titles shorten.
  */
-export function askSashaText(input: { question?: string; items: AskSashaMeal[];
-  options: AskSashaOptions[]; kind: "ingredient" | "cuisine"; excluded: string }): string {
+export function askCoachText(input: { question?: string; items: AskCoachMeal[];
+  options: AskCoachOptions[]; kind: "ingredient" | "cuisine"; excluded: string }): string {
   const ids = input.items.map((item) => `${item.date}:${item.slot}`).join(", ");
   const head = input.question
     ? `${input.question}\n\nThis is about these exact future plan instances (${ids}): `
@@ -70,14 +70,14 @@ export function askSashaText(input: { question?: string; items: AskSashaMeal[];
   };
   for (let rows = input.options.length; rows >= 0; rows -= 1) {
     const text = build(80, rows);
-    if (text.length <= ASK_SASHA_MAX_TEXT) return text;
+    if (text.length <= ASK_COACH_MAX_TEXT) return text;
   }
   for (const titleMax of [40, 20, 0]) {
     const text = build(titleMax, 0);
-    if (text.length <= ASK_SASHA_MAX_TEXT) return text;
+    if (text.length <= ASK_COACH_MAX_TEXT) return text;
   }
   // Unreachable with the UI's bounds (500-character question, 12 meals); the head still survives.
-  return build(0, 0).slice(0, ASK_SASHA_MAX_TEXT);
+  return build(0, 0).slice(0, ASK_COACH_MAX_TEXT);
 }
 
 /** What the affected-meals chip says. A complete count is exact; an incomplete one is a lower bound
@@ -88,21 +88,21 @@ export function affectedLabel(badge: { count: number; complete: boolean }, scope
 }
 
 /** The user's own wording and the affected-meal ids it is about; blank wording sends nothing. */
-export function askSashaPayload(question: string, affectedIds: readonly string[]): AskSashaPayload | null {
+export function askCoachPayload(question: string, affectedIds: readonly string[]): AskCoachPayload | null {
   const text = question.trim();
   if (!text) return null;
-  return { question: text.slice(0, ASK_SASHA_MAX_QUESTION),
-    affectedIds: [...new Set(affectedIds)].slice(0, ASK_SASHA_MAX_MEALS) };
+  return { question: text.slice(0, ASK_COACH_MAX_QUESTION),
+    affectedIds: [...new Set(affectedIds)].slice(0, ASK_COACH_MAX_MEALS) };
 }
 
 /** Said when "Send" would cover only the first meals: the checked meals, or every affected one when
  *  none is checked, exceed what one request carries. */
 export function askCapNotice(affected: number, checked: number): string | null {
   const total = checked > 0 ? checked : affected;
-  if (total <= ASK_SASHA_MAX_MEALS) return null;
+  if (total <= ASK_COACH_MAX_MEALS) return null;
   return checked > 0
-    ? `Asking about the first ${ASK_SASHA_MAX_MEALS} of ${total} selected meals; select fewer to choose which`
-    : `Asking about the first ${ASK_SASHA_MAX_MEALS} of ${total} affected meals; select specific meals to choose which`;
+    ? `Asking about the first ${ASK_COACH_MAX_MEALS} of ${total} selected meals; select fewer to choose which`
+    : `Asking about the first ${ASK_COACH_MAX_MEALS} of ${total} affected meals; select specific meals to choose which`;
 }
 
 /** "Sun, Oct 19 · Meal 3": a readable date and the slot's name, never the ISO date or slot id. */
@@ -321,10 +321,10 @@ export default function AvoidImpact() {
    * the server and send only verified, exclusion-filtered options; `question` adds the user's own
    * wording and the exact affected ids ahead of that context. Nothing here changes the plan.
    */
-  async function askSasha(items: Instance[], question?: string): Promise<boolean> {
+  async function askCoach(items: Instance[], question?: string): Promise<boolean> {
     if (!items.length) return false;
-    if (items.length > ASK_SASHA_MAX_MEALS) {
-      setError(`Select up to ${ASK_SASHA_MAX_MEALS} future meals to ask ${ASSISTANT_NAME} about at once.`);
+    if (items.length > ASK_COACH_MAX_MEALS) {
+      setError(`Select up to ${ASK_COACH_MAX_MEALS} future meals to ask ${ASSISTANT_NAME} about at once.`);
       return false;
     }
     const impact = result;
@@ -342,7 +342,7 @@ export default function AvoidImpact() {
       assertCurrent(h);
       setVerifiedOptions(options);
       const response = await postTurn({ threadId: null, messageId: crypto.randomUUID(),
-        text: askSashaText({ question, items, kind: impact.kind, excluded: impact.q,
+        text: askCoachText({ question, items, kind: impact.kind, excluded: impact.q,
           options: options.map(({ instance, recipes }) => ({ date: instance.date,
             slot: instance.slot, names: recipes.map((recipe) => recipe.name) })) }) },
         { account: h });
@@ -363,12 +363,12 @@ export default function AvoidImpact() {
   }
   async function askInOwnWords(impact: Impact) {
     // The checked meals, or every listed one when none is checked, bounded to the request limit.
-    const payload = askSashaPayload(askText, selectedKeys.length
+    const payload = askCoachPayload(askText, selectedKeys.length
       ? selectedKeys : impact.instances.map(keyOf));
     if (!payload) return;
     const items = payload.affectedIds.flatMap((id) =>
       impact.instances.filter((item) => keyOf(item) === id));
-    if (await askSasha(items, payload.question)) setAskText("");
+    if (await askCoach(items, payload.question)) setAskText("");
   }
   async function remove(item: Instance) {
     const impact = result;
@@ -528,13 +528,13 @@ export default function AvoidImpact() {
       </div>)}
       <Button variant="secondary" disabled={selectedKeys.length === 0} status={busy ? "pending" : undefined}
         className={WRAP_BUTTON}
-        onClick={() => void askSasha(result.instances.filter((item) => selectedKeys.includes(keyOf(item))))}>
+        onClick={() => void askCoach(result.instances.filter((item) => selectedKeys.includes(keyOf(item))))}>
         {`Ask ${ASSISTANT_NAME} about selected`}
       </Button>
       <div className="my-3 flex flex-col gap-2">
         <label className="flex flex-col gap-1.5 text-caption">
           <span>Ask {ASSISTANT_NAME} about these meals</span>
-          <textarea value={askText} rows={3} maxLength={ASK_SASHA_MAX_QUESTION} disabled={busy}
+          <textarea value={askText} rows={3} maxLength={ASK_COACH_MAX_QUESTION} disabled={busy}
             placeholder="In your own words"
             className="well min-h-11 px-3 py-2 text-caption outline-none disabled:opacity-40"
             onChange={(event) => setAskText(event.target.value)} />
