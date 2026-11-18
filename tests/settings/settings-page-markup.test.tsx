@@ -26,7 +26,7 @@
  * meal-times card, and Data & account as one card. On 2026-10-05 (owner notes): "Body profile & units"
  * left for the profile card's details, Goals & targets became one card, and the daily targets show
  * each macro's amount and short name once. On 2026-10-07 (owner: "Choose a mascot"): one insertion,
- * the Your companion section after Cuisines; next/image is pinned to a plain img (its module reads
+ * the Your companion section (off the UI since 2026-11-17, lib/today/companion-ui.ts); next/image is pinned to a plain img (its module reads
  * `document` when it loads, which this server render has not got).
  */
 import { readFileSync } from "node:fs";
@@ -224,7 +224,6 @@ const SECTION_ORDER = [
   "Goals &amp; targets",
   "Water",
   "Cuisines and country",
-  "Your companion",
   "Background",
   "How Sasha works",
   "Schedule &amp; reminders",
@@ -244,7 +243,6 @@ const GROUP_HEADINGS = [
   "Goals &amp; targets",
   "Water",
   "Cuisines and country",
-  "Your companion",
   "Background",
   "How Sasha works",
   "Schedule &amp; reminders",
