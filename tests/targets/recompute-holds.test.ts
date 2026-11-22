@@ -112,7 +112,6 @@ describe("recomputeDerivedTarget with kidney disease on a 0-pace adaptive revisi
     for (const write of writes) {
       expect(write.training_macros.protein).toBe(58);
       expect(write.rest_macros.protein).toBe(58);
-      expect(write.protein_g_min).toBe(58);
     }
     // Settled: a second run finds nothing above standard protein.
     const count = fake.writes.length;
@@ -139,7 +138,6 @@ describe("recomputeDerivedTarget with kidney disease and a protein pin", () => {
       const write = fake.writes.at(-1) as Row & { training_macros: Row; rest_macros: Row };
       expect(write.training_macros.protein).toBe(58);
       expect(write.rest_macros.protein).toBe(58);
-      expect(write.protein_g_min).toBe(58);
       // The pin is the user's own and comes back when the hold is removed.
       expect(write.pin_protein_g).toBe(145);
       const count = fake.writes.length;

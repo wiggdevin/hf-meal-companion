@@ -37,7 +37,7 @@ run("frozen target seed on a real database (step E1)", () => {
     // The live profile row says something else; the frozen seed wins.
     const live = await users.admin.from("user_settings").upsert({ user_id: users.a.userId,
       first_opened_at: "2026-09-01T00:00:00Z", sex: "female", birth_year: 1968, height_cm: 170,
-      weight_kg: 90, activity_level: "very_active" });
+      weight_kg: 70, activity_level: "very_active", goal: "recomp" });
     expect(live.error).toBeNull();
     expect(await seedFor(users.admin, users.a.userId, "2026-09-02"))
       .toEqual({ tdeeKcal: 1873, bmrKcal: 1338, source: "revision" });

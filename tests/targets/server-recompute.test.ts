@@ -22,11 +22,12 @@ describe("recomputeDerivedTarget", () => {
     expect(write.effective_from).toBe(TODAY);
     expect(write.training_macros).toMatchObject({ kcal: 1960, protein: 145 });
     expect(write.rest_macros).toMatchObject({ kcal: 1764 });
-    expect(write.kcal_min).toBe(1430);
+    // The minima are the checked writer's: the row carries none (tests/targets/checked-writer-db.test.ts).
+    expect(write).not.toHaveProperty("kcal_min");
     expect(write).toMatchObject({ formula_name: "profile-energy-v1", target_source: "derived",
       input_goal: "recomp", input_activity_level: "moderate", input_weight_kg: 72.575,
       input_weight_source: "onboarding", input_training_weekdays: [1, 3, 4, 5], goal_rate_bp_week: 0,
-      kcal_min_source: "macro_minimum", pin_training_kcal: null, pin_rest_kcal: null, pin_protein_g: null });
+      pin_training_kcal: null, pin_rest_kcal: null, pin_protein_g: null });
     // A second run is a no-op: nothing to write once the revision matches.
     const again = await recomputeDerivedTarget(fake.client, USER, { today: TODAY });
     expect(again.status).toBe("unchanged");

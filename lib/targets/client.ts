@@ -319,7 +319,7 @@ function persistTargetRevision(
 /**
  * `requestId`: a caller that may send the SAME revision again after a lost answer (onboarding's
  * "Use this plan" retry) mints it once and passes it on every attempt. The server writes at most
- * one revision per request id (`write_target_revision` answers the stored row for a repeated
+ * one revision per request id (`write_target_revision_checked` answers the stored row for a repeated
  * `request_id`, migration 20261023091000), so the retry cannot create a second revision. Omitted,
  * each call mints its own.
  */

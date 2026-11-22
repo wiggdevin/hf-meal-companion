@@ -14,7 +14,7 @@
  * - Nothing is written when the active revision already matches, so a retry is a no-op.
  * - Adaptive and proposal revisions (another `formula_name`) are authoritative and left alone, and
  *   an account that has not finished onboarding is skipped: onboarding writes its own revision.
- * - The write is conditional (`write_target_revision_if_active`): it lands only while the
+ * - The write is conditional (`write_target_revision_if_active_checked`): it lands only while the
  *   revision this run planned from is still active, so a weigh-in, pin, proposal or another
  *   recompute that committed meanwhile is never buried; on conflict the run re-plans.
  * - It re-derives from profile fields only. Weight and pins stay what the active revision says:
@@ -221,11 +221,11 @@ export function revisionMatches(active: TargetProfile, expected: Derived): boole
     && (active.input_activity_level ?? null) === expected.inputs.activity
     && (active.input_goal ?? null) === expected.inputs.goal
     && Number(active.goal_rate_bp_week ?? 0) === Number(expected.inputs.goalRateBpWeek ?? 0)
-    && Number(active.kcal_min) === Number(expected.floors.kcalMin)
+    // The minima are the checked writer's (migration 20270109100000): it computes them from the
+    // account's own weight, height and goal, which can differ from the weight this plan derives
+    // at, so their numbers are not compared (they would never settle). A row that did not come
+    // from that writer says so in its source and is rewritten once.
     && (active.kcal_min_source ?? null) === expected.floors.kcalMinSource
-    && Number(active.protein_g_min) === Number(expected.floors.proteinGMin)
-    && Number(active.fat_g_min) === Number(expected.floors.fatGMin)
-    && Number(active.carb_g_min) === Number(expected.floors.carbGMin)
     // A revision without the frozen seed, or one frozen by older rules, is rewritten once so
     // the expenditure engine has the start this derivation would give it (step E1).
     && num(active.initial_tdee_kcal) === expected.seed.initialTdeeKcal
@@ -370,7 +370,7 @@ async function plan(
 
 /**
  * Bring the account's active derived revision in line with its current `user_settings` row.
- * Writes through `writeDerivedTargets` (the `write_target_revision` RPC), never raw SQL.
+ * Writes through `writeDerivedTargets` (the `write_target_revision_checked` RPC), never raw SQL.
  */
 export async function recomputeDerivedTarget(
   client: SupabaseClient, userId: string, options: RecomputeOptions = {},
@@ -412,7 +412,7 @@ export async function recomputeDerivedTarget(
         return { status: "would_write", active: next.active,
           expected: "copy" in first ? first.copy : first.expected };
       }
-      // Unconditional writes (`write_target_revision`): the conditional RPC refuses any date with
+      // Unconditional writes (`write_target_revision_checked`): the conditional RPC refuses any date with
       // a later revision, and a 0 pace is the safe side of any race. The next round verifies.
       let last: TargetRevision | null = null;
       for (const write of next.writes) {

@@ -101,7 +101,7 @@ export function fakeClient(row: Row | null, targets: TargetProfile[], weighIns: 
   };
   const rpc = async (name: string, args: { p_user_id: string; p_row: Row; p_expected_id: string | null;
     p_expected_settings_rev: number | null }) => {
-    if (name !== "write_target_revision_if_active" && name !== "write_target_revision") {
+    if (name !== "write_target_revision_if_active_checked" && name !== "write_target_revision_checked") {
       throw new Error(`unexpected rpc ${name}`);
     }
     attempts += 1;
@@ -111,7 +111,7 @@ export function fakeClient(row: Row | null, targets: TargetProfile[], weighIns: 
     const settingsRev = fake.settings.row ? Number(fake.settings.row.rev) : null;
     // The conditional RPC also refuses a row with a later revision after it (the SQL's own rule);
     // `write_target_revision` writes unconditionally.
-    if (name === "write_target_revision_if_active" && ((active?.id ?? null) !== args.p_expected_id
+    if (name === "write_target_revision_if_active_checked" && ((active?.id ?? null) !== args.p_expected_id
       || (args.p_expected_settings_rev != null && settingsRev !== args.p_expected_settings_rev)
       || fake.targets.some((t) => t.effective_from > String(p.effective_from)))) {
       fake.conflicts += 1;
@@ -123,8 +123,10 @@ export function fakeClient(row: Row | null, targets: TargetProfile[], weighIns: 
     const written = {
       ...p, id: `t${rev}`, user_id: USER, rev, authored_by: "user", mode: "grams",
       kcal_train: Number(p.training_macros.kcal), kcal_rest: Number(p.rest_macros.kcal),
+      // The checked writer computes the minima and stamps their source (migration 20270109100000).
       kcal_min: p.kcal_min ?? 1650, protein_g_min: p.protein_g_min ?? p.training_macros.protein,
       fat_g_min: p.fat_g_min ?? 50, carb_g_min: p.carb_g_min ?? 100,
+      kcal_min_source: "macro_minimum",
       goal_rate_bp_week: p.goal_rate_bp_week ?? 0,
     } as unknown as TargetProfile;
     fake.targets.push(written);

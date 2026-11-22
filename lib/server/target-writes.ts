@@ -2,8 +2,8 @@ import "server-only";
 /**
  * The target authority's write RPCs, on the service-role client, always for a user id the caller
  * already verified (the session user, or a job's or script's own listed account), never a value
- * from a request body. Migration 20261228090000 revokes EXECUTE on these four functions from
- * `authenticated`: a signed-in phone that called them over PostgREST skipped every server-side
+ * from a request body. Migrations 20261228090000 and 20270109100000 revoke EXECUTE on these
+ * functions from `authenticated`: a signed-in phone that called them over PostgREST skipped every server-side
  * check in lib/server/targets.ts and lib/server/proposals.ts (the adult floor, the pace holds,
  * the pace caps, the floors). The functions keep their own `_sync_assert_caller` guard; the
  * service role carries no auth.uid() and passes it.
@@ -18,30 +18,31 @@ async function call(fn: string, args: Record<string, unknown>): Promise<RpcResul
   return { data, error };
 }
 
-/** `write_target_revision(p_user_id, p_row)`. */
-export function rpcWriteTargetRevision(
-  userId: string, row: Record<string, unknown>,
+/**
+ * `write_target_revision_checked(p_user_id, p_row, p_predecessor)` (migration 20270109100000).
+ * The only way app code writes a revision: it takes the minima from the account's own weight,
+ * height and goal and refuses a row below them (SF001), a missing profile (SF002) and macros that
+ * do not add up (SF004); errors go through `mapTargetWriteError`. With `predecessor` it writes
+ * both rows in one transaction (the Undo pair): only `row` is checked, the predecessor is the row
+ * an Undo restores later and is checked when it is restored.
+ */
+export function rpcWriteTargetRevisionChecked(
+  userId: string, row: Record<string, unknown>, predecessor?: Record<string, unknown>,
 ): Promise<RpcResult> {
-  return call("write_target_revision", { p_user_id: userId, p_row: row });
-}
-
-/** `write_target_revision_if_active(p_user_id, p_row, p_expected_id, p_expected_settings_rev)`. */
-export function rpcWriteTargetRevisionIfActive(
-  userId: string, row: Record<string, unknown>,
-  expectedActiveId: string | null, expectedSettingsRev: number | null,
-): Promise<RpcResult> {
-  return call("write_target_revision_if_active", {
-    p_user_id: userId, p_row: row, p_expected_id: expectedActiveId,
-    p_expected_settings_rev: expectedSettingsRev,
+  return call("write_target_revision_checked", {
+    p_user_id: userId, p_row: row, ...(predecessor ? { p_predecessor: predecessor } : {}),
   });
 }
 
-/** `write_target_revision_pair(p_user_id, p_predecessor, p_row)`: one transaction. */
-export function rpcWriteTargetRevisionPair(
-  userId: string, predecessor: Record<string, unknown>, row: Record<string, unknown>,
+/** `write_target_revision_if_active_checked(p_user_id, p_row, p_expected_id, p_expected_settings_rev)`. */
+export function rpcWriteTargetRevisionIfActiveChecked(
+  userId: string, row: Record<string, unknown>,
+  expectedActiveId: string | null, expectedSettingsRev: number | null,
 ): Promise<RpcResult> {
-  return call("write_target_revision_pair",
-    { p_user_id: userId, p_predecessor: predecessor, p_row: row });
+  return call("write_target_revision_if_active_checked", {
+    p_user_id: userId, p_row: row, p_expected_id: expectedActiveId,
+    p_expected_settings_rev: expectedSettingsRev,
+  });
 }
 
 /** `approve_target_proposal(p_user_id, p_proposal_id)`. */

@@ -7,6 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createTestUsers, HAS_BRANCH, HAS_DB, resetUser, runSql } from "../helpers/supabase";
 import { deriveTargetRevision } from "@/lib/profile/derive";
 import { macroMinimumKcal, proteinBasisKg } from "@/lib/profile/rate-goal";
+import { TargetBelowFloorError } from "@/lib/server/target-write-errors";
 import type { Settings } from "@/lib/types";
 
 const run = HAS_BRANCH ? describe : describe.skip;
@@ -352,6 +353,56 @@ run("write_target_revision_checked (database)", () => {
           expect(ts.kcalMin).toBe(macroMinimumKcal({ proteinGMin: ts.proteinGMin, fatGMin: 50, carbGMin: 100 }));
           if (!kidney && p.goal !== "lose_fat" && p.goal !== "recomp") {
             expect(ts.proteinGMin).toBe(Math.round(proteinBasisKg(p.weight, p.height) * 1.8));
+          }
+        }
+      });
+    }
+  });
+
+  describe("revisions the TypeScript engine derives pass the real writer", () => {
+    // The engine does not raise a pin to the floors (it never did for protein or calories): the
+    // writer refuses a pin under them, with the minimum, and stores nothing.
+    const pinSets: { name: string; pins: Partial<Settings>; refused?: true }[] = [
+      { name: "no pins", pins: {} },
+      { name: "high pins", pins: { trainingKcal: 2900, restKcal: 2300, proteinG: 170 } },
+      { name: "pins under the floors", pins: { trainingKcal: 1200, restKcal: 1100, proteinG: 60 },
+        refused: true },
+    ];
+    // A kidney hold lowers the protein basis to 0.8 g/kg, so 60 g and 1,200 kcal can be legal.
+    const KIDNEY_LOW = { trainingKcal: 800, restKcal: 800, proteinG: 30 };
+    const personas: { goal: Settings["goal"]; height: number; weight: number }[] = [
+      { goal: "recomp", height: 170.2, weight: 72.575 }, { goal: "lose_fat", height: 160, weight: 95 },
+      { goal: "gain_muscle", height: 175, weight: 68.25 }, { goal: "maintain", height: 152.4, weight: 49.9 },
+    ];
+    for (const kidney of [false, true]) {
+      it.skipIf(!HAS_DB)(`writes each derived set (${kidney ? "kidney hold" : "no hold"})`, async () => {
+        await admin.from("constraint_profiles").delete().eq("user_id", userId);
+        if (kidney) {
+          await admin.from("constraint_profiles").upsert({ user_id: userId, conditions: ["kidney"] });
+        }
+        const { writeDerivedTargets } = await import("@/lib/server/targets");
+        const { defaultSettings } = await import("@/lib/store");
+        for (const p of personas) {
+          await seedProfile({ height_cm: p.height, goal: p.goal, weight_kg: p.weight });
+          for (const { name, pins, refused } of pinSets) {
+            await admin.from("target_profiles").delete().eq("user_id", userId);
+            const settings = { ...defaultSettings(), sex: "female", birthYear: 1968,
+              heightCm: p.height, weightKg: p.weight, activityLevel: "moderate", goal: p.goal,
+              goalRateBpWeek: 0, ...(refused && kidney ? KIDNEY_LOW : pins) } as Settings;
+            const written = await writeDerivedTargets(client, userId, { settings,
+              latestWeighInKg: null, today: "2026-10-03", trainingWeekdays: [1, 3, 4, 5] })
+              .catch((e: unknown) => e);
+            if (refused) {
+              expect(written, `${name} ${JSON.stringify(p)}`).toBeInstanceOf(TargetBelowFloorError);
+              expect(await rows()).toHaveLength(0);
+              continue;
+            }
+            expect(written, `${name} ${JSON.stringify(p)}`).not.toBeInstanceOf(Error);
+            const stored = (await rows()).at(-1) as Record<string, number>;
+            const floor = runSql(`select protein_g_min, fat_g_min, kcal_min from account_floor('${userId}', ${p.weight})`)
+              .split("|").map(Number);
+            expect([stored.protein_g_min, stored.fat_g_min, stored.kcal_min].map(Number))
+              .toEqual(floor);
           }
         }
       });
