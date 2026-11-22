@@ -115,11 +115,17 @@ export default function SafetyRound({ initial, note, onDone, busy = false }: {
     <BeatQuestion>Before we pick foods: does anything here apply to you?</BeatQuestion>
     {/* One primary at a time: once a chip is picked, Continue is the primary and this steps back. */}
     <Button size="lg" block variant={picks.length > 0 ? "secondary" : "primary"} disabled={busy || writing}
-      onClick={() => onDone({ picks: [], pregnancy: null, medicines: [], conditionText: "", rulesEdited: false })}>
+      onClick={() => {
+        // Rules added in the editor before the person changed their mind still count: the shell
+        // reads the account's rules again whenever the editor was used (W062 verify round).
+        if (writing) return;
+        onDone({ picks: [], pregnancy: null, medicines: [], conditionText: "", rulesEdited: edited });
+      }}>
       No, none of these
     </Button>
     <p className="m-0 pt-2 text-caption text-graphite">Or tap any that apply</p>
-    <ChoiceChips label="Applies to me" multiple block options={PICKS} value={picks} onChange={togglePick} />
+    <ChoiceChips label="Applies to me" multiple block options={PICKS} value={picks} onChange={togglePick}
+      disabled={writing} />
 
     <Reveal id="safety-allergy" open={has("allergy")}>
       <div className="-mx-1 flex flex-col gap-2 px-1 py-1">

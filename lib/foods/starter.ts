@@ -8,7 +8,7 @@ import { activeHardRulesFor } from "@/lib/policy/profiles/account-rules";
 import type { ConstraintProfile } from "@/lib/policy/constraints";
 import { suggestionFoodIdentity, suggestionItemsVerdict } from "@/lib/coach/suggest-verdict";
 import {
-  LEGACY_PREFERENCE_FLAGS, legacyProfileIdsFor, type LegacyPreferenceFlag,
+  LEGACY_PREFERENCE_FLAGS, type LegacyPreferenceFlag,
 } from "@/lib/policy/profiles/legacy-flags";
 
 export type DietStyle = "omnivore" | "pescatarian" | "vegetarian" | "vegan";
@@ -97,10 +97,10 @@ function preferenceFlagsFor(flags: readonly string[]): LegacyPreferenceFlag[] {
 
 /**
  * The inputs `evaluatePolicy` reads for an account, built the way lib/server/policy-profile.ts
- * builds them: the legacy flags are preference flags, and the instances are the profile's hard
- * rules. A flag's own synthesized instance (and the stored row a flag already covers) is never
- * added a second time as a profile rule, exactly as the server never adds one: the flag is the
- * person's current choice and reaches the evaluator as a preference flag. `legacy_no_pork` and
+ * builds them: the legacy flags are preference flags, and the stored instances are the profile's
+ * hard rules. A flag's own synthesized instance is never added a second time as a profile rule,
+ * exactly as the server never adds one; a STORED row is always kept, even when a flag maps to
+ * the same profile id. `legacy_no_pork` and
  * `legacy_no_beef` exist only as a synthesis of those flags, so they fold back into the flags.
  */
 export function starterPolicyInputs(
@@ -111,8 +111,12 @@ export function starterPolicyInputs(
     if (instance.profileId === "legacy_no_pork") preferenceFlags.add("no_pork");
     else if (instance.profileId === "legacy_no_beef") preferenceFlags.add("no_beef");
   }
-  const flagBacked = legacyProfileIdsFor(LEGACY_PREFERENCE_FLAGS.filter((flag) => preferenceFlags.has(flag)));
-  const rules = instances.filter((instance) => !flagBacked.has(instance.profileId)
+  // Every stored row is a profile rule, whether or not a legacy flag maps to the same profile id
+  // (`no_shellfish` plus a stored crustacean row keeps the stored row), exactly as the server's
+  // `readPolicyProfile` does. Only an instance synthesized from a flag is skipped: the flag
+  // already reaches the evaluator as a preference flag. An instance with no marker (an older
+  // server) is treated as stored, which can only withhold more.
+  const rules = instances.filter((instance) => instance.derivedFromFlag !== true
     && instance.profileId !== "legacy_no_pork" && instance.profileId !== "legacy_no_beef");
   return {
     preferenceFlags: LEGACY_PREFERENCE_FLAGS.filter((flag) => preferenceFlags.has(flag)),
@@ -148,7 +152,7 @@ function starterRuleHit(
     ingredientsTextIsLabel: false, foodName: food.name, foodBrand: null, packaged: false,
     policyCategories: null, facets: {}, noCook: null, onEatsList: false, onAvoidList: false,
     role: item.role,
-  });
+  }, { denyOnly: true });
   const verdict = suggestionItemsVerdict(
     [{ foodRefId: refId, catalogFoodRevisionId: null, verdict: "allowed" }],
     { status: "ready", preferenceFlags, byIdentity: { [suggestionFoodIdentity({ foodRefId: refId, catalogFoodRevisionId: null })]: facts } },

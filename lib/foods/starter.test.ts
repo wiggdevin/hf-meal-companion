@@ -53,8 +53,13 @@ describe("account-safe starter foods", () => {
         profileInstancesForLegacyFlags([flag], "2026-09-01")).map((item) => item.id);
       expect(ids.length).toBeGreaterThan(0);
       for (const out of carriers[flag]) expect(ids).not.toContain(out);
-      // Only the carriers go (a few more for soy and eggs: edamame, whey, bread); the rest stay.
-      expect(ids.length).toBeGreaterThanOrEqual(all.length - 8);
+      // The carriers go, and so does every formulated starter the shared evaluator cannot prove
+      // free of the allergen from an unlabeled row (bread, whey, yogurt, tempeh, tortilla,
+      // peanut butter, canned tuna: at most 8); every plain whole food stays.
+      expect(ids.length).toBeGreaterThanOrEqual(all.length - 10);
+      for (const plain of ["white-rice-cooked", "banana", "olive-oil", "lentils-cooked"]) {
+        if (!carriers[flag].includes(plain)) expect(ids).toContain(plain);
+      }
     }
   });
 
@@ -99,7 +104,12 @@ describe("account-safe starter foods", () => {
       profileId: "legacy_no_beef", facet: "contains_ingredient:beef" }] };
     const ids = starterChoices([], emptyRules, [beef]).map((item) => item.id);
     expect(ids).not.toContain("ground-beef-90-10-cooked");
-    expect(ids.length).toBe(STARTERS.length - 1);
+    // A formulated starter has no label here, so a named-ingredient rule withholds it too; every
+    // plain whole food but the beef stays.
+    const formulated = ["tuna-canned-in-water-light", "whey-protein-powder", "greek-yogurt-plain-nonfat",
+      "tempeh", "white-bread", "corn-tortilla", "whole-wheat-bread", "peanut-butter"];
+    expect(ids.length).toBe(STARTERS.length - 1 - formulated.length);
+    for (const id of formulated) expect(ids).not.toContain(id);
   });
 
   it("lowers the floor to what a role has, and names the problem when a pick breaks a rule", () => {
@@ -151,7 +161,7 @@ describe("account-safe starter foods", () => {
   it("requires two selected foods per role and converts to household portions", () => {
     const choices = starterChoices(["vegan"], emptyRules);
     expect(starterSelectionValid(choices.slice(0, 2).map((item) => item.id), choices)).toBe(false);
-    const selected = ["tofu-firm", "tempeh", "white-rice-cooked", "quinoa-cooked", "olive-oil", "avocado"];
+    const selected = ["tofu-firm", "edamame-cooked", "white-rice-cooked", "quinoa-cooked", "olive-oil", "avocado"];
     expect(starterSelectionValid(selected, choices)).toBe(true);
     const tofu = starterFood("tofu-firm", "eats");
     expect(tofu.unit).toBe("oz");

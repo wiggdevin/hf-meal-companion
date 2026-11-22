@@ -81,10 +81,11 @@ export function profileInstancesForLegacyFlag(
   if (catalogIds) {
     return catalogIds
       .map((id) => legacyInstanceFromCatalog(id, confirmedAt))
-      .filter((instance): instance is ProfileInstance => instance !== null);
+      .filter((instance): instance is ProfileInstance => instance !== null)
+      .map((instance) => ({ ...instance, derivedFromFlag: true as const }));
   }
   const synthetic = SYNTHETIC_RULES[flag];
-  return synthetic ? [syntheticInstance(synthetic, confirmedAt)] : [];
+  return synthetic ? [{ ...syntheticInstance(synthetic, confirmedAt), derivedFromFlag: true as const }] : [];
 }
 
 export function profileInstancesForLegacyFlags(

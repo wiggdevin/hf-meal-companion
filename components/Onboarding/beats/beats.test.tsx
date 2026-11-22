@@ -84,6 +84,32 @@ describe("SafetyRound", () => {
     expect(screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(false);
   });
 
+  // W062 verify round (Sol WARN SafetyRound.tsx:118): "None" after the editor was used still tells
+  // the shell the rules were edited, so it reads the account's rules again before any food UI.
+  it("'No, none of these' after the rule editor was used still reports rulesEdited", () => {
+    const onDone = vi.fn();
+    render(<SafetyRound initial={null} onDone={onDone} />);
+    fireEvent.click(screen.getByRole("button", { name: "Food allergy" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add food rules" }));
+    fireEvent.click(screen.getByRole("button", { name: "Food allergy" }));
+    fireEvent.click(screen.getByRole("button", { name: "No, none of these" }));
+    expect(onDone).toHaveBeenCalledWith(expect.objectContaining({ picks: [], rulesEdited: true }));
+  });
+
+  it("locks the pick chips while a rule write is in flight, and frees them when it settles", () => {
+    render(<SafetyRound initial={null} onDone={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Food allergy" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add food rules" }));
+    act(() => editor.report?.({ pending: true, error: null }));
+    for (const chip of within(screen.getByRole("group", { name: "Applies to me" })).getAllByRole("button")) {
+      expect(chip.hasAttribute("disabled")).toBe(true);
+    }
+    act(() => editor.report?.({ pending: false, error: null }));
+    for (const chip of within(screen.getByRole("group", { name: "Applies to me" })).getAllByRole("button")) {
+      expect(chip.hasAttribute("disabled")).toBe(false);
+    }
+  });
+
   it("offers pregnancy to every adult and needs one of its follow-ups before Continue", () => {
     const onDone = vi.fn();
     render(<SafetyRound initial={null} onDone={onDone} />);

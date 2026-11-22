@@ -102,7 +102,7 @@ describe("saveOnboardingPlan", () => {
     expect(deps.mirrorOnboardedAt).not.toHaveBeenCalled();
   });
 
-  it("a stored halal account has no certified starter: it finishes with nothing written, and an uncertified pick is never saved", async () => {
+  it("a stored halal account has no certified starter: an uncertified Eats pick is reported, never saved or silently dropped", async () => {
     const halal = legacyInstanceFromCatalog("halal", "2026-09-01")!;
     const noBeef = profileInstancesForLegacyFlags(["no_beef"], "2026-09-01");
     const deps = baseDeps({ readRules: vi.fn(async () => ({ profile: rules, instances: [halal, ...noBeef] })) });
@@ -113,10 +113,13 @@ describe("saveOnboardingPlan", () => {
     // The person ticked chicken and beef before the rule landed: neither is written.
     const stale = { "chicken-breast-roasted": "eats", "ground-beef-90-10-cooked": "eats",
       "white-rice-cooked": "eats", "brown-rice-cooked": "eats", "olive-oil": "eats", "avocado-oil": "eats" } as const;
-    expect(await saveOnboardingPlan(input(stale), deps)).toEqual({ ok: true });
+    const refused = await saveOnboardingPlan(input(stale), deps);
+    expect(refused).toMatchObject({ ok: false, code: "starter_rules" });
     expect(deps.writeStarter).not.toHaveBeenCalled();
-    expect(deps.persistPlan).toHaveBeenCalledTimes(1);
     expect(deps.marksStand).not.toHaveBeenCalled();
+    // Finishing starter-free (no Eats picks) still succeeds.
+    expect(await saveOnboardingPlan(input({}), deps)).toEqual({ ok: true });
+    expect(deps.writeStarter).not.toHaveBeenCalled();
   });
 
   it("a zero-starter save (nothing eligible, nothing picked) writes no memberships and still completes", async () => {

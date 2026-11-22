@@ -2,7 +2,7 @@ import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  persistCompletedOnboarding, saveOnboardingSettings,
+  persistCompletedOnboarding, saveOnboardingSettings, type OnboardingPersistence,
 } from "@/lib/profile/onboarding-client";
 import { createOnboardingState, onboardingReducer } from "@/lib/profile/onboarding-state";
 import { defaultSettings } from "@/lib/store";
@@ -292,5 +292,97 @@ describe("the onboarding save's target request id", () => {
     }, {}, "00000000-0000-4000-8000-0000000000cc");
     expect(saveSynced).toHaveBeenCalledWith(expect.anything(), "complete", expect.any(Array),
       "00000000-0000-4000-8000-0000000000cc");
+  });
+
+  // W062 verify round (Sol + Neon BLOCK): the account must not look finished before its foods were
+  // written. `deferStamp` writes the whole profile row without `onboarded_at`; `stamp()` is the one
+  // later write that sets it (and opens the food world on a first completion).
+  describe("deferred onboarded_at stamp", () => {
+    const completeState = () => {
+      let state = createOnboardingState(defaultSettings());
+      for (const action of [
+        { type: "edit_body", key: "heightCm", value: "165" },
+        { type: "edit_body", key: "birthYear", value: "1996" },
+        { type: "set_sex", value: "female" },
+        { type: "edit_weight", value: "132" },
+        { type: "set_activity", value: "moderate" },
+        { type: "set_goal", value: "recomp" },
+      ] as const) state = onboardingReducer(state, action);
+      return state;
+    };
+    const persistence = () => ({
+      saveLocal: vi.fn<(settings: Settings) => void>(),
+      saveSynced: vi.fn<OnboardingPersistence["saveSynced"]>(async () => undefined),
+      saveWeighIn: vi.fn(async () => null),
+      loadConstraints: vi.fn(async () => ({ profile: { avoid_allergens: [], avoid_food_ref_ids: [],
+        banned_categories: [], conditions: [], notes: null }, rev: 0 })),
+      saveConstraints: vi.fn(async () => ({ status: "ok" }) as never), openFoodWorld: vi.fn(async () => {}),
+      localDate: () => "2026-09-19", hasWeighIn: () => true,
+    });
+    const now = new Date(2026, 8, 19, 12, 0);
+
+    it("writes the profile without the stamp, and stamps only when stamp() runs", async () => {
+      const deps = persistence();
+      const result = await persistCompletedOnboarding(defaultSettings(), completeState(), now, deps,
+        {}, undefined, null, { deferStamp: true });
+      expect(result.constraintsSaved).toBe(true);
+      // The one profile write asked to omit the stamp; nothing stamped, the world not opened, and
+      // this device keeps no `onboardedAt` either.
+      expect(deps.saveSynced).toHaveBeenCalledTimes(1);
+      expect(deps.saveSynced.mock.calls[0][1]).toBe("complete");
+      expect(deps.saveSynced.mock.calls[0][4]).toBe(true);
+      expect(deps.openFoodWorld).not.toHaveBeenCalled();
+      expect(deps.saveLocal).toHaveBeenCalledTimes(1);
+      expect(deps.saveLocal.mock.calls[0][0].onboardedAt ?? null).toBeNull();
+
+      await result.stamp!();
+      expect(deps.saveSynced).toHaveBeenCalledTimes(2);
+      expect(deps.saveSynced.mock.calls[1][1]).toBe("skip");
+      expect(deps.saveSynced.mock.calls[1][0].onboardedAt).toEqual(expect.any(String));
+      expect(deps.saveLocal.mock.calls.at(-1)![0].onboardedAt).toEqual(expect.any(String));
+      expect(deps.openFoodWorld).toHaveBeenCalledTimes(1);
+    });
+
+    it("runs the stamp once, even if the caller retries after it succeeded", async () => {
+      const deps = persistence();
+      const result = await persistCompletedOnboarding(defaultSettings(), completeState(), now, deps,
+        {}, undefined, null, { deferStamp: true });
+      await result.stamp!();
+      await result.stamp!();
+      expect(deps.saveSynced).toHaveBeenCalledTimes(2);
+      expect(deps.openFoodWorld).toHaveBeenCalledTimes(1);
+    });
+
+    it("a stamp that failed can be run again", async () => {
+      const deps = persistence();
+      const result = await persistCompletedOnboarding(defaultSettings(), completeState(), now, deps,
+        {}, undefined, null, { deferStamp: true });
+      deps.saveSynced.mockRejectedValueOnce(new Error("offline"));
+      await expect(result.stamp!()).rejects.toThrow("offline");
+      await result.stamp!();
+      expect(deps.openFoodWorld).toHaveBeenCalledTimes(1);
+    });
+
+    it("without deferStamp the profile write stamps as before and returns no stamp function", async () => {
+      const deps = persistence();
+      const result = await persistCompletedOnboarding(defaultSettings(), completeState(), now, deps);
+      expect(result.stamp).toBeUndefined();
+      expect(deps.saveSynced).toHaveBeenCalledTimes(1);
+      expect(deps.saveSynced.mock.calls[0][4]).toBeUndefined();
+    });
+
+    it("the queued settings op of a deferred save carries no onboarded_at; the stamp op carries it alone", async () => {
+      const onboardedAt = new Date(2026, 8, 19, 12, 0).toISOString();
+      const settings = { ...defaultSettings(), sex: "female" as const, birthYear: 1996, heightCm: 165,
+        weightKg: 60, activityLevel: "moderate" as const, goal: "recomp" as const, onboardedAt };
+      await saveOnboardingSettings(settings, "complete", [], vi.fn(async () => undefined as never),
+        () => 60, undefined, true);
+      const first = (await allOps(h))[0].payload as Record<string, unknown>;
+      expect(first.birth_year).toBe(1996);
+      expect(first.onboarded_at ?? null).toBeNull();
+      await saveOnboardingSettings(settings, "skip");
+      const ops = await allOps(h);
+      expect((ops[ops.length - 1].payload as Record<string, unknown>).onboarded_at).toBe(onboardedAt);
+    });
   });
 });

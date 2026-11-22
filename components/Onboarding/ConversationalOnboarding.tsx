@@ -440,6 +440,9 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
    *  new request, written again (with its own target request id). */
   const profileWrittenKey = useRef<string | null>(null);
   const constraintsSaved = useRef(false);
+  /** W062: the profile write defers the `onboarded_at` stamp until the food writes succeed; a retry
+   *  that skips the (already written) profile write still has to run that same stamp last. */
+  const pendingStamp = useRef<(() => Promise<void>) | null>(null);
   /** Gates the draft-save effect below until the resume-draft read (or its failure) has actually
    *  settled — see that effect's own comment for why. */
   const [draftChecked, setDraftChecked] = useState(false);
@@ -505,6 +508,7 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
       setComposerNote(null);
       profileWritten.current = false;
       profileWrittenKey.current = null;
+      pendingStamp.current = null;
       leaving.current = false;
       void (async () => {
         let settings: Settings;
@@ -584,6 +588,7 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
       setExtractCalls(0);
       profileWritten.current = false;
       profileWrittenKey.current = null;
+      pendingStamp.current = null;
       leaving.current = false;
     });
     return () => { live = false; unreadyFn(); ungoneFn(); };
@@ -930,7 +935,9 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
     if (rulesEdited) {
       setCheckingRules(true);
       try {
-        const freshChoices = await starter.reread();
+        // The reread must judge the account under the answers just given, not the render's older
+        // ones (a pregnancy tap withholds tuna), so it takes this round's conditions explicitly.
+        const freshChoices = await starter.reread(safetyConditionEntries(safetyAnswersFrom(round)));
         if (!freshChoices) { setLeaveError(RULES_UNVERIFIED); return; }
       } finally {
         setCheckingRules(false);
@@ -1027,16 +1034,19 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
       storedEligibility: serverHeldEligibility(mergeEligibility(stored), serverHeld),
       starter: writesFoods ? { status: foodAccess.status as "legacy" | "pilot", marks: starter.marks, plannedCount } : null,
     }, {
-      persistPlan: async (planSettings, state, now, deps, safety, requestId, held) => {
+      persistPlan: async (planSettings, state, now, deps, safety, requestId, held, options) => {
         if (profileWritten.current && profileWrittenKey.current === requestKey) {
-          return { settings: planSettings, constraintsSaved: constraintsSaved.current };
+          return { settings: planSettings, constraintsSaved: constraintsSaved.current,
+            ...(pendingStamp.current ? { stamp: pendingStamp.current } : {}) };
         }
-        const written = await persistCompletedOnboarding(planSettings, state, now, deps, safety, requestId, held);
+        const written = await persistCompletedOnboarding(planSettings, state, now, deps, safety, requestId, held,
+          options);
         // Final Sol review r3 BLOCK: a failed safety-condition write wrote nothing, so Try again
         // must run the whole save again, not skip to a constraints retry it cannot satisfy.
         if (written.profileWritten === false) return written;
         profileWritten.current = true;
         profileWrittenKey.current = requestKey;
+        pendingStamp.current = written.stamp ?? null;
         constraintsSaved.current = written.constraintsSaved;
         return written;
       },

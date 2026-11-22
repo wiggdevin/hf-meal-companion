@@ -6,9 +6,10 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  STARTERS, starterChoices, starterRuleHits, starterSelectionProblem, type Starter,
+  STARTERS, starterChoices, starterPolicyInputs, starterRuleHits, starterSelectionProblem, type Starter,
 } from "./starter";
 import { starterSuggestionEvidence } from "./starter-evidence";
+import { profileInstancesForLegacyFlags } from "@/lib/policy/profiles/legacy-flags";
 import { starterReadiness } from "./starter-availability";
 import { profileDefinition } from "@/lib/policy/profiles/catalog";
 import { buildProfileInstance } from "@/lib/policy/profiles/loader";
@@ -81,6 +82,75 @@ describe("starter eligibility comes only from the shared evaluator", () => {
       "olive-oil", "peanut-butter"];
     const problem = starterSelectionProblem(picks, [], { ...empty, avoid_allergens: ["peanuts"] });
     expect(problem).toMatchObject({ kind: "rule", foodName: expect.stringMatching(/^Peanut butter/) });
+  });
+});
+
+describe("stored hard rules are never dropped for a flag that maps to the same profile", () => {
+  it("no_shellfish plus a stored crustacean row still withholds unlabeled bread and whey", () => {
+    const list = offered(empty, stored("allergy_crustacean"), ["no_shellfish"]);
+    for (const id of ["white-bread", "whole-wheat-bread", "whey-protein-powder"]) expect(list, id).not.toContain(id);
+  });
+
+  it("no_shellfish plus a stored mollusc row keeps the stored rule", () => {
+    expect(offered(empty, stored("allergy_mollusc"), ["no_shellfish"])).not.toContain("white-bread");
+  });
+
+  it("a synthesized flag instance is not added a second time as a profile rule", () => {
+    const synthesized = profileInstancesForLegacyFlags(["no_shellfish"], AT);
+    expect(synthesized.length).toBeGreaterThan(0);
+    expect(synthesized.every((instance) => instance.derivedFromFlag === true)).toBe(true);
+    const { profile } = starterPolicyInputs(["no_shellfish"], empty, synthesized, new Date(AT));
+    expect(profile.profileRules?.items).toEqual([]);
+  });
+
+  it("a stored vegan row keeps its hard rules next to a vegan flag", () => {
+    const { profile } = starterPolicyInputs(["vegan"], empty, stored("vegan"), new Date(AT));
+    expect((profile.profileRules?.items ?? []).map((item) => item.facet)).toContain("honey");
+  });
+});
+
+describe("a missing curated tag never clears an allergy (deny-only onboarding evidence)", () => {
+  const blank: SuggestionFoodEvidence = {
+    allergenTags: [], allergenEvidence: {}, checkedAllergens: [], ingredientsText: null,
+    ingredientsTextIsLabel: false, foodName: "x", foodBrand: null, packaged: false,
+    policyCategories: null, facets: {}, noCook: null, onEatsList: false, onAvoidList: false, role: "carb",
+  };
+
+  it("a stored egg allergy withholds unlabeled bread, whey, tortilla and peanut butter", () => {
+    const list = offered(empty, stored("allergy_egg"));
+    for (const id of ["white-bread", "whole-wheat-bread", "whey-protein-powder", "corn-tortilla", "peanut-butter"]) {
+      expect(list, id).not.toContain(id);
+    }
+    expect(list).not.toContain("egg-white");
+    expect(list).toContain("white-rice-cooked");
+  });
+
+  it.each([["allergy_peanut"], ["allergy_tree_nut"], ["allergy_milk"], ["allergy_soy"], ["celiac"]])(
+    "a stored %s withholds unlabeled bread and the tortilla", (profileId) => {
+      const list = offered(empty, stored(profileId));
+      expect(list, profileId).not.toContain("white-bread");
+      expect(list, profileId).not.toContain("corn-tortilla");
+    });
+
+  it("the onboarding evidence has no absent attestation for any facet", () => {
+    for (const item of STARTERS) {
+      const evidence = starterSuggestionEvidence(item, blank, { denyOnly: true });
+      expect(Object.values(evidence.attestedFacets ?? {}), item.id).not.toContain("absent");
+      for (const [facet, judgment] of Object.entries(evidence.facets)) {
+        if (facet !== "human_food") expect(judgment?.p, `${item.id} ${facet}`).toBe(1);
+      }
+    }
+  });
+
+  it("the coach's default evidence is unchanged: it still attests absence", () => {
+    const bread = STARTERS.find((item) => item.id === "white-bread")!;
+    expect(Object.values(starterSuggestionEvidence(bread, blank).attestedFacets ?? {})).toContain("absent");
+  });
+
+  it("a banned category still finds a starter's curated category", () => {
+    const list = ids(starterChoices([], { ...empty, banned_categories: ["poultry"] }));
+    expect(list).not.toContain("chicken-breast-roasted");
+    expect(list).toContain("white-rice-cooked");
   });
 });
 

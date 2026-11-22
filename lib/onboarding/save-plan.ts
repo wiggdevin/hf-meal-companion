@@ -12,18 +12,23 @@
  * selection (6-12 foods) that is 6-12 sequential RPCs on top of everything else, which the live
  * QA measured at 8+ seconds.
  *
- * This function runs in this order (W062 reordered it so a refusal writes nothing):
- *   1. reads the account's food rules exactly ONCE for the starter step, merges the safety
- *      round's pending condition entries into that read, and judges the picks with the shared
- *      evaluator (`starterChoices`) and the ONE readiness function (`starterReadiness`). A
- *      selection the rules no longer allow returns the typed `starter_rules` refusal BEFORE any
- *      write, so `onboarded_at` is never stamped and no membership is queued;
- *   2. writes the eligible starter foods' membership ops (bounded-concurrency batches, no
- *      per-food acknowledgement round trip), reusing that one read for the write's own recheck
- *      (ONB2-RULE-REREAD-WRITE). Nothing eligible means nothing is written (a starter-free save);
- *   3. only then writes the settings+target-revision and constraints in parallel
- *      (`persistCompletedOnboarding`), which stamps `onboarded_at`, and drains the outbox for
- *      every op the save queued (settings AND food membership) before mirroring `onboarded_at`.
+ * This function runs in this order (W062, verify round: food safety wins every tie):
+ *   1. reads the account's food rules exactly ONCE for the starter step (constraints, profile
+ *      instances AND the rule review; a review that is missing or required fails closed), projects
+ *      the constraint patch persistence will write (draft diet flags' allergen exclusions, the
+ *      safety round's conditions) onto that read, and judges the picks with the shared evaluator
+ *      (`starterChoices`) and the ONE readiness function (`starterReadiness`). A pick the rules
+ *      withhold, or a selection they leave short, returns the typed `starter_rules` refusal BEFORE
+ *      any write, so nothing is queued and `onboarded_at` is never stamped;
+ *   2. writes the settings+target-revision and the constraints (conditions first) in
+ *      `persistCompletedOnboarding`, with the `onboarded_at` stamp DEFERRED. A refusal there (under
+ *      18, a held pace, a failed condition write) stops the save with NOTHING starter-related queued;
+ *   3. only then writes the starter foods' membership ops (bounded-concurrency batches, no per-food
+ *      acknowledgement round trip), reusing that one read for the write's own recheck
+ *      (ONB2-RULE-REREAD-WRITE). Nothing eligible means no Eats written (a starter-free save); an
+ *      explicit Avoid mark is always written, even on a food the rules withhold;
+ *   4. stamps `onboarded_at` LAST (`completed.stamp()`), then drains the outbox for every op the
+ *      save queued (settings AND food membership) before mirroring `onboarded_at`.
  *
  * A rules read that fails (offline, a switched account) still fails closed rather than falling
  * back to a stale list. A retry is safe: the membership writes are idempotent (the per-food
@@ -32,13 +37,15 @@
 
 import { accountHandle, assertCurrent, type AccountHandle } from "@/lib/device/account";
 import { loadConstraints, type Profile } from "@/lib/constraints-client";
+import { dbFood } from "@/lib/food-db";
+import { loadRuleReview } from "@/lib/rule-review-client";
 import { fetchProfileInstances } from "@/lib/profile/instances-client";
 import type { ProfileInstance } from "@/lib/policy/profiles/types";
 import {
-  starterChoices, starterProblemMessage, starterSelectionProblem,
-  type Starter, type StarterMark,
+  STARTERS, starterChoices, starterProblemMessage, starterRuleHits, starterSelectionProblem,
+  type Starter, type StarterMark, type StarterSelectionProblem,
 } from "@/lib/foods/starter";
-import { starterEatsIds, starterReadiness } from "@/lib/foods/starter-availability";
+import { starterReadiness } from "@/lib/foods/starter-availability";
 import {
   defaultStarterWriter, persistStarterSelection, STARTER_RULE_CHANGED_ERROR,
   starterMarksStand, STARTER_RULES_UNAVAILABLE_ERROR, type StarterWriter,
@@ -47,7 +54,7 @@ import {
   CONSTRAINT_SAVE_WARNING, mirroredOnboardedAt, ONBOARDING_SYNC_WARNING,
   persistCompletedOnboarding, retryOnboardingConstraints,
 } from "@/lib/profile/onboarding-client";
-import type { OnboardingState } from "@/lib/profile/onboarding-state";
+import { projectedConstraintProfile, type OnboardingState } from "@/lib/profile/onboarding-state";
 import {
   AdultOnlyError, safetyConditionEntries, type SafetyAnswers, type TargetEligibility,
 } from "@/lib/profile/rate-eligibility";
@@ -127,12 +134,14 @@ export type SaveOnboardingPlanDeps = {
   mirrorOnboardedAt: typeof mirroredOnboardedAt;
 };
 
-async function readFreshStarterRules(h: AccountHandle): Promise<FreshStarterRules | null> {
+/** Exported for its own test. A rule review that is missing or still required is not "no rules":
+ *  the read fails closed, exactly as `useStarterStep` and `starter-client` do. */
+export async function readFreshStarterRules(h: AccountHandle): Promise<FreshStarterRules | null> {
   try {
-    const [constraints, instances] = await Promise.all([
-      loadConstraints({ account: h }), fetchProfileInstances(h),
+    const [constraints, review, instances] = await Promise.all([
+      loadConstraints({ account: h }), loadRuleReview({ account: h }), fetchProfileInstances(h),
     ]);
-    if (!constraints) return null;
+    if (!constraints || !review || review.required) return null;
     return { profile: constraints.profile, instances: instances.instances };
   } catch {
     return null;
@@ -148,6 +157,21 @@ const defaultDeps: SaveOnboardingPlanDeps = {
   marksStand: starterMarksStand,
   mirrorOnboardedAt: mirroredOnboardedAt,
 };
+
+/** The first picked food the rules withhold, named with its rule (a diet-style miss included, so
+ *  the person is never told only "a rule changed"). Null when the evaluator gives no named hit. */
+function withheldPickProblem(
+  ids: readonly string[], flags: readonly string[], profile: Profile,
+  instances: readonly ProfileInstance[], asOf: Date,
+): StarterSelectionProblem | null {
+  const hits = starterRuleHits(flags, profile, instances, asOf);
+  for (const id of ids) {
+    const hit = hits.get(id);
+    const name = dbFood(id)?.name;
+    if (hit && name) return { kind: "rule", foodName: name, rule: hit.rule, verdict: hit.verdict };
+  }
+  return null;
+}
 
 /**
  * Save a completed (never a skipped — see `persistSkippedOnboarding` for that path) onboarding
@@ -169,14 +193,17 @@ export async function saveOnboardingPlan(
     const flags = input.onboardingState.flags;
 
     // 1. The fresh rules read and the selection check run BEFORE anything is written, so a typed
-    //    `starter_rules` refusal leaves no membership and no `onboarded_at` behind. The safety
-    //    round's pending condition entries are merged into the fresh profile (the stored row does
-    //    not hold them until `persistPlan` below), the same way the Foods step lists them.
+    //    `starter_rules` refusal leaves no membership and no `onboarded_at` behind. The profile is
+    //    PROJECTED: the draft flags' allergen exclusions and the safety round's conditions are
+    //    appended to the stored one (the stored row does not hold them until `persistPlan` below),
+    //    the very patch persistence writes, so preview, preflight and write agree.
     let freshChoices: readonly Starter[] = [];
     let scopedMarks: Record<string, StarterMark> = {};
+    let fresh: FreshStarterRules | null = null;
+    let profile: Profile | null = null;
+    const asOf = new Date();
     if (input.starter) {
       const { status, marks, plannedCount } = input.starter;
-      let fresh: FreshStarterRules | null;
       try {
         fresh = await readRules(h);
       } catch {
@@ -184,37 +211,37 @@ export async function saveOnboardingPlan(
       }
       if (!fresh) return { ok: false, error: STARTER_RULES_UNAVAILABLE_ERROR };
       assertCurrent(h);
-      const profile = { ...fresh.profile,
-        conditions: [...fresh.profile.conditions, ...safetyConditionEntries(safety)] };
-      const asOf = new Date();
+      profile = projectedConstraintProfile(flags, fresh.profile, safetyConditionEntries(safety));
       freshChoices = starterChoices(flags, profile, fresh.instances, asOf);
       const eligible = new Set(freshChoices.map((item) => item.id));
-      // Only marks on a food the shared evaluator allows can be written; the rest are dropped.
-      scopedMarks = Object.fromEntries(Object.entries(marks).filter(([id]) => eligible.has(id)));
+      const picked = Object.entries(marks).filter(([, mark]) => mark === "eats").map(([id]) => id);
+      // A pick the rules now withhold is REPORTED (the person goes back to Foods and sees which
+      // food and rule), never dropped while the save succeeds.
+      const withheld = picked.filter((id) => !eligible.has(id));
+      if (withheld.length > 0) {
+        const problem = withheldPickProblem(withheld, flags, profile, fresh.instances, asOf);
+        return { ok: false, code: "starter_rules",
+          error: problem ? starterProblemMessage(problem) : STARTER_RULE_CHANGED_ERROR };
+      }
+      // Eats only inside the eligible list; an explicit Avoid on any known starter always stands
+      // (avoiding a food is safe whatever the rules say about it).
+      const known = new Set(STARTERS.map((item) => item.id));
+      scopedMarks = Object.fromEntries(Object.entries(marks).filter(([id, mark]) =>
+        (mark === "eats" && eligible.has(id)) || (mark === "avoid" && known.has(id))));
       // The one readiness function the Foods step uses; a legacy account's per-meal protein need
       // is capped at the proteins its rules leave.
       if (!starterReadiness(scopedMarks, freshChoices, status === "legacy" ? plannedCount : 0).ready) {
-        const picked = Object.entries(marks).filter(([, mark]) => mark === "eats").map(([id]) => id);
         const problem = starterSelectionProblem(picked, flags, profile, fresh.instances, asOf);
         return { ok: false, code: "starter_rules",
           error: problem ? starterProblemMessage(problem) : STARTER_RULE_CHANGED_ERROR };
       }
-      const rules = fresh;
-      // 2. Starter writes (queued). Nothing eligible means nothing to write: a starter-free save
-      //    writes no membership at all. The write reuses this exact read for its own recheck
-      //    (ONB2-RULE-REREAD-WRITE) instead of fetching a second time.
-      if (freshChoices.length > 0 && starterEatsIds(scopedMarks, freshChoices).length > 0) {
-        await writeStarter(scopedMarks, freshChoices,
-          { ...defaultStarterWriter, freshRules: async () => ({ profile, instances: rules.instances }) },
-          "reviewed", flags);
-        writtenMarks = scopedMarks;
-        writtenChoices = freshChoices;
-      }
     }
 
-    // 3. `persistPlan` stamps `onboarded_at`, so it runs only after the starter writes succeeded.
+    // 2. The plan: conditions, constraints, settings and target revision. `onboarded_at` is NOT
+    //    stamped yet (`deferStamp`): a refusal here (adult_only, rate_not_eligible, a failed
+    //    safety-condition write) leaves nothing starter-related queued and the account unfinished.
     const completed = await persistPlan(input.settings, input.onboardingState, undefined, undefined, safety,
-      input.targetRequestId, input.storedEligibility ?? null);
+      input.targetRequestId, input.storedEligibility ?? null, { deferStamp: true });
     if (!completed.constraintsSaved && safetyConditionEntries(safety).length > 0) {
       // G7: the condition patch failed before the target was written, so nothing was saved. A
       // flags-only retry would drop the conditions and leave the plan unsaved; offer the step again.
@@ -224,6 +251,22 @@ export async function saveOnboardingPlan(
       const retried = await retryConstraints(input.onboardingState.flags);
       if (!retried) return { ok: false, error: CONSTRAINT_SAVE_WARNING };
     }
+
+    // 3. Starter writes (queued), only now. Nothing to write means no membership at all. The write
+    //    reuses the exact read above for its own recheck (ONB2-RULE-REREAD-WRITE).
+    if (fresh && profile && Object.keys(scopedMarks).length > 0) {
+      const rules = fresh;
+      const projected = profile;
+      await writeStarter(scopedMarks, freshChoices,
+        { ...defaultStarterWriter, freshRules: async () => ({ profile: projected, instances: rules.instances }) },
+        "reviewed", flags);
+      writtenMarks = scopedMarks;
+      writtenChoices = freshChoices;
+    }
+
+    // 4. The stamp, last: every write above was queued or acknowledged without a refusal.
+    assertCurrent(h);
+    await completed.stamp?.();
     assertCurrent(h);
 
     // GPT-6 Sol BLOCK (onb2-p0): the gate covers EVERY op this save queued, the food membership
@@ -245,6 +288,10 @@ export async function saveOnboardingPlan(
   } catch (error) {
     const refused = refusal(error);
     if (refused) return { ok: false, ...refused };
+    // The write's own recheck found a rule saved since the read: back to Foods, like the preflight.
+    if (error instanceof Error && error.message === STARTER_RULE_CHANGED_ERROR) {
+      return { ok: false, code: "starter_rules", error: error.message };
+    }
     return { ok: false, error: error instanceof Error ? error.message : ONBOARDING_SYNC_WARNING };
   }
 }

@@ -18,7 +18,7 @@ function Check() {
 }
 
 export default function ChoiceChips<T extends string | number>({
-  label, options, value, onChange, multiple = false, block = false,
+  label, options, value, onChange, multiple = false, block = false, disabled = false,
 }: {
   /** The group's accessible name. */
   label: string;
@@ -29,6 +29,8 @@ export default function ChoiceChips<T extends string | number>({
   multiple?: boolean;
   /** One full-width chip per row (long labels). */
   block?: boolean;
+  /** Every chip inert (a write the answers depend on is in flight). */
+  disabled?: boolean;
 }) {
   const chosen = (option: T) => Array.isArray(value) ? value.includes(option) : value === option;
   return <div role={multiple ? "group" : "radiogroup"} aria-label={label}
@@ -39,6 +41,7 @@ export default function ChoiceChips<T extends string | number>({
         role={multiple ? undefined : "radio"}
         aria-pressed={multiple ? on : undefined}
         aria-checked={multiple ? undefined : on}
+        disabled={disabled}
         onClick={() => onChange(option.value)}
         className={`${styles.chip} ${block ? styles.block : ""} text-body-sm font-medium text-charcoal`}>
         {on && <Check />}

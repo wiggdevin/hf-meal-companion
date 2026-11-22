@@ -7,7 +7,7 @@ import { loadConstraints, type Profile } from "@/lib/constraints-client";
 import { loadRuleReview } from "@/lib/rule-review-client";
 import { fetchProfileInstances } from "@/lib/profile/instances-client";
 import { initialStarterSelection, starterChoices, type Starter, type StarterMark } from "@/lib/foods/starter";
-import type { OnboardingState } from "@/lib/profile/onboarding-state";
+import { projectedConstraintProfile, type OnboardingState, type PreferenceFlag } from "@/lib/profile/onboarding-state";
 
 /**
  * One account-rules read, shared by the hook's own effect and `reread()` below (ONB2-RULE-REREAD).
@@ -22,13 +22,14 @@ async function readStarterChoices(
   ]);
   if (!constraints || !review || review.required) return null;
   assertCurrent(h);
-  return starterChoices(flags, withPending(constraints.profile, pending), profiles.instances);
+  return starterChoices(flags, withPending(constraints.profile, flags, pending), profiles.instances);
 }
 
-/** The safety round's condition entries are saved with the plan, so the Foods step and the save
- *  both judge the account as if they were already stored (lib/onboarding/save-plan.ts does the same). */
-function withPending(profile: Profile, pending: readonly string[]): Profile {
-  return pending.length === 0 ? profile : { ...profile, conditions: [...profile.conditions, ...pending] };
+/** The draft flags' allergen exclusions and the safety round's condition entries are saved with the
+ *  plan, so the Foods step and the save both judge the account as if they were already stored: the
+ *  same projected constraint patch persistence writes (lib/onboarding/save-plan.ts does the same). */
+function withPending(profile: Profile, flags: readonly string[], pending: readonly string[]): Profile {
+  return projectedConstraintProfile(flags as readonly PreferenceFlag[], profile, pending);
 }
 
 /** `preselectDefaults: false` (onboarding v2's love round): start with nothing marked, so only foods
@@ -67,7 +68,7 @@ export function useStarterStep(state: OnboardingState | null, enabled = true,
         return;
       }
       assertCurrent(h);
-      const profile = withPending(constraints.profile, pending);
+      const profile = withPending(constraints.profile, activeFlags, pending);
       const safe = starterChoices(activeFlags, profile, profiles.instances);
       setLoadedFor(key);
       setChoices(safe);
@@ -91,13 +92,16 @@ export function useStarterStep(state: OnboardingState | null, enabled = true,
    * of the hook's own memoized key, and hands the caller the FRESH list to gate the write on — never
    * the stale closure. It also updates the hook's own state so the rendered choices/marks catch up.
    */
-  async function reread(): Promise<Starter[] | null> {
+  async function reread(pendingOverride?: readonly string[]): Promise<Starter[] | null> {
     const h = currentAccountOrNull();
     if (!h) return null;
     const activeFlags = flags ? flags.split("|") : [];
+    // A caller that has just changed the safety answers passes them here: this render's own
+    // `pendingKey` still holds the older ones (W062 verify round).
+    const pending = pendingOverride ?? (pendingKey ? pendingKey.split("\u0001") : []);
     let fresh: Starter[] | null;
     try {
-      fresh = await readStarterChoices(h, activeFlags, pendingKey ? pendingKey.split("\u0001") : []);
+      fresh = await readStarterChoices(h, activeFlags, pending);
     } catch {
       fresh = null;
     }
@@ -120,7 +124,7 @@ export function useStarterStep(state: OnboardingState | null, enabled = true,
       return next;
     });
     setRevision((value) => value + 1);
-    setLoadedFor(`${h.userId}\0${flags}\0${text}\0${pendingKey}\0${revision + 1}`);
+    setLoadedFor(`${h.userId}\0${flags}\0${text}\0${pendingOverride?.join("\u0001") ?? pendingKey}\0${revision + 1}`);
     return fresh;
   }
   return { choices: current ? choices : null, marks, error,

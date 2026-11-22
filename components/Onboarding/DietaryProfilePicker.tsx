@@ -10,7 +10,7 @@
  * `DietaryProfilePickerView` is pure props-in/callbacks-out (tests/onboarding/dietary-profile-picker.test.tsx);
  * the default export is the container that owns the account, the fetch and the network calls.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pill } from "@/components/Sheet";
 import Button from "@/components/ui/Button";
 import Notice from "@/components/ui/Notice";
@@ -284,6 +284,12 @@ export default function DietaryProfilePicker({ onRulesChanged, onWriteState }: {
   const pending = busyId !== null || customPending;
   const failure = rowError?.message ?? customError;
   useEffect(() => { onWriteState?.({ pending, error: failure }); }, [onWriteState, pending, failure]);
+  // Closing the editor must never leave its owner waiting on a write this picker no longer reports
+  // (a stuck "pending" kept Continue disabled for good); the last failure stays visible.
+  const lastFailure = useRef<string | null>(null);
+  const writeStateRef = useRef(onWriteState);
+  useEffect(() => { lastFailure.current = failure; writeStateRef.current = onWriteState; });
+  useEffect(() => () => writeStateRef.current?.({ pending: false, error: lastFailure.current }), []);
 
   // Onboarding mounts only once the account is bound in practice, but a subscription (rather than
   // a synchronous read) is what lib/device/account.ts's own callers do (AuthGate.tsx,

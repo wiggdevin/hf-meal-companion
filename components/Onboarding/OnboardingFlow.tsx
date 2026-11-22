@@ -2,7 +2,7 @@
 
 import { accountHandle, currentAccountOrNull, type AccountHandle } from "@/lib/device/account";
 import { readAccountItem, removeAccountItem, writeAccountItem } from "@/lib/device/account-storage";
-import { useEffect, useReducer, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent } from "react";
 import { motion, useIsPresent, useReducedMotion } from "motion/react";
 import { useRouter } from "next/navigation";
 import {
@@ -12,7 +12,7 @@ import {
   createOnboardingState, missingProfileFields, onboardingReducer, previewCompletedSettings,
   type OnboardingAction, type OnboardingState,
 } from "@/lib/profile/onboarding-state";
-import { AdultOnlyError, paceAllowed } from "@/lib/profile/rate-eligibility";
+import { AdultOnlyError, paceAllowed, safetyConditionEntries } from "@/lib/profile/rate-eligibility";
 import { TargetSaveRefusedError } from "@/lib/targets/client";
 import { todayIso } from "@/lib/settings/date";
 import SafetyRound from "@/components/Onboarding/beats/SafetyRound";
@@ -44,7 +44,8 @@ import { useStarterStep } from "./useStarterStep";
 import { useOnboardingFoodAccess } from "./useOnboardingFoodAccess";
 import { starterReadiness } from "@/lib/foods/starter-availability";
 import { mealCountFor } from "@/lib/plan";
-import { persistStarterSelection } from "@/lib/foods/starter-client";
+import { persistStarterSelection, STARTER_RULE_CHANGED_ERROR } from "@/lib/foods/starter-client";
+import type { Starter, StarterMark } from "@/lib/foods/starter";
 import CloseButton from "@/components/ui/CloseButton";
 import { SPRINGS } from "@/lib/design/motion";
 import { lockBodyScroll } from "@/lib/dom/scroll-lock";
@@ -204,6 +205,8 @@ export default function OnboardingFlow({
   const feedback = useActionFeedback();
   const saving = feedback.phase === "pending";
   const [completed, setCompleted] = useState(false);
+  /** The deferred `onboarded_at` stamp of the plan write (W062), run after the foods are written. */
+  const pendingStamp = useRef<(() => Promise<void>) | null>(null);
   const [constraintsSaved, setConstraintsSaved] = useState(false);
   const [foodsSaved, setFoodsSaved] = useState(false);
   const [showDevice, setShowDevice] = useState(false);
@@ -272,7 +275,11 @@ export default function OnboardingFlow({
   }, [state?.step, refreshStored]);
   const foodAccess = useOnboardingFoodAccess(state);
   const optionalFoods = foodAccess.status === "pilot";
-  const starter = useStarterStep(state, foodAccess.status === "legacy");
+  // The safety round's condition entries are saved with the plan: the Foods step lists foods as the
+  // account will be once they are stored (a pregnancy answer withholds tuna), like the shell does.
+  const pendingConditions = useMemo(() => safetyConditionEntries(safetyAnswersFrom(safetyRound)),
+    [safetyRound]);
+  const starter = useStarterStep(state, foodAccess.status === "legacy", { pendingConditions });
   const cuisine = useCuisineStep(state?.step ?? 0);
 
   useEffect(() => {
@@ -402,6 +409,22 @@ export default function OnboardingFlow({
     else finish();
   }
 
+  /** W062: the starter write's gate, run BEFORE the plan write (and again on a retry that already
+   *  wrote the plan): a fresh rules read, then the picks judged against it. A pick the rules now
+   *  withhold, or a selection they leave short, blocks the save with nothing written. Returns the
+   *  marks and choices the later write uses; Avoid marks always stand. */
+  async function preflightFoods(): Promise<{ marks: Record<string, StarterMark>; choices: Starter[] }> {
+    const fresh = await starter.reread();
+    if (!fresh) throw new Blocked("Couldn’t verify your food rules. Go back to Foods and retry.");
+    const allowed = new Set(fresh.map((item) => item.id));
+    const picked = Object.entries(starter.marks).filter(([, mark]) => mark === "eats").map(([id]) => id);
+    if (picked.some((id) => !allowed.has(id))) throw new Blocked(STARTER_RULE_CHANGED_ERROR);
+    const marks = Object.fromEntries(Object.entries(starter.marks)
+      .filter(([, mark]) => mark === "eats" || mark === "avoid"));
+    if (!starterReadiness(marks, fresh, plannedCount).ready) throw new Blocked(STARTER_RULE_CHANGED_ERROR);
+    return { marks, choices: fresh };
+  }
+
   async function savePlan(): Promise<void> {
     if (!completed && !planReady) {
       throw new Blocked(optionalFoods ? "Couldn’t verify your food rules. Retry on Foods."
@@ -416,12 +439,16 @@ export default function OnboardingFlow({
       if (access === "legacy" && !(starterSelectionReady && proteinAvailability?.ready)) {
         throw new Blocked("Go back to Foods and choose foods for your plan.");
       }
+      // The fresh rules read and the pick check come first: a refusal writes nothing at all.
+      const foods = access === "legacy" && !foodsSatisfied ? await preflightFoods() : null;
       let result: Awaited<ReturnType<typeof persistCompletedOnboarding>>;
       try {
         // The round's conditions are written before the target, and the stored holds ride along,
-        // so the revision the server derives is the plan this screen showed (A087, A088).
+        // so the revision the server derives is the plan this screen showed (A087, A088). The
+        // `onboarded_at` stamp is deferred until the food writes below succeeded (W062).
         result = await persistCompletedOnboarding(cuisine.withCuisines(currentBase), currentState,
-          undefined, undefined, safetyAnswersFrom(safetyRound), undefined, planEligibility);
+          undefined, undefined, safetyAnswersFrom(safetyRound), undefined, planEligibility,
+          { deferStamp: true });
       } catch (error) {
         if (!isAdultOnly(error)) throw error;
         setServerMinor(true);
@@ -432,6 +459,7 @@ export default function OnboardingFlow({
       if (result.profileWritten === false) throw new Blocked(SAFETY_SAVE_WARNING);
       // Marked done BEFORE the drain: persist is the half that must never run twice — it mints the
       // target revision and the weigh-in — so a retry after a failed drain only drains.
+      pendingStamp.current = result.stamp ?? null;
       setCompleted(true);
       setConstraintsSaved(result.constraintsSaved);
       if (access === "pilot") {
@@ -439,26 +467,37 @@ export default function OnboardingFlow({
         setFoodsSaved(true);
       }
       if (!result.constraintsSaved) throw new Blocked(LEGACY_CONSTRAINT_WARNING);
+      if (foods) await writeFoods(foods);
+      if (foods) foodsSatisfied = true;
     }
     if (!constraintsSaved && completed) {
       if (!await retryOnboardingConstraints(currentState.flags)) throw new Blocked(LEGACY_CONSTRAINT_WARNING);
       setConstraintsSaved(true);
     }
     if (!foodsSatisfied) {
-      // ONB2-RULE-REREAD (Sol r6 BLOCK on onb2-l4-r2): re-read the account's rules right now,
-      // immediately before the write — never trust `starter.choices` from an earlier render. A
-      // rule saved mid-flow (e.g. through the rule editor a dietary-text jump opens) writes
-      // constraints directly and would not otherwise retrigger `useStarterStep`'s own effect, so
-      // the stale list could still let an already-excluded food write through as "eats".
-      const freshChoices = await starter.reread();
-      if (!freshChoices) throw new Blocked("Couldn’t verify your food rules. Go back to Foods and retry.");
-      // Nothing eligible: nothing to write. The draft flags are not stored yet, so they ride along.
-      if (freshChoices.length > 0) await persistStarterSelection(starter.marks, freshChoices, undefined, "reviewed", currentState.flags);
-      setFoodsSaved(true);
+      // ONB2-RULE-REREAD (Sol r6 BLOCK on onb2-l4-r2): a retry after the plan was written but the
+      // food write failed re-reads the account's rules right now, immediately before the write —
+      // never trust `starter.choices` from an earlier render (a rule saved mid-flow through the rule
+      // editor does not retrigger `useStarterStep`'s own effect).
+      await writeFoods(await preflightFoods());
     }
-    // Everything above only QUEUED the stamp; leaving on a queued write is what sends a finished
-    // account back to step 1 on its next load.
+    // The stamp goes last, after the plan and the foods were written without a refusal. It is
+    // still only QUEUED here; leaving on a queued write is what sends a finished account back to
+    // step 1 on its next load, so the drain below is the gate.
+    const stamp = pendingStamp.current;
+    if (stamp) {
+      await stamp();
+      pendingStamp.current = null;
+    }
     if (!await settingsAccepted()) throw new Blocked(ONBOARDING_SYNC_WARNING);
+  }
+
+  /** Queue the starter foods' membership writes (nothing eligible: an Eats-free save), once. */
+  async function writeFoods(foods: { marks: Record<string, StarterMark>; choices: Starter[] }): Promise<void> {
+    if (Object.keys(foods.marks).length > 0) {
+      await persistStarterSelection(foods.marks, foods.choices, undefined, "reviewed", currentState.flags);
+    }
+    setFoodsSaved(true);
   }
 
   async function skip(): Promise<void> {

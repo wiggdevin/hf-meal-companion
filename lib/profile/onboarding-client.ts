@@ -89,6 +89,10 @@ export async function saveOnboardingSettings(
   readLatestWeighIn: typeof latestWeighInKg = latestWeighInKg,
   /** The save's one target request id (see `persistCompletedOnboarding`). */
   targetRequestId?: string,
+  /** W062: write the whole profile row WITHOUT stamping `onboarded_at` (the stamp is a later,
+   *  separate `"skip"`-mode write, so a refused save or a failed food write never leaves an
+   *  account that looks finished). A stamp the row already holds is kept as it was. */
+  omitOnboardedAt = false,
 ): Promise<TargetRevision | undefined> {
   const h = accountHandle();
   // The revision dates from the LOCAL day onboarding finished, not the UTC day: an evening
@@ -111,10 +115,12 @@ export async function saveOnboardingSettings(
     const rev = typeof row.rev === "number" ? row.rev : null;
     const { rev: _rev, user_id: _userId, ...stored } = row;
     void _rev; void _userId;
+    const { onboarded_at: _stamp, ...withoutStamp } = settingsProfileToRow(settings);
+    void _stamp;
     const profile = mode === "skip"
       ? { onboarded_at: settings.onboardedAt ?? null }
       : {
-          ...settingsProfileToRow(settings),
+          ...(omitOnboardedAt ? withoutStamp : settingsProfileToRow(settings)),
           ...(pinFields.includes("trainingKcal")
             ? { training_kcal: settings.trainingKcal } : {}),
           ...(pinFields.includes("restKcal") ? { rest_kcal: settings.restKcal } : {}),
@@ -148,6 +154,7 @@ export type OnboardingPersistence = {
     mode: OnboardingSaveMode,
     pinFields?: readonly PlanField[],
     targetRequestId?: string,
+    omitOnboardedAt?: boolean,
   ) => Promise<TargetRevision | undefined | void>;
   saveWeighIn: (localDate: string, lb: number) => Promise<string | null>;
   loadConstraints: () => Promise<ConstraintLoad>;
@@ -171,8 +178,9 @@ export async function openFoodWorld(h: AccountHandle): Promise<void> {
 
 const persistence: OnboardingPersistence = {
   saveLocal: (settings) => saveStore({ ...loadStore(), settings }),
-  saveSynced: (settings, mode, pinFields, targetRequestId) =>
-    saveOnboardingSettings(settings, mode, pinFields, undefined, undefined, targetRequestId),
+  saveSynced: (settings, mode, pinFields, targetRequestId, omitOnboardedAt) =>
+    saveOnboardingSettings(settings, mode, pinFields, undefined, undefined, targetRequestId,
+      omitOnboardedAt),
   saveWeighIn: (date, lb) => saveMorningWeight(date, lb, () => {}, { skipTargets: true }),
   loadConstraints: () => loadConstraints(),
   saveConstraints: (patch, rev) => saveConstraints(patch, rev),
@@ -236,6 +244,16 @@ export type CompletedOnboardingResult = {
   /** False when the safety round's condition write failed before anything else was written (no
    *  weigh-in, settings or target): a retry must run the whole save again (final Sol review r3). */
   profileWritten?: false;
+  /** Present only when the caller asked for `deferStamp`: the ONE write that stamps `onboarded_at`
+   *  (and opens the food world on a first completion). The caller runs it last, after every other
+   *  write the save makes was acknowledged. Memoised, so a retry that already stamped never
+   *  re-opens the world; a failed stamp can be run again. */
+  stamp?: () => Promise<void>;
+};
+
+export type CompletedOnboardingOptions = {
+  /** W062: write everything but the `onboarded_at` stamp; see `CompletedOnboardingResult.stamp`. */
+  deferStamp?: boolean;
 };
 
 /**
@@ -257,8 +275,10 @@ export async function persistCompletedOnboarding(
    *  with this round's taps, so a stored hold the round did not repeat builds the same held plan
    *  the screen showed, instead of failing as an incomplete profile with no pace. */
   storedEligibility?: TargetEligibility | null,
+  options: CompletedOnboardingOptions = {},
 ): Promise<CompletedOnboardingResult> {
   const h = accountHandle();
+  const deferStamp = options.deferStamp === true;
   const conditions = safetyConditionEntries(safety);
   const round = eligibilityFromSafetyAnswers(safety);
   const eligibility: TargetEligibility = storedEligibility ? {
@@ -291,15 +311,34 @@ export async function persistCompletedOnboarding(
   // G7: a safety-round condition patch was already written (with the flags) before the target, so
   // there is no second constraints write then.
   const [revision, constraints] = await Promise.all([
-    targetRequestId === undefined
-      ? deps.saveSynced(settings, "complete", changedPlanFields(base, settings))
-      : deps.saveSynced(settings, "complete", changedPlanFields(base, settings), targetRequestId),
+    deferStamp
+      ? deps.saveSynced(settings, "complete", changedPlanFields(base, settings), targetRequestId, true)
+      : targetRequestId === undefined
+        ? deps.saveSynced(settings, "complete", changedPlanFields(base, settings))
+        : deps.saveSynced(settings, "complete", changedPlanFields(base, settings), targetRequestId),
     conditions.length > 0
       ? Promise.resolve({ constraintsSaved: true } as const)
       : applyFlagConstraints(h, state.flags, deps),
   ]);
   const savedSettings = revision ? settingsWithTargetRevision(settings, revision) : settings;
   assertCurrent(h);
+  if (deferStamp) {
+    // Everything but the stamp is written. This device keeps the profile it just saved (the
+    // person can see their plan), but not `onboardedAt`: that is `stamp()`'s job, run last.
+    deps.saveLocal({ ...savedSettings, onboardedAt: base.onboardedAt ?? null });
+    let stamped: Promise<void> | null = null;
+    const stamp = () => {
+      stamped ??= (async () => {
+        assertCurrent(h);
+        deps.saveLocal(savedSettings);
+        await deps.saveSynced(savedSettings, "skip");
+        assertCurrent(h);
+        if (!base.onboardedAt && conditions.length === 0) await deps.openFoodWorld(h);
+      })().catch((error) => { stamped = null; throw error; });
+      return stamped;
+    };
+    return { settings: savedSettings, ...constraints, stamp };
+  }
   deps.saveLocal(savedSettings);
   // W13 (D14): only a FIRST completion opens the world — a later re-run of this same function
   // (an account editing its profile again) must never re-invite an account that chose `closed`.
