@@ -25,7 +25,7 @@ function loadWorker(windows: WindowClient[]) {
   const caches = {
     open: async () => ({ put: async () => undefined, match: async () => undefined }),
     match: async () => undefined,
-    keys: async () => ["hf-shell-v2", "hf-shell-v3"],
+    keys: async () => ["hf-shell-v3", "hf-shell-v4"],
     delete: async (key: string) => { deleted.push(key); return true; },
   };
   const listeners: Record<string, (event: unknown) => void> = {};
@@ -57,7 +57,7 @@ describe("service worker v3 never drives open tabs", () => {
     const b = windowClient("b", "https://hf.example/foods");
     const { listeners, clients, deleted } = loadWorker([a, b]);
     await run(listeners, "activate");
-    expect(deleted).toEqual(["hf-shell-v2"]);
+    expect(deleted).toEqual(["hf-shell-v3"]);
     expect(clients.claim).not.toHaveBeenCalled();
     for (const w of [a, b]) {
       expect(w.navigate).not.toHaveBeenCalled();

@@ -34,7 +34,15 @@ const RULES = { user_id: "u1", ...DEFAULT_PROFILE };
 /** Only the surface proposeDraft uses: two rpcs, three table reads, one insert. */
 function fakeDb(opts: { today?: number; duplicate?: { id: string } | null; portions?: unknown[];
   portionRows?: unknown[]; portionsError?: boolean; mediaObject?: typeof DEFAULT_MEDIA_OBJECT | null; mediaObjectError?: boolean;
-  constraints?: Record<string, unknown> | null; timeZone?: string | null } = {}) {
+  constraints?: Record<string, unknown> | null; timeZone?: string | null;
+  /** One answer per constraint_profiles read, in order; "error" fails that read. */
+  constraintReads?: (Record<string, unknown> | null | "error")[] } = {}) {
+  const reads = opts.constraintReads ? [...opts.constraintReads] : null;
+  const constraintRead = () => {
+    if (!reads) return { data: opts.constraints ?? null, error: null };
+    const next = reads.length > 1 ? reads.shift() : reads[0];
+    return next === "error" ? { data: null, error: { message: "rules down" } } : { data: next ?? null, error: null };
+  };
   const inserts: Record<string, unknown>[] = [];
   const rpc = vi.fn(async (name: string) => {
     if (name === "ai_calls_today") return { data: opts.today ?? 0, error: null };
@@ -58,7 +66,7 @@ function fakeDb(opts: { today?: number; duplicate?: { id: string } | null; porti
     // `in` resolves a query result.
     chain.in = table === "ai_calls" ? vi.fn(self)
       : vi.fn(() => settled({ data: opts.portions ?? [], error: null }));
-    chain.maybeSingle = vi.fn().mockResolvedValue(
+    chain.maybeSingle = table === "constraint_profiles" ? vi.fn(async () => constraintRead()) : vi.fn().mockResolvedValue(
       table === "ai_calls" ? { data: opts.duplicate ?? null, error: null }
       : table === "media_objects" ? (opts.mediaObjectError
           ? { data: null, error: { message: "boom" } }
@@ -206,6 +214,28 @@ describe("proposeDraft", () => {
     const out = await proposeDraft(db.client, db.client, "u1", REQ,
       { runCapture: captureOk as never, searchFoods: search as never });
     expect(out.items[0].policy).toMatchObject({ verdict: "blocked", reason: "category:onion_garlic" });
+  });
+
+  it("judges the draft by rules added while the model ran (verify round, Sol BLOCK)", async () => {
+    const search = vi.fn(async () => ({
+      hits: [{ ...HIT, description: "Onions, raw", prefStatus: null, score: 0.96,
+        policyCategories: ["onion_garlic"] },
+        { ...HIT, catalogFoodId: 8, revisionId: 80, prefStatus: null, score: 0.6,
+          policyCategories: [] }],
+      queryClass: "generic", autoResolve: null, catalogVersion: "v1",
+    }));
+    // The pre-model read has no row; the rule lands before the model answers.
+    const db = fakeDb({ constraintReads: [null, RULES] });
+    const out = await proposeDraft(db.client, db.client, "u1", REQ,
+      { runCapture: captureOk as never, searchFoods: search as never });
+    expect(out.items[0].policy).toMatchObject({ verdict: "blocked", reason: "category:onion_garlic" });
+  });
+
+  it("shows no draft when the rules cannot be read again after the model call", async () => {
+    const db = fakeDb({ constraintReads: [null, "error"] });
+    await expect(proposeDraft(db.client, db.client, "u1", REQ,
+      { runCapture: captureOk as never, searchFoods: searchAutoResolve as never }))
+      .rejects.toMatchObject({ code: "policy_failed" });
   });
 
   it("blocks nothing the account has not named (no constraint_profiles row)", async () => {

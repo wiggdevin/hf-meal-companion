@@ -129,6 +129,17 @@ describe("proposeDraft's pre-model checks", () => {
     expect(d.runCapture).not.toHaveBeenCalled();
   });
 
+  it("answers a duplicate with 409 even when the cap read fails: no blocked row, no model call", async () => {
+    const log: string[] = [];
+    const db = fakeDb(log, { duplicate: true, failCaps: true });
+    const d = deps(log);
+    const err = await proposeDraft(db.client, db.client, "u1", REQ, d).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(DuplicateRequest);
+    expect((err as { status?: number }).status).toBe(409);
+    expect(blockedRows(db.inserts)).toEqual([]);
+    expect(d.runCapture).not.toHaveBeenCalled();
+  });
+
   it("handles a failed cap read at once and throws it only after the probe clears", async () => {
     const unhandled = vi.fn();
     process.on("unhandledRejection", unhandled);

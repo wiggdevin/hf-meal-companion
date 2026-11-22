@@ -2,7 +2,7 @@
 
 import { AccountChanged, currentAccountOrNull, isAccountClosing, isCurrent, onAccountGone,
   type AccountHandle } from "@/lib/device/account";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { saveExtraNote } from "@/lib/log-note-client";
 import { syncFoodPref } from "@/lib/foods/prefs-client";
 import { getDay, loadStore, saveStore, upsertExtra, upsertFood } from "@/lib/store";
@@ -57,7 +57,7 @@ import ScanReadySheet from "@/components/today/ScanReadySheet";
 import type { BarcodeResponse } from "@/lib/barcode/client";
 import { captureActions, captureOverlayProps } from "@/lib/capture-client";
 import { publicFeatureScan } from "@/lib/capture/public-flags";
-import { useLogIntent } from "@/components/today/useLogIntent";
+import { LogIntentWatcher, type LogRequest } from "@/components/today/useLogIntent";
 import { slotOnDay } from "@/lib/log/log-intent";
 import LogNowButton from "@/components/today/LogNowButton";
 import type { CaptureMethod } from "@/lib/capture/flags";
@@ -221,12 +221,13 @@ export default function Today() {
   const [scanReady, setScanReady] = useState(false);
   // A `/log` link (home-screen shortcut): open what it asked for, once mounted. A slot counts only
   // when the viewed day's layout has it; the sheet fallback keeps it too.
-  useLogIntent(mounted, { methods: captureActions().map((a) => a.method), scan: publicFeatureScan() }, ({ open, slot }) => {
+  // LogIntentWatcher (rendered in a Suspense boundary below) calls this once Today is mounted.
+  const openLogRequest = ({ open, slot }: LogRequest): void => {
     const daySlot = slotOnDay(slot, resolved.slots);
     if (open.kind === "sheet") { openCardPanel(() => { setLogSlot(daySlot); setLogOpen("food"); }); return; }
     setHandoffSlot(daySlot);
     if (open.kind === "scan") setScanReady(true); else setCaptureMode(open.method);
-  });
+  };
   const [pendingProposal, setPendingProposal] = useState<Fresh<ProposalSummary[]> | null>(null);
   const [starterGate, setStarterGate] = useState<StarterGate | null>(null);
   const [eligibleFoodIds, setEligibleFoodIds] = useState<Set<string> | null>(null);
@@ -992,11 +993,16 @@ export default function Today() {
         className="mx-auto flex w-full max-w-md flex-col gap-5 px-4"
         style={{ paddingTop: "calc(var(--safe-top) + 20px)" }}
       >
+        <Suspense fallback={null}>
+          <LogIntentWatcher enabled={{ methods: captureActions().map((a) => a.method), scan: publicFeatureScan() }}
+            onOpen={openLogRequest} />
+        </Suspense>
         <TodayHeader eyebrow={eyebrow} title={title} greeting={isToday ? greetingFor(nowM) : undefined}
           back={isToday ? undefined : { href: "/", label: "Back to today",
             onClick: (event) => { event.preventDefault(); selectDate(todayIso); } }}
           trailing={<>
-            <LogNowButton onOpen={() => openCardPanel(() => { setLogSlot(focusSlotId); setLogOpen("food"); })} />
+            <LogNowButton onOpen={() => openCardPanel(() => { setLogSlot(focusSlotId); setLogOpen("food"); })}
+              opensDialog={!focusSlotId} panelOpen={logOpen !== null} />
             <DayTypeToggle
               key={viewedDate}
               date={viewedDate}
@@ -1263,7 +1269,9 @@ export default function Today() {
               // On a past day the slot and its time come from one choice, so they never disagree.
               slot={handoffSlot ?? (logAtFor(captureSlot) ? captureSlot : undefined)}
               at={logAtFor(captureSlot)}
-              onOpenSearch={() => { setCaptureMode(null); setHandoffSlot(null); setLogOpen("food"); }}
+              // Search keeps the requested slot, as the scan-ready sheet's Search does.
+              onOpenSearch={() => { const slot = handoffSlot; setCaptureMode(null); setHandoffSlot(null);
+                openCardPanel(() => { setLogSlot(slot); setLogOpen("food"); }); }}
               onLogged={() => { setCaptureMode(null); setHandoffSlot(null); refresh(); confirmLogged(); }}
               onClose={() => { setCaptureMode(null); setHandoffSlot(null); }}
             />

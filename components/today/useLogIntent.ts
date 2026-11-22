@@ -10,9 +10,14 @@
  * already mounted (a client navigation, or the address changed by a shortcut) is read the same way.
  * The address is the latch: a request is cleared from it as it is handled, so the same request is
  * never opened twice, and an address with no request handles nothing.
+ *
+ * Verify round: the read also re-runs when only the query changes (`useSearchParams`), so a second
+ * `/?log=…` push onto a mounted Today opens too. A fresh address request discards a request held
+ * across onboarding, so the older one never opens later. `useSearchParams` needs a Suspense
+ * boundary on a prerendered page, so Today renders `LogIntentWatcher` inside one.
  */
 import { useEffect, useLayoutEffect, useRef } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import type { CaptureMethod } from "@/lib/capture/flags";
 import { takeHeldLogIntent } from "@/lib/log/held-log-intent";
 import { parseLogIntent, resolveLogIntent, withoutLogIntent, type LogIntent, type LogOpen } from "@/lib/log/log-intent";
@@ -39,6 +44,7 @@ export function useLogIntent(
   open: (request: LogRequest) => void,
 ): void {
   const pathname = usePathname();
+  const search = useSearchParams()?.toString() ?? "";
   const latest = useRef({ enabled, open });
   // A layout effect runs before every passive effect, so the read below sees this render's values.
   useLayoutEffect(() => { latest.current = { enabled, open }; });
@@ -48,7 +54,10 @@ export function useLogIntent(
     let alive = true;
     const handle = (): void => {
       if (!alive) return;
-      const intent = takeAddressIntent() ?? takeHeldLogIntent();
+      const fromAddress = takeAddressIntent();
+      // Read the held request either way: a fresh address request supersedes and drops it.
+      const held = takeHeldLogIntent();
+      const intent = fromAddress ?? held;
       if (!intent) return;
       latest.current.open({ open: resolveLogIntent(intent.mode, latest.current.enabled), slot: intent.slot });
     };
@@ -57,6 +66,16 @@ export function useLogIntent(
     // page cleared its own) is a request too.
     window.addEventListener("popstate", handle);
     return () => { alive = false; window.removeEventListener("popstate", handle); };
-    // `pathname` re-runs the read after a client navigation lands on Today with a new request.
-  }, [ready, pathname]);
+    // `pathname` and `search` re-run the read after a client navigation lands on Today with a new
+    // request, including one that changes only the query.
+  }, [ready, pathname, search]);
+}
+
+/** The hook as a component, so Today can put it inside the Suspense boundary `useSearchParams` needs. */
+export function LogIntentWatcher({ enabled, onOpen }: {
+  enabled: { methods: readonly CaptureMethod[]; scan: boolean };
+  onOpen: (request: LogRequest) => void;
+}): null {
+  useLogIntent(true, enabled, onOpen);
+  return null;
 }

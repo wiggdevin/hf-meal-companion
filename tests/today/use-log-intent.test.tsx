@@ -8,14 +8,15 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let pathname = "/";
-vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
+let query = "";
+vi.mock("next/navigation", () => ({ usePathname: () => pathname, useSearchParams: () => new URLSearchParams(query) }));
 
 import { useLogIntent } from "@/components/today/useLogIntent";
 import { holdLogIntent } from "@/lib/log/held-log-intent";
 
 const enabled = { methods: ["text", "voice", "photo"] as const, scan: true };
 
-beforeEach(() => { pathname = "/"; window.sessionStorage.clear(); });
+beforeEach(() => { pathname = "/"; query = ""; window.sessionStorage.clear(); });
 afterEach(() => { cleanup(); window.history.replaceState(null, "", "/"); });
 
 describe("useLogIntent", () => {
@@ -64,6 +65,38 @@ describe("useLogIntent", () => {
     rerender();
     await waitFor(() => expect(open).toHaveBeenCalledTimes(2));
     expect(open).toHaveBeenLastCalledWith({ open: { kind: "capture", method: "photo" }, slot: "meal-3" });
+  });
+
+  it("answers two /?log= pushes in a row that change only the query (verify round)", async () => {
+    window.history.replaceState(null, "", "/?log=voice");
+    query = "log=voice";
+    const open = vi.fn();
+    const { rerender } = renderHook(() => useLogIntent(true, enabled, open));
+    await waitFor(() => expect(open).toHaveBeenCalledTimes(1));
+    // A client push onto the same path: only the search params change.
+    window.history.pushState(null, "", "/?log=photo&slot=meal-2");
+    query = "log=photo&slot=meal-2";
+    rerender();
+    await waitFor(() => expect(open).toHaveBeenCalledTimes(2));
+    expect(open).toHaveBeenLastCalledWith({ open: { kind: "capture", method: "photo" }, slot: "meal-2" });
+    window.history.pushState(null, "", "/?log=barcode");
+    query = "log=barcode";
+    rerender();
+    await waitFor(() => expect(open).toHaveBeenCalledTimes(3));
+    expect(open).toHaveBeenLastCalledWith({ open: { kind: "scan" }, slot: null });
+  });
+
+  it("drops a request held across onboarding when a fresh link supersedes it", async () => {
+    holdLogIntent({ mode: "photo", slot: "meal-2" });
+    window.history.replaceState(null, "", "/?log=voice");
+    const open = vi.fn();
+    const { rerender } = renderHook(() => useLogIntent(true, enabled, open));
+    await waitFor(() => expect(open).toHaveBeenCalledTimes(1));
+    expect(open).toHaveBeenCalledWith({ open: { kind: "capture", method: "voice" }, slot: null });
+    rerender();
+    act(() => window.dispatchEvent(new PopStateEvent("popstate")));
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(window.sessionStorage.length).toBe(0);
   });
 
   it("never opens the same request twice", async () => {

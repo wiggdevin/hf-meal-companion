@@ -589,7 +589,8 @@ export async function proposeDraft(
   const { usedToday, soft, state } = await assertUnderCaps(client, admin, userId, purpose, inputHash, since);
   // The account's food rules are read once the media and the caps have passed, and before the paid
   // model call: a refused request reads nothing more, and a failed read stops before any spend.
-  const profile = await loadUserProfile(client);
+  // This read only proves the rules are readable; the draft is judged by the read after the model.
+  await loadUserProfile(client);
 
   // Owner request 2026-10-02: text, photo and label ask OpenRouter first (lib/ai/capture.ts), the
   // Gemini payload above stays the fallback.
@@ -624,6 +625,10 @@ export async function proposeDraft(
   // T0 §4: every item is grounded at the same time, and `Promise.all` preserves the model's
   // order, so what the user reads on the confirm sheet is still the order the model said it in.
   const groundStarted = Date.now();
+  // Verify round (Sol BLOCK): the rules are read again after the model call, as main did, so an
+  // allergy or banned category added while the model ran still judges this draft. A failed read
+  // throws `policy_failed`: no draft is shown, never one judged by the older rules.
+  const profile = await loadUserProfile(client);
   const results = await Promise.all(parsed.items.map(
     (item) => groundItem(client, userId, item, label, profile, searchFoods)
       .catch((error: unknown) => ungroundable(item, error))));
