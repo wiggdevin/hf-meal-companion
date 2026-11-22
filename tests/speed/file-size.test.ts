@@ -50,7 +50,8 @@ const BASELINES: Record<string, number> = {
   /** 170 in the UI pass (2026-10-04, U19): the weigh-in logs directly and turns into its follow-ups
    *  (Undo, trend, suggestions) instead of sending a chat sentence; the weight path is weigh-in.ts. */
   "components/coach/attachments/WeighInField.tsx": 171,
-  "components/coach/attachments/context.ts": 18,
+  /** +1 (F-108): the moment carries the phone's zone, so a capture keeps it through a trip. */
+  "components/coach/attachments/context.ts": 19,
   /** +9 (UI audit 2026-10-18 §6): `onDispatched`, so a caller can tell posted from refused. */
   "components/coach/attachments/useAttachmentTurn.ts": 106,
   "components/coach/attachments/shell-state.ts": 65,
@@ -65,7 +66,8 @@ const BASELINES: Record<string, number> = {
   "components/coach/LogMealWarnings.tsx": 22,
   /** 37 in the AI-label pass (2026-10-05): blocks carry their message's provenance, so a
    *  compose_meal card inside a food_ideas block inherits it (one field, its import, its comment). */
-  "components/coach/blocks/context.ts": 37,
+  /** +1 (F-108): the message's saved time, the eaten time of a legacy card with no capture time. */
+  "components/coach/blocks/context.ts": 38,
   // +7: Phase 13 slice 4's dietary_profile_proposal import, BLOCK_KINDS entry and dispatch arm.
   "components/coach/blocks/index.tsx": 46,
   "components/coach/blocks/log_draft.tsx": 260,

@@ -140,7 +140,8 @@ export function CoachMessageExtras({
         || (attachment ? labelPostedAfter(message, messages, attachment.mediaPath) : false));
       return <Fragment key={block.id}>
         {renderBlock(block, {
-          tz, onBlockStatus, onSearchManually, commitBarcode, commitCapture, deleteEntry,
+          tz, messageCreatedAt: message.createdAt, onBlockStatus, onSearchManually, commitBarcode,
+          commitCapture, deleteEntry,
           sendText: sendText ?? (() => {}), logFood: (ref) => logFood(ref, tz),
           markEats: (ref) => markFood(ref, "eats"),
           markAvoid: (ref) => markFood(ref, "avoid"),

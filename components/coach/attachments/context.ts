@@ -4,7 +4,7 @@ import { resolveDay } from "@/lib/resolve";
 import { loadStore } from "@/lib/store";
 import type { SlotId } from "@/lib/types";
 
-export type AttachmentMoment = { localDate: string; slot: SlotId };
+export type AttachmentMoment = { localDate: string; slot: SlotId; tz: string };
 
 /** Use the same local date and current-slot rule as the existing capture sheet. */
 export function attachmentMoment(at: Date = new Date()): AttachmentMoment {
@@ -13,6 +13,7 @@ export function attachmentMoment(at: Date = new Date()): AttachmentMoment {
   const slots = resolveDay(loadStore(), date).slots;
   return {
     localDate: date,
+    tz,
     slot: slotForNow(slots, at.getHours() * 60 + at.getMinutes()),
   };
 }
