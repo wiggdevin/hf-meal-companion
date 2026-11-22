@@ -21,7 +21,7 @@ import { forgetLoggedEntry } from "@/lib/log/delete-entry";
 import { opIdFor } from "@/lib/log/op-id";
 import { savedFrom } from "@/lib/log/outcome";
 import { NUTRITION_UNCHECKED_COPY, commitNutritionUnchecked } from "@/lib/nutrition-display";
-import { instantAt } from "@/lib/coach/apply-shared";
+import { draftEatenAt } from "@/lib/capture/draft-eaten-at";
 import type { SlotId } from "@/lib/types";
 import type { LogDraftBlockV1, ResolvedBarcodeDraft } from "@/lib/coach/ui-blocks";
 import Notice from "@/components/ui/Notice";
@@ -69,7 +69,7 @@ async function commitBarcode(
   if (!isBarcodeDraft(block.draft)) throw new Error("That barcode draft is no longer available.");
   const entryId = opIdFor(block.id, undefined);
   const itemId = opIdFor(`${block.id}:item:0`, undefined);
-  const at = instantAt(block.localDate, "12:00", tz);
+  const at = draftEatenAt(block, tz);
   if (!at) throw new Error("That draft date is no longer available.");
   const revision = toCachedRevision(edits.match, block.draft.gtin14);
   const request = buildCommitRequest({
@@ -95,7 +95,7 @@ async function commitCapture(
 ): Promise<LogDraftCommit> {
   if (!isCaptureDraft(block.draft)) throw new Error("That photo draft is no longer available.");
   const entryId = opIdFor(block.id, undefined);
-  const eatenAt = instantAt(block.localDate, "12:00", tz);
+  const eatenAt = draftEatenAt(block, tz);
   if (!eatenAt) throw new Error("That draft date is no longer available.");
   const result = await commitDraft(block.draft, edits.items, {
     entryId, eatenAt, tz, slot: edits.slot ?? slotOf(block),

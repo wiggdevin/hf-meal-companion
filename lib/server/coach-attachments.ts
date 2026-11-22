@@ -386,7 +386,7 @@ export async function runAttachmentTurn(
     const attachMs = elapsed(attachStartedAt, deps.now);
     const block: LogDraftBlockV1 = {
       kind: "log_draft", v: 1, id: deps.newId(), source: "barcode",
-      localDate: req.attachment.localDate,
+      localDate: req.attachment.localDate, capturedAt: new Date(attachStartedAt).toISOString(),
       ...(req.attachment.slot ? { slot: req.attachment.slot } : {}),
       draft, policy: blockPolicy(draft), status: "pending",
     };
@@ -413,6 +413,7 @@ export async function runAttachmentTurn(
     const block: LogDraftBlockV1 = {
       kind: "log_draft", v: 1, id: deps.newId(), source: "capture",
       method: req.attachment.method, localDate: req.attachment.localDate,
+      capturedAt: new Date(attachStartedAt).toISOString(),
       ...(req.attachment.slot ? { slot: req.attachment.slot } : {}),
       draft, policy: blockPolicy(draft), status: "pending",
     };

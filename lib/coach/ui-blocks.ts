@@ -161,6 +161,8 @@ export const logDraftBlockV1Schema = z.object({
   source: z.enum(["barcode", "capture"]),
   method: z.enum(["photo", "label"]).optional(),
   localDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  /** The instant the server took the capture (F-108): the log is eaten then, not at noon. */
+  capturedAt: z.string().datetime().optional(),
   slot: z.string().min(1).max(64).optional(),
   draft: captureDraftSchema,
   policy: z.object({
