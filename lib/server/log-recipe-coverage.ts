@@ -37,6 +37,12 @@ type RevisionRow = { rev: number; nutrients_per_serving: Record<string, unknown>
 /** Ids per `.in()` read: well under the 1,000-row cap and a safe URL length. */
 export const ID_BATCH = 200;
 
+/** A query bound to `signal` when there is one; test doubles without `abortSignal` run unchanged. */
+function bound<Q>(query: Q, signal: AbortSignal | undefined): Q {
+  const q = query as Q & { abortSignal?: (s: AbortSignal) => Q };
+  return signal && typeof q.abortSignal === "function" ? q.abortSignal(signal) : query;
+}
+
 function batches<T>(values: readonly T[]): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < values.length; i += ID_BATCH) out.push(values.slice(i, i + ID_BATCH));
@@ -60,7 +66,7 @@ export class RecipeCoverageReadError extends Error {
  * the owner's user-food ids, so the food_refs read needs no owner predicate of its own).
  */
 export async function partialRecipeCoverageByRef(
-  client: SupabaseClient, refIds: readonly string[], userId?: string,
+  client: SupabaseClient, refIds: readonly string[], userId?: string, signal?: AbortSignal,
 ): Promise<Map<string, number>> {
   const out = new Map<string, number>();
   const unique = [...new Set(refIds)];
@@ -68,8 +74,9 @@ export async function partialRecipeCoverageByRef(
   const userFoodByRef = new Map<string, string>();
   try {
     for (const batch of batches(unique)) {
-      const refs = await client.from("food_refs").select("id, user_food_id, user_foods(kind)")
-        .in("id", batch);
+      signal?.throwIfAborted();
+      const refs = await bound(client.from("food_refs").select("id, user_food_id, user_foods(kind)")
+        .in("id", batch), signal);
       if (refs.error) throw refs.error;
       for (const row of (refs.data ?? []) as { id: string; user_food_id: string | null;
         user_foods?: { kind?: string } | null }[]) {
@@ -82,6 +89,7 @@ export async function partialRecipeCoverageByRef(
       }
     }
   } catch (error) {
+    if (signal?.aborted) throw signal.reason;
     throw new RecipeCoverageReadError(error, null);
   }
   const userFoodIds = [...new Set(userFoodByRef.values())];
@@ -90,13 +98,15 @@ export async function partialRecipeCoverageByRef(
   const recipeRows: { id: string; rev: number; recipe_revisions: RevisionRow[] | null }[] = [];
   try {
     for (const batch of batches(userFoodIds)) {
+      signal?.throwIfAborted();
       const query = client.from("recipes")
         .select("id, rev, recipe_revisions(rev, nutrients_per_serving)").in("id", batch);
-      const recipes = await (userId ? query.eq("user_id", userId) : query);
+      const recipes = await bound(userId ? query.eq("user_id", userId) : query, signal);
       if (recipes.error) throw recipes.error;
       recipeRows.push(...(recipes.data ?? []) as typeof recipeRows);
     }
   } catch (error) {
+    if (signal?.aborted) throw signal.reason;
     throw new RecipeCoverageReadError(error, new Set(userFoodByRef.keys()));
   }
   const coverageByRecipe = new Map<string, number>();
@@ -132,7 +142,7 @@ export type PartialSource = "recorded" | "derived" | "unchecked";
  */
 export async function judgePartialItems(
   client: SupabaseClient, items: readonly JudgedItem[],
-  opts: { onError: "mark" | "throw"; userId?: string; onUnchecked?: () => void },
+  opts: { onError: "mark" | "throw"; userId?: string; onUnchecked?: () => void; signal?: AbortSignal },
 ): Promise<({ source: PartialSource; coverage: number | null } | null)[]> {
   const unrecorded = items.filter((item) => typeof item.nutrition_partial !== "boolean");
   let byRef = new Map<string, number>();
@@ -141,8 +151,10 @@ export async function judgePartialItems(
   if (unrecorded.length > 0) {
     try {
       byRef = await partialRecipeCoverageByRef(client, unrecorded.map((item) => item.food_ref_id),
-        opts.userId);
+        opts.userId, opts.signal);
     } catch (error) {
+      // A stopped read is not an unreadable one: the caller asked for it to end.
+      if (opts.signal?.aborted) throw opts.signal.reason;
       if (opts.onError === "throw") throw error instanceof RecipeCoverageReadError ? error.cause : error;
       const known = error instanceof RecipeCoverageReadError ? error.userFoodRefs : null;
       console.error(known === null

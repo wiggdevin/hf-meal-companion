@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { readIntakeWindow, recentRecordedDates } from "@/lib/server/intake-window";
 
 type Rows = Record<string, unknown>[];
-type Answer = Rows | Error | "hang";
+/** Rows; an Error as a postgrest `{ error }`; `{ rejects }` as a rejected request; or a hang. */
+type Answer = Rows | Error | { rejects: Error } | "hang";
 
 /**
  * A postgrest double with `abortSignal`: each table answers rows, an error, or hangs until its
@@ -24,6 +25,7 @@ function client(tables: Record<string, Answer>) {
           signal.addEventListener("abort", () => reject(signal.reason), { once: true });
         });
       }
+      if (!Array.isArray(value)) return Promise.reject(value.rejects);
       const rows = value.filter((row) => read.filters.every(([op, column, wanted]) => {
         if (!(column in row)) return true;
         const have = String(row[column]);
@@ -146,6 +148,71 @@ describe("readIntakeWindow", () => {
     expect(plan?.signal?.aborted).toBe(true);
   });
 
+  it("fails at once on a user_settings error and aborts the reads still running", async () => {
+    const failure = new Error("user_settings down");
+    const { admin, reads } = client({
+      user_settings: failure, log_entries: "hang", plan_days: "hang", target_profiles: "hang",
+    });
+
+    await expect(readIntakeWindow(admin, "u", { from: "2026-09-13", to: "2026-09-19" },
+      { today: "2026-09-19" })).rejects.toBe(failure);
+    for (const table of ["log_entries", "plan_days", "target_profiles"]) {
+      expect(reads.find((read) => read.table === table)?.signal?.aborted, table).toBe(true);
+    }
+  });
+
+  it("binds the recipe coverage reads to the signal, so an abort stops them", async () => {
+    const unrecorded = { ...entry("2026-09-14"), log_items: [{ ...entry("2026-09-14").log_items[0],
+      nutrition_partial: undefined }] };
+    const { admin, reads } = client({
+      log_entries: [unrecorded], target_profiles: [PROFILE], food_refs: "hang",
+    });
+    const caller = new AbortController();
+
+    const pending = readIntakeWindow(admin, "u", { from: "2026-09-13", to: "2026-09-19" },
+      { today: "2026-09-19", signal: caller.signal });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(reads.some((read) => read.table === "food_refs")).toBe(true);
+    caller.abort(new Error("phone left"));
+
+    await expect(pending).rejects.toThrow("phone left");
+    expect(reads.find((read) => read.table === "food_refs")?.signal?.aborted).toBe(true);
+  });
+
+  it("counts a ritual slot that is both ticked and logged once, from its log", async () => {
+    const coffee = { baseMealId: "recipe:latte-0001", title: "Latte", components: [{ name: "Latte", qty: 1,
+      unit: "whole", role: "free", macros: { kcal: 120, protein: 6, carbs: 10, fat: 5 } }] };
+    const { admin } = client({
+      log_entries: [{ ...entry("2026-09-14", 8), slot: "coffee" }],
+      plan_days: [{ local_date: "2026-09-14", eaten_slots: { coffee: mark("2026-09-14T08:00:00Z", coffee) } }],
+      target_profiles: [PROFILE],
+    });
+
+    const days = await readIntakeWindow(admin, "u", { from: "2026-09-13", to: "2026-09-19" },
+      { today: "2026-09-20" });
+
+    expect(days.map((day) => [day.date, day.protein])).toEqual([["2026-09-14", { value: 8, partial: false }]]);
+    // The tick alone counts its snapshot, so the log above is what replaced it.
+    const ticked = client({ plan_days: [{ local_date: "2026-09-14",
+      eaten_slots: { coffee: mark("2026-09-14T08:00:00Z", coffee) } }], target_profiles: [PROFILE] });
+    expect((await readIntakeWindow(ticked.admin, "u", { from: "2026-09-13", to: "2026-09-19" },
+      { today: "2026-09-20" }))[0]?.protein).toEqual({ value: 6, partial: false });
+  });
+
+  it("charts a logged entry with no items as unmeasured, not as exact zeros", async () => {
+    const { admin } = client({
+      log_entries: [{ ...entry("2026-09-14"), log_items: [] }],
+      target_profiles: [PROFILE],
+    });
+
+    const days = await readIntakeWindow(admin, "u", { from: "2026-09-13", to: "2026-09-19" },
+      { today: "2026-09-20" });
+
+    expect(days.map((day) => [day.kcal, day.protein])).toEqual([[
+      { value: null, partial: true }, { value: null, partial: true },
+    ]]);
+  });
+
   it("stops every read when the caller's signal aborts", async () => {
     const { admin, reads } = client({ log_entries: "hang", plan_days: "hang", target_profiles: "hang" });
     const caller = new AbortController();
@@ -185,5 +252,17 @@ describe("recentRecordedDates", () => {
     expect(reads.find((read) => read.table === "daily_energy")?.filters).toEqual([
       ["gte", "local_date", "2026-06-22"], ["lte", "local_date", "2026-09-19"],
     ]);
+  });
+
+  it.each(["daily_energy", "plan_days"])("aborts the other read when the %s request rejects", async (table) => {
+    const failure = new Error(`${table} unreachable`);
+    const { admin, reads } = client({
+      daily_energy: "hang", plan_days: "hang", [table]: { rejects: failure },
+    });
+
+    await expect(recentRecordedDates(admin, "u", { from: "2026-06-22", to: "2026-09-19", count: 7 }))
+      .rejects.toBe(failure);
+    const other = reads.find((read) => read.table !== table);
+    expect(other?.signal?.aborted).toBe(true);
   });
 });

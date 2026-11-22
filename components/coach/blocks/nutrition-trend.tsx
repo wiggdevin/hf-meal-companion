@@ -119,7 +119,8 @@ export function trendColumns(days: TrendDay[], key: Key, range: { start: string;
     const value = measured.length > 0 ? mean(measured.map((day) => day.value!)) : null;
     const target = measured.length > 0 && measured.every((day) => day.target !== null)
       ? mean(measured.map((day) => day.target!)) : null;
-    const partial = inSpan.some((day) => day.partial);
+    // A week's average reads only its measured days, so only they can make it a floor.
+    const partial = measured.some((day) => day.partial);
     const length = spanDays(span.start, span.end);
     const tail = ` a day · ${measured.length} measured of ${inSpan.length} logged · ${length} of 7 days`;
     const when = `Week ${rangeText(span.start, span.end)}`;
@@ -199,7 +200,7 @@ function Trend({ block }: { block: ChartBlockV1 }) {
       onSelect={(index) => setSelected((current) => (current === index ? null : index))}
       summary={summary} caption={`${isKcal ? "Calories" : LABEL[key]}: ${block.caption}`}
       periodHeading={period} valueHeading={`${isKcal ? "Calories (kcal)" : `${LABEL[key]} (g)`}`} />
-    {days.some((day) => day.partial) && <p className="m-0 text-tiny text-muted">Dashed bars are at least
+    {cols.some((col) => col.value !== null && col.partial) && <p className="m-0 text-tiny text-muted">Dashed bars are at least
       that much: part of what was eaten is only partly measured, or the day is still going.</p>}
   </>;
 }

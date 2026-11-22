@@ -47,6 +47,8 @@ export function chartSpanDays(message: string): number | null {
   for (const [, unit] of message.matchAll(/\b(?:this|last|past|the)\s+(week|fortnight|month)\b/gi)) {
     spans.push(SPAN_UNIT_DAYS[unit.toLowerCase()]);
   }
+  // "over the past day" is a window of one (clamped to 7); "for the day" stays today's chart.
+  if (/\b(?:last|past)\s+day\b/i.test(message)) spans.push(1);
   return spans.length > 0 ? Math.max(...spans) : null;
 }
 
@@ -79,7 +81,7 @@ export function focusMacro(message: string): "protein" | "carbs" | "fat" | undef
 }
 
 /** Asked over time without a window: "how has my protein been", "my macros lately", "protein trend". */
-export const OVER_TIME = /\b(?:trends?|over time|lately|recently|by day|each day|daily|per day)\b|\bhow (?:has|have)\b.*\bbeen\b/i;
+export const OVER_TIME = /\b(?:trends?|over time|lately|recently|by day|each day|daily|per day)\b|\bhow (?:has|have|is|are)\b.*\bbeen\b/i;
 
 const SPAN = `(?:(?:over|for|in|during|from) )?(?:the )?(?:(?:this|last|past) (?:${COUNT} )?|${COUNT} )${UNIT}`;
 const TREND_WINDOW = `(?:${SPAN}|lately|recently|over time|by day|each day|daily|per day)`;

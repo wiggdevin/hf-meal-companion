@@ -120,7 +120,9 @@ type IntakeKey = "kcal" | MacroTrendKey;
 function intakeSeries(rows: readonly NutritionChartRow[], key: IntakeKey, label: string, targetLabel: string) {
   return [
     { label, points: rows.map((row) => ({ x: row.date,
-      y: row[key].value === null ? null : round2(row[key].value!),
+      // A floor keeps full precision: rounding 99.996 up to 100 would claim more than was eaten.
+      // The client floors it at display (nutrition-trend.tsx `amount`).
+      y: row[key].value === null ? null : row[key].partial ? row[key].value : round2(row[key].value!),
       ...(row[key].partial ? { partial: true as const } : {}) })) },
     { label: targetLabel, points: rows.flatMap((row) => row.target && row[key].value !== null
       ? [{ x: row.date, y: round2(row.target[key]) }] : []) },

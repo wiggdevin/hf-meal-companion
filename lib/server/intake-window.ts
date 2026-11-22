@@ -13,6 +13,7 @@
  * when a sibling read fails.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isCommitSlot } from "@/lib/log/contract";
 import { amountLabel, entryMass, massOf } from "@/lib/log/mass";
 import { itemKcal } from "@/lib/nutrients/energy";
 import { readByDateChunks, readByIdBatches } from "@/lib/server/date-chunks";
@@ -81,10 +82,12 @@ function loggedFood(entry: EntryRow, partial: boolean): LoggedFood {
     };
   });
   const { grams, massUnknown } = entryMass(items);
-  const macros = items.reduce((t, i) => ({ kcal: t.kcal + i.macros.kcal, protein: t.protein + i.macros.protein,
+  // An entry with no items measured nothing: NaN totals read as unmeasured (series.ts `add`), not 0.
+  const macros = items.length === 0 ? { kcal: NaN, protein: NaN, carbs: NaN, fat: NaN } : items.reduce((t, i) => ({ kcal: t.kcal + i.macros.kcal, protein: t.protein + i.macros.protein,
     carbs: t.carbs + i.macros.carbs, fat: t.fat + i.macros.fat }), { kcal: 0, protein: 0, carbs: 0, fat: 0 });
   return {
-    ...(/^(meal-[1-6]|snack)$/.test(entry.slot) ? { slot: entry.slot as LoggedFood["slot"] } : {}),
+    // Every slot a log may name (ritual slots too), so a ticked slot with its own log counts once.
+    ...(isCommitSlot(entry.slot) ? { slot: entry.slot } : {}),
     id: entry.id, foodId: "meal", name: "", qty: 1, grams, ...(massUnknown ? { massUnknown: true } : {}),
     portionLabel: "", macros, at: "", items, ...(partial ? { nutritionPartial: true } : {}),
   };
@@ -120,12 +123,13 @@ async function readPlanDays(admin: SupabaseClient, userId: string, span: IntakeD
 async function targetSettings(admin: SupabaseClient, userId: string, through: string,
   signal: AbortSignal): Promise<Settings> {
   const [row, profiles] = await Promise.all([
-    bound(admin.from("user_settings").select("*").eq("user_id", userId), signal).maybeSingle(),
+    // Throw here, not after Promise.all, so a failed settings read stops its siblings at once.
+    bound(admin.from("user_settings").select("*").eq("user_id", userId), signal).maybeSingle()
+      .then((result) => { if (result.error) throw result.error; return result; }),
     fetchAllRows<TargetProfile>((from, to) => bound(admin.from("target_profiles").select("*")
       .eq("user_id", userId).lte("effective_from", through)
       .order("effective_from", { ascending: true }).order("rev", { ascending: true }).range(from, to), signal)),
   ]);
-  if (row.error) throw row.error;
   const settingsRow = (row.data ?? {}) as UserSettingsProfileRow;
   const base: Settings = { ...defaultSettings(), ...settingsProfileFromRow(settingsRow) };
   const revisions = profiles.flatMap((profile) => {
@@ -168,7 +172,7 @@ export async function readIntakeWindow(admin: SupabaseClient, userId: string, sp
   let unchecked = false;
   // #21, the same judgement as one day's context: the recorded flag, else the recipe's revision.
   const judged = await judgePartialItems(admin, entries.flatMap((entry) => entry.log_items),
-    { onError: "mark", userId, onUnchecked: () => { unchecked = true; } });
+    { onError: "mark", userId, signal, onUnchecked: () => { unchecked = true; } });
   signal.throwIfAborted();
   const days = new Map<string, StoredDay>();
   const dayOf = (date: string) => {
@@ -222,10 +226,10 @@ export async function recentRecordedDates(admin: SupabaseClient, userId: string,
     bound(admin.from("daily_energy").select("local_date").eq("user_id", userId)
       .gte("local_date", opts.from).lte("local_date", opts.to)
       .order("local_date", { ascending: false }).limit(opts.count), signal)
-      .then(({ data, error }) => (error ? fail(error) : (data ?? []) as Row[])),
+      .then(({ data, error }) => (error ? fail(error) : (data ?? []) as Row[]), fail),
     bound(admin.from("plan_days").select("local_date, eaten_slots").eq("user_id", userId)
       .gte("local_date", opts.from).lte("local_date", opts.to), signal)
-      .then(({ data, error }) => (error ? fail(error) : (data ?? []) as Row[])),
+      .then(({ data, error }) => (error ? fail(error) : (data ?? []) as Row[]), fail),
   ]);
   const dates = new Set<string>();
   for (const row of logged) if (typeof row.local_date === "string") dates.add(row.local_date.slice(0, 10));

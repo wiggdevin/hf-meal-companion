@@ -181,6 +181,8 @@ export const logDraftBlockV1Schema = z.object({
 const isoDate = z.iso.date();
 const TIME_CHARTS = new Set(["weight_trend", "kcal_week", "macros_trend"]);
 const NUTRITION_TRENDS = new Set(["kcal_week", "macros_trend"]);
+/** The longest charted range (lib/coach/intent.ts clamps a request to 7..90 days). */
+const MAX_RANGE_DAYS = 90;
 
 export const chartBlockV1Schema = z.object({
   kind: z.literal("chart"),
@@ -220,12 +222,22 @@ export const chartBlockV1Schema = z.object({
   if (block.chart === "macros_trend" && block.days !== undefined && (block.days < 7)) {
     ctx.addIssue({ code: "custom", path: ["days"], message: "macros_trend days must be 7..90" });
   }
+  if ((block.start === undefined) !== (block.end === undefined)) {
+    ctx.addIssue({ code: "custom", path: ["start"], message: "start and end come together" });
+  }
   if (block.start && block.end && block.start > block.end) {
     ctx.addIssue({ code: "custom", path: ["start"], message: "start must not be after end" });
+  }
+  if (block.start && block.end && Date.parse(`${block.end}T00:00:00Z`) - Date.parse(`${block.start}T00:00:00Z`)
+    > (MAX_RANGE_DAYS - 1) * 86_400_000) {
+    ctx.addIssue({ code: "custom", path: ["end"], message: `the range spans at most ${MAX_RANGE_DAYS} days` });
   }
   block.series.forEach((series, s) => series.points.forEach((point, p) => {
     if (TIME_CHARTS.has(block.chart) && !isoDate.safeParse(point.x).success) {
       ctx.addIssue({ code: "custom", path: ["series", s, "points", p, "x"], message: "x must be an ISO date" });
+    }
+    if (block.start && block.end && (point.x < block.start || point.x > block.end)) {
+      ctx.addIssue({ code: "custom", path: ["series", s, "points", p, "x"], message: "x must lie inside start..end" });
     }
     if (!NUTRITION_TRENDS.has(block.chart) && (point.y === null || point.partial)) {
       ctx.addIssue({ code: "custom", path: ["series", s, "points", p], message: "only nutrition trends hold null or partial points" });

@@ -81,6 +81,15 @@ describe("chart block hydration", () => {
     expect(chartBlockV1Schema.safeParse(block).success).toBe(true);
   });
 
+  it("keeps a floor's full precision, so display can floor it, and rounds a whole value", () => {
+    const block = hydrateChart({ chart: "kcal_week", days: 7 }, { id: "c", nutritionRows: [
+      nrow("2026-09-18", { kcal: 1499.996 }, { kcal: true }), nrow("2026-09-19", { kcal: 1499.996 }),
+    ], range: { start: "2026-09-13", end: "2026-09-19" } });
+    expect(block?.series[0].points).toEqual([
+      { x: "2026-09-18", y: 1499.996, partial: true }, { x: "2026-09-19", y: 1500 },
+    ]);
+  });
+
   it("names both years when the range crosses one", () => {
     expect(rangeLabel("2025-12-20", "2026-01-02")).toBe("Dec 20, 2025 – Jan 2, 2026");
     expect(rangeLabel("2026-09-19", "2026-09-19")).toBe("Sep 19, 2026");

@@ -28,6 +28,11 @@ const SLOT_IDS = ["coffee", "pouches-pre", "post-refuel", "meal-1", "meal-2", "m
  * so the label costs nothing and tells the export and the coach what the entry was.
  */
 const COMMIT_SLOT_IDS = [...SLOT_IDS, "snack"] as const;
+
+/** Whether a stored `log_entries.slot` is one a commit may name: any plan SlotId, or "snack". */
+export function isCommitSlot(value: unknown): value is (typeof COMMIT_SLOT_IDS)[number] {
+  return typeof value === "string" && (COMMIT_SLOT_IDS as readonly string[]).includes(value);
+}
 const METHODS = ["search", "plan", "text", "voice", "label", "photo", "barcode"] as const;
 const DRAFT_METHODS: readonly string[] = ["voice", "label", "photo"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

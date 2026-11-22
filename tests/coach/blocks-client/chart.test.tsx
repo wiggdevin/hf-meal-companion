@@ -253,6 +253,29 @@ describe("chart block", () => {
       )).toBeTruthy();
     });
 
+    it("reads a week as exact when its only partial day measured nothing, and hides the legend", () => {
+      const many = Array.from({ length: 21 }, (_, index) =>
+        new Date(Date.UTC(2026, 7, 30 + index)).toISOString().slice(0, 10));
+      const { container } = render(renderBlock(trend({ days: 21, start: "2026-08-30", end: "2026-09-19", series: [
+        { label: "Protein", points: many.map((x) => (x === "2026-09-15"
+          ? { x, y: null, partial: true as const } : { x, y: 100 })) },
+        { label: "Protein target", points: many.filter((x) => x !== "2026-09-15").map((x) => ({ x, y: 120 })) },
+      ] }), {} as never));
+      expect(container.querySelectorAll("[data-partial]")).toHaveLength(0);
+      expect(screen.getByLabelText(
+        "Week Sep 13 – Sep 19, 2026 · 100 g protein · target 120 g a day · 6 measured of 7 logged · 7 of 7 days",
+      )).toBeTruthy();
+      expect(screen.queryByText(/Dashed bars/)).toBeNull();
+    });
+
+    it("hides the legend when the only partial day is a blank", () => {
+      render(renderBlock(trend({ series: [
+        { label: "Protein", points: [{ x: "2026-09-15", y: 80 }, { x: "2026-09-17", y: null, partial: true },
+          { x: "2026-09-19", y: 100 }] },
+      ] }), {} as never));
+      expect(screen.queryByText(/Dashed bars/)).toBeNull();
+    });
+
     it("keeps the macro chips with the empty state when no day was logged", () => {
       render(renderBlock(trend({ series: [] }), {} as never));
       expect(screen.getByText("No logged days for protein yet.")).toBeTruthy();

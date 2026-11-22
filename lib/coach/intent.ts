@@ -102,6 +102,8 @@ function chartArgs(message: string): IntentArgs["show_chart"] {
     if (days !== null) return { chart: "macros_trend", days, ...withFocus };
     if (overTime) return { chart: "macros_trend", days: OPEN_TREND_DAYS, ...withFocus };
     if (/\bmacros?\b/i.test(message)) return { chart: "macros_today" };
+    // One macro with no window ("protein chart", "show my carbs chart"): the open two weeks.
+    if (focus) return { chart: "macros_trend", days: OPEN_TREND_DAYS, focus };
   }
   if (/\b(?:week|weekly|calories|calorie|kcal)\b/i.test(message)) {
     // Only "this week" keeps the original last seven logged days; "last 7 days" is 7 calendar days.

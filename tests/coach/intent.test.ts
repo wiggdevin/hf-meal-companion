@@ -13,6 +13,7 @@ vi.mock("@/lib/ai/typesafe", () => ({
     systemOneMock(p.state, p.questions, { ...o, purpose: p.purpose }),
 }));
 
+import { isNutritionTrendCommand } from "@/lib/coach/chart-grammar";
 import {
   chartSpanDays,
   classifyIntent,
@@ -294,6 +295,41 @@ describe("intent pre-pass", () => {
     const result = await classifyIntent(message, context);
     expect(result?.args).toEqual(args);
     if ("days" in args) expect(hintLine(result!)).toContain(`days=${args.days}`);
+  });
+
+  it.each([
+    ["show my carbs chart", { chart: "macros_trend", days: 14, focus: "carbs" }],
+    ["protein chart", { chart: "macros_trend", days: 14, focus: "protein" }],
+    ["fat chart", { chart: "macros_trend", days: 14, focus: "fat" }],
+    ["how is my protein been", { chart: "macros_trend", days: 14, focus: "protein" }],
+    ["how are my macros been", { chart: "macros_trend", days: 14 }],
+    ["protein over the past day", { chart: "macros_trend", days: 7, focus: "protein" }],
+    ["calories over the last day", { chart: "kcal_week", days: 7 }],
+  ] as const)("gives chart args to the gate-admitted phrase %s", async (message, args) => {
+    expect(isNutritionTrendCommand(message)).toBe(true);
+    systemOneMock.mockResolvedValue(answers("show_chart", 0.93));
+    const result = await classifyIntent(message, context);
+    expect(result?.args).toEqual(args);
+  });
+
+  it("gives chart args, with a 7..90 day window, to every phrase the trend gate admits", async () => {
+    const subjects = ["my protein", "carbs", "my fat intake", "macros", "my calories", "kcal"];
+    const windows = ["", " lately", " daily", " over the past day", " for the last 2 days",
+      " over the past 3 weeks", " this month", " a day", " over time"];
+    const phrases = subjects.flatMap((subject) => windows.flatMap((window) => [
+      `show me ${subject} chart${window}`, `${subject} trend${window}`, `chart ${subject}${window}`,
+      `how has ${subject} been${window}`, `how is ${subject} been${window}`,
+    ])).filter(isNutritionTrendCommand);
+    expect(phrases.length).toBeGreaterThan(150);
+    systemOneMock.mockResolvedValue(answers("show_chart", 0.93));
+    for (const message of phrases) {
+      const args = (await classifyIntent(message, context))?.args as { chart?: string; days?: number };
+      expect(args?.chart, message).toMatch(/^(?:kcal_week|macros_trend|macros_today)$/);
+      if (args.days !== undefined) {
+        expect(args.days, message).toBeGreaterThanOrEqual(7);
+        expect(args.days, message).toBeLessThanOrEqual(90);
+      }
+    }
   });
 
   it.each([

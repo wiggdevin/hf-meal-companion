@@ -17,6 +17,12 @@ describe("chart block schema on replay", () => {
     }).success).toBe(true);
   });
 
+  it("accepts a range of exactly 90 days with points on both ends", () => {
+    expect(chartBlockV1Schema.safeParse({ ...VALID_TREND, days: 90, start: "2026-06-22",
+      series: [{ label: "Protein", points: [{ x: "2026-06-22", y: 1 }, { x: "2026-09-19", y: 2 }] }],
+    }).success).toBe(true);
+  });
+
   it.each(INVALID_CHART_BLOCKS)("refuses %s", (_, block) => {
     expect(uiBlockSchema.safeParse(block).success).toBe(false);
   });
