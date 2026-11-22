@@ -100,4 +100,18 @@ Findings:
 - Settled global spend today: $0.034. Earlier days: $0.000 to $0.008. Production already has the
   `background` column (migration 20270103090000 is applied).
 - So no false trip was live at measurement time. The failure mode needs concurrent holds with dead
-  functions; W043's migration closes it.
+  functions. W043 does not hide such holds from the ceiling (an expired hold may still be running,
+  so it counts in full until reconciled). It shortens how long one can linger: interactive holds
+  now live 90 s instead of 300 s, the sweep cron runs on every tick, and one budget lock makes the
+  ceiling exact across the 16 shards. The residual: a dead function's hold still counts until the
+  next sweep (at most one cron interval after its 90 s) and can over-refuse, never over-spend.
+
+## Follow-ups (out of scope for W043; not fixed here)
+- `lib/ai/call.ts` settles a timed-out or cancelled attempt at $0, though the provider may still
+  bill it.
+- `delete_account` drops an account's unsettled reservations before their charge lands, so a call
+  still running at deletion time is never counted.
+- A late settle after the row was pruned (older than 2 days) is a no-op: that spend is not added.
+- The OpenRouter `policy.attempts` setting with `abandonOnCapacity` can make more attempts than the
+  one-attempt allowance a call reserves.
+

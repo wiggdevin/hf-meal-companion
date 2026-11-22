@@ -70,7 +70,17 @@ class RulesTest(unittest.TestCase):
         self.assertEqual(ops.spend_caps({}), {"global": 50.0, "background": 10.0, "account": 2.0})
         caps = ops.spend_caps({"AI_GLOBAL_DAILY_SPEND_CAP_USD": "20", "AI_DAILY_SPEND_CAP_USD": "junk",
                                "AI_BACKGROUND_DAILY_SPEND_CAP_USD": ""})
-        self.assertEqual(caps, {"global": 20.0, "background": 10.0, "account": 2.0})
+        # 30 % of $20 is $6: the tighter limit wins over the configured $10, as in the app.
+        self.assertEqual(caps, {"global": 20.0, "background": 6.0, "account": 2.0})
+
+    def test_background_cap_is_clamped_by_one_minus_the_interactive_share(self):
+        self.assertEqual(ops.spend_caps({"AI_BACKGROUND_DAILY_SPEND_CAP_USD": "30"})["background"], 15.0)
+        self.assertEqual(ops.spend_caps({"AI_INTERACTIVE_SHARE": "0.9"})["background"], 5.0)
+        self.assertEqual(ops.spend_caps({"AI_INTERACTIVE_SHARE": "1"})["background"], 0.0)
+        for bad in ("0", "-1", "0x1", "abc", "2", "NaN", "0.0000001"):
+            self.assertEqual(ops.spend_caps({"AI_INTERACTIVE_SHARE": bad})["background"], 10.0, bad)
+        for bad in ("0x20", "1e1", "-5", "Infinity"):
+            self.assertEqual(ops.spend_caps({"AI_GLOBAL_DAILY_SPEND_CAP_USD": bad})["global"], 50.0, bad)
 
     def test_grounding_alerts_past_five_thousand_queries_a_month(self):
         self.assertIsNone(ops.spend_findings({"lookup_month_cost": 70}, ops.spend_caps({}))["grounding"])

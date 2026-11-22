@@ -7,6 +7,7 @@ import { DEFAULT_TZ } from "@/lib/health/contract";
 
 const mocked = vi.hoisted(() => ({
   expiredCounts: 0,
+  noExpired: false,
   spendSweeps: 0,
   signalPurges: 0,
   onboardingEventsPurges: 0,
@@ -112,15 +113,17 @@ const admin = {
       },
     };
   },
-  // Scale S2 spend sweep: expired-hold counts alternate 1, 0 (one hold before each pass, none
-  // after it), and each sweep pass reports one reconciled hold.
+  // Scale S2 spend sweep: the sweep runs once unconditionally; expired-hold counts then alternate
+  // 1, 0 (one hold before the next pass, none after it) and each pass reports one reconciled hold.
   rpc: vi.fn(async (fn: string, args?: Record<string, unknown>) => {
     // The backup refuses to run without its pass lease: a fresh pass every fire.
     if (fn === "claim_job_cursor" && args?.p_job === "backup") {
       return { data: [{ after_key: null, listed: false, retry_keys: [], relist: false, done: false,
         pass_started_at: new Date().toISOString() }], error: null };
     }
-    if (fn === "ai_spend_expired_count") return { data: mocked.expiredCounts++ % 2 === 0 ? 1 : 0, error: null };
+    if (fn === "ai_spend_expired_count") {
+      return { data: mocked.noExpired ? 0 : mocked.expiredCounts++ % 2 === 0 ? 1 : 0, error: null };
+    }
     if (fn === "ai_spend_sweep") { mocked.spendSweeps += 1; return { data: 1, error: null }; }
     // Phase 18 W6: one partial purge pass (fewer rows than a full batch) ends the run.
     if (fn === "food_signal_events_purge") { mocked.signalPurges += 1; return { data: 3, error: null }; }
@@ -236,6 +239,7 @@ const cronRequest = (path: string, method: "GET" | "POST", token?: string) => ne
 beforeEach(() => {
   vi.clearAllMocks();
   mocked.expiredCounts = 0;
+  mocked.noExpired = false;
   mocked.spendSweeps = 0;
   mocked.signalPurges = 0;
   mocked.onboardingEventsPurges = 0;
@@ -275,7 +279,18 @@ describe("Vercel cron route registration", () => {
       "/api/jobs/estimate", "/api/jobs/facet-warm", "/api/jobs/weekly-proposal",
       "/api/jobs/weekly-review",
     ].includes(path);
-    expect(jobRuns[path]()).toBe(iteratesSettingsOwners ? 4 : 2);
+    // The spend sweep runs its unconditional pass, then one pass for the single expired hold.
+    const expected = iteratesSettingsOwners || path === "/api/jobs/spend-sweep" ? 4 : 2;
+    expect(jobRuns[path]()).toBe(expected);
+  });
+
+  it("spend sweep runs one bounded sweep every tick, even when no hold has expired", async () => {
+    mocked.noExpired = true;
+    const route = await routeLoaders["/api/jobs/spend-sweep"]();
+    const response = await route.GET!(cronRequest("/api/jobs/spend-sweep", "GET", "cron-secret"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ passes: 1, remaining: 0 });
+    expect(mocked.spendSweeps).toBe(1);
   });
 
   it("weekly review runs once for every settings owner", async () => {
