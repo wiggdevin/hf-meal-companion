@@ -10,6 +10,7 @@ export type FoodBlockRef = Pick<FoodSearchBlockV1["results"][number],
 export type LogDraftCommit = { entryIds: string[]; summary: string; saved?: string }; // saved: said once in place of "Logged"
 export type LogDraftBlockContext = {
   tz: string;
+  messageCreatedAt?: string; // F-108: a legacy card (no capture time) is eaten when its message was saved
   onBlockStatus: (blockId: string, status: LogDraftBlockV1["status"], entryIds?: string[]) => void | Promise<void>;
   onSearchManually: (block: LogDraftBlockV1) => void;
   rerunAsLabel: (block: LogDraftBlockV1) => void;

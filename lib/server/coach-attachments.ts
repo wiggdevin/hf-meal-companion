@@ -17,6 +17,7 @@ import { attachDeterministicSanity, startPersistedCoachSanity }
   from "@/lib/server/coach-sanity";
 import { proposeDraft } from "@/lib/server/capture";
 import { accountClock } from "@/lib/server/day-context";
+import { stampCapture } from "@/lib/capture/draft-eaten-at";
 import { HttpError } from "@/lib/server/auth";
 import { mergeScannedAllergenFacts, policyEvidence, readScannedAllergenSources, scannedAllergenTags }
   from "@/lib/server/barcode-policy";
@@ -382,11 +383,13 @@ export async function runAttachmentTurn(
 
   if (req.attachment.kind === "barcode") {
     const attachStartedAt = deps.now();
+    const stamp = stampCapture(req.attachment, req.attachment.scannedAt,
+      accountClock(req, attachStartedAt).tz, attachStartedAt);
     const draft = await barcodeDraft(client, userId, req.attachment);
     const attachMs = elapsed(attachStartedAt, deps.now);
     const block: LogDraftBlockV1 = {
       kind: "log_draft", v: 1, id: deps.newId(), source: "barcode",
-      localDate: req.attachment.localDate, capturedAt: new Date(attachStartedAt).toISOString(),
+      localDate: req.attachment.localDate, ...stamp,
       ...(req.attachment.slot ? { slot: req.attachment.slot } : {}),
       draft, policy: blockPolicy(draft), status: "pending",
     };
@@ -400,6 +403,7 @@ export async function runAttachmentTurn(
   }
   const clock = accountClock(req, deps.now());
   const attachStartedAt = deps.now();
+  const stamp = stampCapture(req.attachment, req.attachment.pickedAt, clock.tz, attachStartedAt);
   try {
     const proposed = await (deps.propose ?? proposeAttachment)(client, admin, userId, {
       method: req.attachment.method,
@@ -412,8 +416,7 @@ export async function runAttachmentTurn(
     const draft = captureDraftSchema.parse(proposed);
     const block: LogDraftBlockV1 = {
       kind: "log_draft", v: 1, id: deps.newId(), source: "capture",
-      method: req.attachment.method, localDate: req.attachment.localDate,
-      capturedAt: new Date(attachStartedAt).toISOString(),
+      method: req.attachment.method, localDate: req.attachment.localDate, ...stamp,
       ...(req.attachment.slot ? { slot: req.attachment.slot } : {}),
       draft, policy: blockPolicy(draft), status: "pending",
     };

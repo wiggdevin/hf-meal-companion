@@ -25,6 +25,7 @@ export function barcodeAttachment(response: BarcodeResponse, match: BarcodeMatch
     localDate: moment.localDate,
     slot: moment.slot,
     scannedAt: at.toISOString(),
+    tz: moment.tz,
   };
 }
 

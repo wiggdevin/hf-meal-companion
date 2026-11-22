@@ -17,6 +17,8 @@ export const barcodeAttachmentSchema = z.object({
   localDate: z.string().regex(LOCAL_DATE, "must be YYYY-MM-DD"),
   slot: z.enum(ATTACHMENT_SLOT_IDS).optional(),
   scannedAt: z.iso.datetime({ offset: true }),
+  /** The phone's zone when it scanned (F-108): the log keeps that zone, even after a trip. */
+  tz: z.string().min(1).max(64).optional(),
 });
 
 export const captureAttachmentSchema = z.object({
@@ -26,6 +28,9 @@ export const captureAttachmentSchema = z.object({
   mediaPath: z.string().regex(MEDIA_PATH, "must be media/<uid>/<uuid>.<ext>"),
   localDate: z.string().regex(LOCAL_DATE, "must be YYYY-MM-DD"),
   slot: z.enum(ATTACHMENT_SLOT_IDS).optional(),
+  /** When the photo was picked, and the phone's zone then (F-108). A rerun as a label resends both. */
+  pickedAt: z.iso.datetime({ offset: true }).optional(),
+  tz: z.string().min(1).max(64).optional(),
 });
 
 export const coachAttachmentSchema = z.discriminatedUnion("kind", [

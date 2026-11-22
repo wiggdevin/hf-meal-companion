@@ -33,7 +33,7 @@ export function useCaptureUpload(
       const moment = attachmentMoment(at);
       onAttachment({
         kind: "capture", v: 1, method, mediaPath: uploaded.path,
-        localDate: moment.localDate, slot: moment.slot,
+        localDate: moment.localDate, slot: moment.slot, pickedAt: at.toISOString(), tz: moment.tz,
       }, SENT[method]);
       setStatus(null);
     } catch {

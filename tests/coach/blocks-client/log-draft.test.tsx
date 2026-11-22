@@ -154,6 +154,29 @@ describe("log_draft block", () => {
     expect(request.local_date).toBe("2026-09-19");
   });
 
+  it("keeps the capture's own zone and date after the phone moves zone (F-108)", async () => {
+    const commit = vi.mocked(commitLogEntry);
+    commit.mockResolvedValue({ status: "queued" });
+    // 23:30 in Denver on 19 Sep; the phone is now in New York, where it is already 20 Sep.
+    const captured = { ...barcodeBlock, capturedAt: "2026-09-20T05:30:00.000Z", capturedTz: "America/Denver" };
+    render(<LogDraftBlock block={captured} ctx={context({ tz: "America/New_York" })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Log it" }));
+    await waitFor(() => expect(commit).toHaveBeenCalledOnce());
+    const request = commit.mock.calls[0][0];
+    expect(request.eaten_at).toBe("2026-09-20T05:30:00.000Z");
+    expect(request.local_date).toBe("2026-09-19");
+  });
+
+  it("logs a legacy card reloaded later at its message's saved time (F-108)", async () => {
+    const commit = vi.mocked(commitLogEntry);
+    commit.mockResolvedValue({ status: "queued" });
+    render(<LogDraftBlock block={barcodeBlock}
+      ctx={context({ messageCreatedAt: "2026-09-19T20:15:00.000Z" })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Log it" }));
+    await waitFor(() => expect(commit).toHaveBeenCalledOnce());
+    expect(commit.mock.calls[0][0].eaten_at).toBe("2026-09-19T20:15:00.000Z");
+  });
+
   it("stays pending when status persistence fails and retries without logging twice", async () => {
     const commitBarcode = vi.fn().mockResolvedValue({
       entryIds: ["entry-1"], summary: "Plain rice crackers",
