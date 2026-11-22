@@ -24,6 +24,12 @@
 const CACHE_VERSION = "v3";
 const CACHE_NAME = `hf-shell-${CACHE_VERSION}`;
 
+// Fast logging (2026-11-21): the manifest's share_target POSTs a shared image to /log/share. The
+// worker keeps it in its own cache, which activation never deletes, and sends the window to the
+// photo capture; Today takes it once (lib/log/shared-image.ts holds the same two names).
+const SHARE_CACHE = "hf-share";
+const SHARED_IMAGE_KEY = "/log/shared-image";
+
 const SHELL_URLS = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 
 // Reload review r1 #7 / r2 #4: an install succeeds only with a usable offline shell: "/" itself
@@ -85,7 +91,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))),
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME && key !== SHARE_CACHE).map((key) => caches.delete(key)))),
   );
 });
 
@@ -123,8 +129,33 @@ function cacheFirst(request) {
   return caches.match(request).then((cached) => cached || fetch(request).then((response) => putInCache(request, response)));
 }
 
+function sharedImageFrom(form) {
+  return form.getAll("image").find((file) => file && typeof file.type === "string" && file.type.startsWith("image/"));
+}
+
+function receiveShare(request) {
+  const to = (path) => Response.redirect(new URL(path, self.location.origin).href, 303);
+  return request
+    .formData()
+    .then((form) => {
+      const image = sharedImageFrom(form);
+      if (!image) return to("/?log=photo");
+      const kept = new Response(image, { headers: { "content-type": image.type } });
+      return caches
+        .open(SHARE_CACHE)
+        .then((cache) => cache.put(SHARED_IMAGE_KEY, kept))
+        .then(() => to("/?log=photo&shared=1"));
+    })
+    .catch(() => to("/?log=photo"));
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
+  const target = new URL(request.url);
+  if (request.method === "POST" && target.origin === self.location.origin && target.pathname === "/log/share") {
+    event.respondWith(receiveShare(request));
+    return;
+  }
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);

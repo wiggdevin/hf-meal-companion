@@ -77,6 +77,8 @@ export type CaptureSheetProps = {
   at?: Date;
   /** The meal card the capture came from, if any; else the slot for the time now. */
   slot?: SlotId;
+  /** A photo shared into the app (manifest share_target), shown ready in the plate capture. */
+  initialFile?: File | null;
 };
 
 // #4a4c42 is DESIGN.md text-secondary (line 13) — same token and 14 px size as CaptureConfirm.tsx's
@@ -152,7 +154,7 @@ function TextCapture({ text, onChangeText, busy, onSubmit }: {
 }
 
 function CaptureBody({
-  online, mode, text, onChangeText, busy, onSubmitText, onVoiceReady, onPhotoReady, onOpenSearch,
+  online, mode, text, onChangeText, busy, onSubmitText, onVoiceReady, onPhotoReady, onOpenSearch, initialFile,
 }: {
   online: boolean;
   mode: CaptureMethod;
@@ -163,6 +165,7 @@ function CaptureBody({
   onVoiceReady: (clip: Blob) => void;
   onPhotoReady: (photo: Blob, meta: PhotoMeta) => void;
   onOpenSearch: () => void;
+  initialFile?: File | null;
 }) {
   if (!online) return <OfflineCapture onOpenSearch={onOpenSearch} />;
   if (mode === "text") {
@@ -172,7 +175,7 @@ function CaptureBody({
   return (
     <>
       <PhotoCapture busy={busy} label={mode === "label" ? "Scan the label" : "Photograph the plate"}
-        withThumbnail={mode === "photo"} onReady={onPhotoReady} />
+        withThumbnail={mode === "photo"} onReady={onPhotoReady} initialFile={mode === "photo" ? initialFile : null} />
       {/* Phase 18 W12-F: present beside the control before any tap opens the camera, for both the
           plate photo and the nutrition-label photo (the notice is about medicines, prescriptions and
           labels WITH NAMES, so it does not conflict with this mode's own nutrition-panel purpose). */}
@@ -364,7 +367,7 @@ function useCaptureFlow(initialMode: CaptureMethod | "confirm", initialDraft: Pr
  * pretend: one line and a way into the Phase 2 search, which logs with no signal.
  */
 export default function CaptureSheet({
-  open, initialMode, initialDraft, projection, onClose, onLogged, onOpenSearch, at, slot,
+  open, initialMode, initialDraft, projection, onClose, onLogged, onOpenSearch, at, slot, initialFile,
 }: CaptureSheetProps): React.JSX.Element | null {
   const online = useOnline();
   const [text, setText] = useState("");
@@ -445,6 +448,7 @@ export default function CaptureSheet({
             captureInputKey({ method: mode, blob: photo }));
           }}
           onOpenSearch={onOpenSearch}
+          initialFile={initialFile}
         />
 
         {/* T0 §2: after two seconds of any hop, say which hop it is. */}
