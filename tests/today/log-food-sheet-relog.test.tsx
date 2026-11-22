@@ -14,6 +14,13 @@ import type { StoredDay } from "@/lib/types";
 import { EGG, RICE, entry, item } from "../log/fast/relog-fixtures";
 
 const savedMealRefs = vi.hoisted(() => vi.fn());
+const acct = vi.hoisted(() => ({ live: true }));
+
+vi.mock("@/lib/device/account", async (original) => ({
+  ...(await original<typeof import("@/lib/device/account")>()),
+  currentAccountOrNull: () => ({ userId: "u1", epoch: 1 }),
+  isCurrent: () => acct.live,
+}));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {} }) }));
 vi.mock("@/components/Sheet", () => ({
@@ -65,6 +72,7 @@ beforeEach(() => {
   onRelog = vi.fn<RelogStart>(async () => batch("done"));
   onClose = vi.fn<() => void>();
   savedMealRefs.mockReset();
+  acct.live = true;
 });
 
 afterEach(() => {
@@ -73,10 +81,10 @@ afterEach(() => {
   else process.env.NEXT_PUBLIC_CATALOG_SEARCH = savedFlag;
 });
 
-function sheet(withRelog = true) {
+function sheet(withRelog = true, relogPending = false) {
   return render(<LogFoodSheet mode="food" mine={{}} slot="meal-1" at={AT} onAdd={() => {}}
     onSomethingElse={() => {}} onClose={onClose} onCapture={() => {}} days={DAYS}
-    onRelog={withRelog ? onRelog : undefined} />);
+    onRelog={withRelog ? onRelog : undefined} relogPending={relogPending} />);
 }
 
 describe("LogFoodSheet's one-tap re-log", () => {
@@ -109,7 +117,7 @@ describe("LogFoodSheet's one-tap re-log", () => {
     sheet();
     fireEvent.click(screen.getByRole("button", { name: "Star meal" }));
     await waitFor(() => expect(onRelog).toHaveBeenCalledWith([bowl], expect.anything()));
-    expect(savedMealRefs).toHaveBeenCalledWith("m1");
+    expect(savedMealRefs).toHaveBeenCalledWith("m1", { userId: "u1", epoch: 1 });
   });
 
   it("does not re-log a starred meal whose foods were never logged, even with a matching name", async () => {
@@ -155,5 +163,53 @@ describe("LogFoodSheet's one-tap re-log", () => {
   it("shows no recents row where Today did not ask for one", () => {
     sheet(false);
     expect(screen.queryByRole("button", { name: "Same as yesterday" })).toBeNull();
+  });
+
+  it("holds the guard across the saved-meal read: a second tap during it sends nothing", async () => {
+    let read: (refs: string[]) => void = () => {};
+    savedMealRefs.mockImplementation(() => new Promise((r) => { read = r; }));
+    sheet();
+    fireEvent.click(screen.getByRole("button", { name: "Star meal" }));
+    fireEvent.click(screen.getByRole("button", { name: "Star meal" }));
+    fireEvent.click(screen.getByRole("button", { name: /Log Two eggs again/ }));
+    expect(onRelog).not.toHaveBeenCalled();
+    await act(async () => { read([RICE, EGG]); });
+    await waitFor(() => expect(onRelog).toHaveBeenCalledTimes(1));
+    expect(savedMealRefs).toHaveBeenCalledTimes(1);
+    expect(onRelog).toHaveBeenCalledWith([bowl], expect.anything());
+  });
+
+  it("sends nothing when the account changed during the saved-meal read", async () => {
+    let read: (refs: string[]) => void = () => {};
+    savedMealRefs.mockImplementation(() => new Promise((r) => { read = r; }));
+    sheet();
+    fireEvent.click(screen.getByRole("button", { name: "Star meal" }));
+    acct.live = false;
+    await act(async () => { read([RICE, EGG]); });
+    expect(onRelog).not.toHaveBeenCalled();
+  });
+
+  it("waits while Today is running a re-log, Undo or Retry", () => {
+    sheet(true, true);
+    expect((screen.getByRole("button", { name: "Same as yesterday" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: /Log Two eggs again/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Star egg" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("offers no Same as yesterday on a day not lived yet", () => {
+    const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const future = new Date(Date.now() + 3 * 86_400_000);
+    // Something to copy on the day before that future day, so only the guard keeps the button away.
+    const days = { ...DAYS, [iso(new Date(future.getTime() - 86_400_000))]: { extras: [eggs] } as StoredDay };
+    render(<LogFoodSheet mode="food" mine={{}} slot="meal-1" at={future} onAdd={() => {}}
+      onSomethingElse={() => {}} onClose={onClose} onCapture={() => {}} days={days} onRelog={onRelog} />);
+    expect(screen.queryByRole("button", { name: "Same as yesterday" })).toBeNull();
+    cleanup();
+    // The same shelf on today's date does offer it.
+    const today = new Date();
+    render(<LogFoodSheet mode="food" mine={{}} slot="meal-1" at={today} onAdd={() => {}}
+      onSomethingElse={() => {}} onClose={onClose} onCapture={() => {}}
+      days={{ [iso(new Date(today.getTime() - 86_400_000))]: { extras: [eggs] } as StoredDay }} onRelog={onRelog} />);
+    expect(screen.getByRole("button", { name: "Same as yesterday" })).toBeTruthy();
   });
 });

@@ -6,7 +6,9 @@
  */
 import Button from "@/components/ui/Button";
 import Notice, { type NoticeTone } from "@/components/ui/Notice";
-import { batchMessage, canRetry, canUndo, fullyUndone, type RelogBatch } from "@/lib/log/relog-batch";
+import {
+  batchMessage, canRetry, canUndo, failedReasons, fullyUndone, type RelogBatch,
+} from "@/lib/log/relog-batch";
 import { NUTRITION_UNCHECKED_COPY } from "@/lib/nutrition-display";
 
 function toneOf(batch: RelogBatch): NoticeTone {
@@ -29,10 +31,18 @@ export default function RelogReceipts({ batches, isRunning, onUndo, onRetry, onD
         const running = isRunning(batch.opId);
         const details = [batch.note, ...batch.warnings,
           batch.nutritionUnchecked ? NUTRITION_UNCHECKED_COPY : undefined].filter(Boolean);
+        // Each entry that did not log says why, under its own name, once several are in one batch.
+        const reasons = batch.receipts.length > 1 ? failedReasons(batch) : [];
         return (
           <div key={batch.opId} className="flex flex-col gap-1.5" data-relog-batch={batch.opId}>
             <Notice tone={toneOf(batch)} title={batchMessage(batch)} onDismiss={() => onDismiss(batch.opId)}>
-              {details.length > 0 ? details.join(" ") : undefined}
+              {details.length > 0 || reasons.length > 0 ? (
+                <>
+                  {details.length > 0 && <span>{details.join(" ")}</span>}
+                  {/* Notice's body is a paragraph: one line per entry, never a list inside it. */}
+                  {reasons.map((r, i) => <span key={`${r.name}-${i}`} className="block">{`${r.name}: ${r.message}`}</span>)}
+                </>
+              ) : undefined}
             </Notice>
             {(canUndo(batch) || canRetry(batch)) && (
               <div className="flex gap-2 pl-1">

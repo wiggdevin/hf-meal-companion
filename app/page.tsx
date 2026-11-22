@@ -965,7 +965,7 @@ export default function Today() {
     if (logOpen && logSlot === id) return <LogFoodSheet key={`log-${logOpen}-${id}`} mode={logOpen}
       mine={store.foods} slot={id} projection={logProjection} onAdd={logFood} at={logAtFor(id)}
       onSomethingElse={() => { setHandoffSlot(id); setLogOpen(null); setLogSlot(null); setLabelOpen(true); }}
-      onClose={() => { setLogOpen(null); setLogSlot(null); }} days={store.days} onRelog={relogs.start}
+      onClose={() => { setLogOpen(null); setLogSlot(null); }} days={store.days} onRelog={relogs.start} relogPending={relogs.pending}
       {...captureOverlayProps((mode) => { setHandoffSlot(id); setCaptureMode(mode); },
         () => { setHandoffSlot(id); setScanOpen(true); })} />;
     return null;
@@ -1221,7 +1221,7 @@ export default function Today() {
               at={logAtFor(logSlot ?? currentSlotId ?? resolved.slots[0]?.slot ?? "meal-1")}
               onSomethingElse={() => { setHandoffSlot(null); setLogOpen(null); setLabelOpen(true); }}
               onClose={() => { setLogOpen(null); setLogSlot(null); }}
-              days={store.days} onRelog={relogs.start}
+              days={store.days} onRelog={relogs.start} relogPending={relogs.pending}
               {...captureOverlayProps((mode) => { setHandoffSlot(null); setCaptureMode(mode); },
                 () => { setHandoffSlot(null); setScanOpen(true); })}
             />

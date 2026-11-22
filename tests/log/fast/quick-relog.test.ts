@@ -11,6 +11,7 @@ const getRow = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/sync/idb", () => ({ getRow: (...args: unknown[]) => getRow(...args) }));
 
 import { logAgainRequest } from "@/lib/log/log-again";
+import { canLogAgain } from "@/lib/log/recent-meals";
 import {
   favoriteRelog, relogDetail, sameAsYesterdayCopy, sameAsYesterdayKey, savedMealRefs, shiftDay, yesterdayInSlot,
 } from "@/lib/log/quick-relog";
@@ -88,6 +89,32 @@ describe("yesterdayInSlot", () => {
   it("has one durable key per day and slot", () => {
     expect(sameAsYesterdayKey("2026-11-21", "meal-1")).toBe("same-as-yesterday:2026-11-21:meal-1");
     expect(shiftDay("2026-03-01", -1)).toBe("2026-02-28");
+  });
+
+  it("refuses a date that is not a real calendar day instead of throwing or rolling over", () => {
+    expect(shiftDay("2026-02-30", -1)).toBeNull();
+    expect(shiftDay("not-a-date", -1)).toBeNull();
+    expect(shiftDay("", -1)).toBeNull();
+    expect(yesterdayInSlot(days, "garbage", "meal-1")).toEqual({ copy: [], omitted: [] });
+  });
+});
+
+describe("the commit contract's limits", () => {
+  it("offers no re-log the server would refuse: over 30 items, or a unit over 32 characters", () => {
+    const many = entry("many", "2026-11-20T08:00:00Z", Array.from({ length: 31 }, () => item(EGG, 10)));
+    expect(canLogAgain(many)).toBe(false);
+    const thirty = entry("thirty", "2026-11-20T08:00:00Z", Array.from({ length: 30 }, () => item(EGG, 10)));
+    expect(canLogAgain(thirty)).toBe(true);
+    const long = entry("long", "2026-11-20T08:00:00Z", [{ ...item(EGG, 10), unit: "u".repeat(33) }]);
+    expect(canLogAgain(long)).toBe(false);
+  });
+
+  it("never stores the synthetic \"Logged meal\" name as a title, and falls back to UTC for an empty zone", () => {
+    const pulled = entry("pulled", "2026-11-20T08:00:00Z", [item(EGG, 10)], { name: "Logged meal" });
+    const built = logAgainRequest(pulled, new Date("2026-11-21T12:00:00Z"), "");
+    expect(built?.req.title).toBeUndefined();
+    expect(built?.req.tz).toBe("UTC");
+    expect(logAgainRequest(eggsNew, new Date("2026-11-21T12:00:00Z"), "UTC")?.req.title).toBe(eggsNew.name);
   });
 });
 

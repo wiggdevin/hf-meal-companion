@@ -92,6 +92,7 @@ export default function LogFoodSheet({
   at,
   days,
   onRelog,
+  relogPending = false,
 }: {
   mode: "food" | "meal";
   mine: Record<string, Food>;
@@ -118,6 +119,8 @@ export default function LogFoodSheet({
   /** A one-tap re-log (recents, a star, Same as yesterday), run by Today's batches; one that logged
    *  something closes this sheet, one that logged nothing says so here (useSheetRelog). */
   onRelog?: RelogStart;
+  /** A re-log, Undo or Retry is running on Today: every re-log control here waits too. */
+  relogPending?: boolean;
 }) {
   const router = useRouter();
   const [view, setView] = useState<View>(mode === "meal" ? "meal" : "search");
@@ -687,12 +690,12 @@ export default function LogFoodSheet({
     >
       <div className="flex flex-col gap-4">
         {captureRow}
-        {onRelog && mode === "food" && <RecentMealsRow days={days ?? {}} slot={slot} at={at} busy={submitting}
+        {onRelog && mode === "food" && <RecentMealsRow days={days ?? {}} slot={slot} at={at} busy={submitting || relogPending}
           onRelog={(entries, key) => void relogs.relog(entries, key)} />}
         {blocked && <Notice tone="error" title={blocked} className="mb-2" />}
         {useCatalog ? (
           <>
-            <FavoritesStrip onPick={(fav) => void handleFavoritePick(fav)} disabled={submitting} />
+            <FavoritesStrip onPick={(fav) => void handleFavoritePick(fav)} disabled={submitting || relogPending} />
             {favoriteNote && <Notice tone="neutral" title={favoriteNote} />}
             <CatalogSearch mine={mine} autoFocus onPick={pickCatalogRow} />
           </>

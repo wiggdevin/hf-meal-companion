@@ -15,13 +15,28 @@ vi.mock("@/lib/device/account", () => ({
   currentAccountOrNull: () => ({ userId: "u1", epoch: 1 }),
   isCurrent: () => true,
 }));
-vi.mock("@/lib/store", () => ({ getDay: (date: string) => state.days[date] }));
+vi.mock("@/lib/device/account-storage", () => {
+  const items = new Map<string, string>();
+  return { readAccountItem: (_h: unknown, n: string) => items.get(n) ?? null,
+    writeAccountItem: (_h: unknown, n: string, v: string) => { items.set(n, v); return true; } };
+});
+vi.mock("@/lib/store", () => ({ getDay: (date: string) => state.days[date], loadStore: () => ({ days: state.days }) }));
 vi.mock("@/lib/log-commit-client", () => ({
   commitLogEntry: vi.fn(),
   committedEntry: (date: string, fallback: LoggedFood) =>
     state.days[date]?.extras.find((e) => e.id === fallback.id) ?? fallback,
 }));
-vi.mock("@/lib/log/delete-entry", () => ({ forgetLoggedEntry: vi.fn() }));
+vi.mock("@/lib/log/delete-entry", () => ({
+  forgetLoggedEntry: vi.fn(),
+  isDeleted: async () => false,
+  readServerEntry: async (_h: unknown, id: string) => {
+    for (const [date, day] of Object.entries(state.days)) {
+      const card = day.extras.find((e) => e.id === id);
+      if (card && typeof card.rev === "number") return { rev: card.rev, date };
+    }
+    return "gone";
+  },
+}));
 
 import RelogReceipts from "@/components/today/RelogReceipts";
 import { useRelogBatches } from "@/components/today/useRelogBatches";
@@ -50,6 +65,8 @@ function Harness({ onChange }: { onChange: () => void }) {
     <>
       <button type="button" onClick={() => void relogs.start([eggs], { at: AT, slot: "meal-1" })}>eggs</button>
       <button type="button" onClick={() => void relogs.start([rice, eggs], { at: AT, slot: "meal-2" })}>both</button>
+      <button type="button" onClick={() => void relogs.start([eggs],
+        { at: AT, slot: "meal-1", durableKey: "same-as-yesterday:2026-11-21:meal-1" })}>same</button>
       <RelogReceipts batches={relogs.batches} isRunning={relogs.isRunning}
         onUndo={(id) => void relogs.undo(id)} onRetry={(id) => void relogs.retry(id)} onDismiss={relogs.dismiss} />
     </>
@@ -118,5 +135,28 @@ describe("Today's re-log receipts", () => {
     await waitFor(() => expect(screen.getAllByRole("button", { name: "Undo" })).toHaveLength(2));
     fireEvent.click(within(cards()[0]).getByRole("button", { name: "Dismiss" }));
     expect(screen.getAllByRole("button", { name: "Undo" })).toHaveLength(1);
+  });
+
+  it("resumes a listed Same as yesterday batch on a second tap: no second post, no second Undo", async () => {
+    render(<Harness onChange={() => {}} />);
+    fireEvent.click(screen.getByText("same"));
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "Undo" })).toHaveLength(1));
+    fireEvent.click(screen.getByText("same"));
+    await waitFor(() => expect(commit).toHaveBeenCalledTimes(1));
+    await act(async () => {});
+    expect(document.querySelectorAll("[data-relog-batch]")).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Undo" })).toHaveLength(1);
+    // The first tap's proof is kept: its Undo still takes the entry back.
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    await waitFor(() => expect(screen.getByText("Undone.")).toBeTruthy());
+    expect(forget).toHaveBeenCalledTimes(1);
+  });
+
+  it("names each entry that did not log, with its reason", async () => {
+    answers = [{ status: "refused", reason: "x", message: "No." }, { status: "ok" }];
+    render(<Harness onChange={() => {}} />);
+    fireEvent.click(screen.getByText("both"));
+    await waitFor(() => expect(screen.getByText("Logged Eggs. Rice did not log.")).toBeTruthy());
+    expect(screen.getByText("Rice: The server would not take that one. Try again.")).toBeTruthy();
   });
 });

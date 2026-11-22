@@ -28,10 +28,12 @@ export default function RecentMealsRow({ days, slot, at, busy, onRelog }: {
 }) {
   const id = useId();
   const day = localIsoDate(at ?? new Date());
+  const today = localIsoDate(new Date());
   const rows = useMemo(() => ({
     recents: recentMeals(days, { limit: 6 }),
-    yesterday: yesterdayInSlot(days, day, slot),
-  }), [days, day, slot]);
+    // A day not lived yet has no "yesterday" to copy into it, as on Today's card.
+    yesterday: day <= today ? yesterdayInSlot(days, day, slot) : { copy: [], omitted: [] },
+  }), [days, day, slot, today]);
   const { recents, yesterday } = rows;
   if (recents.length === 0 && yesterday.copy.length === 0) return null;
   return (

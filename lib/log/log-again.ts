@@ -11,6 +11,8 @@ import { commitLogEntry, type CommitResult } from "@/lib/log-commit-client";
 import { canLogAgain } from "@/lib/log/recent-meals";
 import type { LoggedFood, SlotId } from "@/lib/types";
 
+const SYNTHETIC_TITLE = "Logged meal";
+
 /** Ids a re-log batch fixed in advance, so a retry posts the same entry, never a second one. */
 export type RelogIds = { entryId: string; itemIds: readonly string[] };
 
@@ -23,7 +25,10 @@ export function logAgainRequest(entry: LoggedFood, at: Date, tz: string, slot?: 
   const items = (entry.items ?? []).map((item, index) => ({
     ...item, id: ids?.itemIds[index] ?? crypto.randomUUID(), seq: index + 1 }));
   const req = buildCommitRequest({
-    entryId, eatenAt: at, tz, slot: slot ?? entry.slot ?? "snack", title: entry.name,
+    entryId, eatenAt: at, tz: tz || "UTC", slot: slot ?? entry.slot ?? "snack",
+    // "Logged meal" is the name a pulled entry gets when it has none (lib/log/pulled-entry.ts):
+    // stored as a title, it would stop the server and the card naming the meal from its foods.
+    title: entry.name === SYNTHETIC_TITLE ? undefined : entry.name,
     items: items.map((item) => ({ id: item.id, foodRefId: item.food_ref_id,
       revision: { revision_id: null }, grams: item.grams, qty: item.qty, unit: item.unit })),
   });
@@ -38,10 +43,9 @@ export function logAgainRequest(entry: LoggedFood, at: Date, tz: string, slot?: 
 
 /** Commit the re-log. `null`: nothing was sent, because the entry cannot be rebuilt. */
 export async function logAgain(
-  entry: LoggedFood, at: Date = new Date(), tz: string = Intl.DateTimeFormat().resolvedOptions().timeZone,
-  slot?: SlotId,
+  entry: LoggedFood, at: Date = new Date(), tz?: string, slot?: SlotId,
 ): Promise<{ result: CommitResult; date: string; card: LoggedFood } | null> {
-  const built = logAgainRequest(entry, at, tz, slot);
+  const built = logAgainRequest(entry, at, tz || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", slot);
   if (built === null) return null;
   const date = built.req.local_date;
   const result = await commitLogEntry(built.req,

@@ -10,11 +10,16 @@ import type { LoggedFood, StoredDay } from "@/lib/types";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** The commit contract's limits (lib/log/contract.ts): more items, or a longer unit, is refused. */
+const MAX_ITEMS = 30;
+const MAX_UNIT = 32;
+
 /** Can this entry be logged again as it stands? */
 export function canLogAgain(entry: LoggedFood): boolean {
   if (typeof entry.rev !== "number" || entry.localOnly || entry.notSaved || entry.massUnknown) return false;
   const items = entry.items ?? [];
-  return items.length > 0 && items.every((item) => UUID.test(item.food_ref_id)
+  return items.length > 0 && items.length <= MAX_ITEMS && items.every((item) => UUID.test(item.food_ref_id)
+    && typeof item.unit === "string" && item.unit.length >= 1 && item.unit.length <= MAX_UNIT
     && typeof item.grams === "number" && Number.isFinite(item.grams) && item.grams > 0
     && Number.isFinite(item.qty) && item.qty > 0);
 }

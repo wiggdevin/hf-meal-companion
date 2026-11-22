@@ -53,8 +53,12 @@ export function favoriteRelog(
 }
 
 /** "YYYY-MM-DD" plus `days`, at noon UTC so no zone or DST shift can move it. */
-export function shiftDay(date: string, days: number): string {
+export function shiftDay(date: string, days: number): string | null {
+  // A real calendar day only: "2026-02-30" rolls over in Date and "x" is Invalid Date, which
+  // toISOString throws on during render.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isInteger(days)) return null;
   const at = new Date(`${date}T12:00:00Z`);
+  if (Number.isNaN(at.getTime()) || at.toISOString().slice(0, 10) !== date) return null;
   at.setUTCDate(at.getUTCDate() + days);
   return at.toISOString().slice(0, 10);
 }
@@ -63,7 +67,8 @@ export type YesterdayInSlot = { copy: LoggedFood[]; omitted: LoggedFood[] };
 
 /** Yesterday's entries in this slot: what a re-log can rebuild (in logged order), and what it leaves out. */
 export function yesterdayInSlot(days: Record<string, StoredDay>, date: string, slot: SlotId): YesterdayInSlot {
-  const all = (days[shiftDay(date, -1)]?.extras ?? []).filter((entry) => entry.slot === slot);
+  const before = shiftDay(date, -1);
+  const all = (before ? days[before]?.extras ?? [] : []).filter((entry) => entry.slot === slot);
   return { copy: all.filter(canLogAgain), omitted: all.filter((entry) => !canLogAgain(entry)) };
 }
 

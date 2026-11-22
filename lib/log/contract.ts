@@ -83,6 +83,8 @@ export type LogEntity = Record<string, unknown>;
 
 export type LogCommitResponse = {
   status: "ok"; entry_id: string; rev: number; user_food_id?: string;
+  /** True when the server already held this entry and wrote nothing: a replay, never a new create. */
+  replayed?: true;
   /**
    * The stored items, whole — the client mirrors them verbatim, and a row whose items name no
    * food cannot be the base of an edit (T0 §3, Grok pass 3 HIGH 2).
