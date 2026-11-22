@@ -12,10 +12,12 @@ import { SYNCED_EVENT, lastError } from "@/lib/sync/client";
 import { announceQueued } from "@/lib/sync/outbox";
 import type { TargetRevision } from "@/lib/types";
 import { settingsWithTargetRevision, targetDayFor } from "@/lib/targets/revision";
-import { TargetFloorError, targetRefusal } from "@/lib/targets/refusal";
+import { isFinalRefusal, targetRefusal } from "@/lib/targets/refusal";
 
 export { settingsWithTargetRevision } from "@/lib/targets/revision";
-export { TargetFloorError, TargetSaveRefusedError } from "@/lib/targets/refusal";
+export {
+  isFinalRefusal, TargetFloorError, TargetMacroError, TargetSaveRefusedError,
+} from "@/lib/targets/refusal";
 
 export type TargetPredecessor = {
   operation: "derive";
@@ -216,8 +218,8 @@ async function sendRevision(
     return result;
   } catch (error) {
     if (error instanceof AccountChanged || !isCurrent(h)) throw error;
-    if (error instanceof TargetFloorError) {
-      // A floor refusal is final: the same body is refused again, so it is never queued. A
+    if (isFinalRefusal(error)) {
+      // A floor or macro refusal is final: the same body is refused again, so it is never queued. A
       // queued caller drops it too, and the caller shows the server's sentence.
       if (written) await restorePendingForOwner(h, h.userId, opts.requestId, previous);
       throw error;
@@ -280,7 +282,7 @@ export async function drainPendingTargetRevisions(h: AccountHandle, options: {
       rethrowAccountChanged(e);
       // A queued save the server now refuses as below its floor never succeeds on a retry: drop
       // it, so the queue does not retry it forever. The owner's older record is not put back.
-      if (e instanceof TargetFloorError) await cancelPendingTargetRevision(entry.requestId, h);
+      if (isFinalRefusal(e)) await cancelPendingTargetRevision(entry.requestId, h);
       continue;
     }
     await cancelPendingTargetRevision(entry.requestId, h);

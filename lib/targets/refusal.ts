@@ -38,6 +38,23 @@ export class TargetFloorError extends TargetSaveRefusedError {
   }
 }
 
+/**
+ * `422 kcal_mismatch` or `422 invalid_macros`: the calories and the macros do not agree. Like a
+ * floor refusal it is final (the same body is refused again) and carries the server's sentence.
+ */
+export class TargetMacroError extends TargetSaveRefusedError {
+  constructor(code: "kcal_mismatch" | "invalid_macros", message: string) {
+    super(422, code);
+    this.message = message;
+    this.name = "TargetMacroError";
+  }
+}
+
+/** A refusal that never succeeds on a retry, so it is never queued and a queued copy is dropped. */
+export function isFinalRefusal(error: unknown): error is TargetFloorError | TargetMacroError {
+  return error instanceof TargetFloorError || error instanceof TargetMacroError;
+}
+
 const FLOORS: readonly string[] = ["kcal", "fat", "protein"];
 const DAY_TYPES: readonly string[] = ["training", "rest"];
 
@@ -66,12 +83,16 @@ export async function targetRefusal(
     const floor = floorErrorFrom(body);
     if (floor) return floor;
   }
+  if ((code === "kcal_mismatch" || code === "invalid_macros") && typeof body?.message === "string"
+      && body.message.length > 0) {
+    return new TargetMacroError(code, body.message);
+  }
   return new TargetSaveRefusedError(response.status, code);
 }
 
-/** The sentence to show for a failed save: the server's own for a floor refusal, else `fallback`. */
+/** The sentence to show for a failed save: the server's own for a final refusal, else `fallback`. */
 export function refusalMessage(error: unknown, fallback: string): string {
-  return error instanceof TargetFloorError ? error.message : fallback;
+  return isFinalRefusal(error) ? error.message : fallback;
 }
 
 /**
@@ -83,7 +104,7 @@ export async function undoRestore<T>(restore: () => Promise<T>): Promise<T> {
   try {
     return await restore();
   } catch (error) {
-    if (error instanceof TargetFloorError) {
+    if (isFinalRefusal(error)) {
       throw new Error(`Couldn't undo this: ${error.message}`, { cause: error });
     }
     throw error;

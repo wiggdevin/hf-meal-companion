@@ -6,13 +6,24 @@ set local lock_timeout = '3s';
 do $migration$
 declare
   definition text;
-  from_text constant text := 'null::target_profiles, write_target_revision_checked(p_user_id, v_payload));';
-  to_text constant text := 'null::target_profiles, write_target_revision(p_user_id, v_payload));';
+  patched text;
+  write_from constant text := 'null::target_profiles, write_target_revision_checked(p_user_id, v_payload));';
+  write_to constant text := 'null::target_profiles, write_target_revision(p_user_id, v_payload));';
+  lock_to constant text := 'perform pg_advisory_xact_lock(hashtextextended(p_user_id::text, 0));';
+  lock_from constant text :=
+    'perform pg_advisory_xact_lock(hashtextextended(p_user_id::text || '':user_settings:settings'', 0));'
+    || E'\n  ' || lock_to;
 begin
   select pg_get_functiondef('public.approve_target_proposal(uuid,uuid)'::regprocedure)
     into definition;
-  if position(from_text in definition) > 0 then
-    execute replace(definition, from_text, to_text);
+  patched := replace(replace(definition, write_from, write_to), lock_from, lock_to);
+  -- A body that does not match is left alone, but never silently: the functions below must not
+  -- be dropped while approval still calls one of them.
+  if position('write_target_revision_checked' in patched) > 0 then
+    raise exception 'down: approve_target_proposal still calls the checked writer; fix by hand first';
+  end if;
+  if patched <> definition then
+    execute patched;
   end if;
 end;
 $migration$;

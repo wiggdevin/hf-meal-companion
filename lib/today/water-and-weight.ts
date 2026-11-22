@@ -28,7 +28,7 @@ import { targetDayFor, targetRevisionOn } from "@/lib/targets/revision";
 import { getDay, loadStore, saveStoreFor, updateDay } from "@/lib/store";
 import { SYNCED_EVENT } from "@/lib/sync/client";
 import {
-  persistDerivedTargetRevisionSet, settingsWithTargetRevision, TargetFloorError,
+  persistDerivedTargetRevisionSet, settingsWithTargetRevision, isFinalRefusal,
   TargetRevisionQueuedError,
   type TargetPredecessor, type TargetRevisionSet,
 } from "@/lib/targets/client";
@@ -316,7 +316,7 @@ export async function saveMorningWeight(
     const targetRequestId = error instanceof TargetRevisionQueuedError ? error.requestId : undefined;
     // A floor refusal is final and is not queued: the weight stays, the targets do not move, and
     // the server's own sentence says why (a new weight can put the old targets under a minimum).
-    const message = error instanceof TargetFloorError
+    const message = isFinalRefusal(error)
       ? `Weight saved. Your targets were not changed: ${error.message}`
       : TARGETS_PARTIAL_MESSAGE;
     const partial = { ok: true as const, partial: "targets" as const,

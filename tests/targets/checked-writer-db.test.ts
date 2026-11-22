@@ -190,6 +190,20 @@ run("write_target_revision_checked (database)", () => {
     });
   });
 
+  describe("macros that cannot be judged", () => {
+    it("refuses a day with a missing macro, and a day that is not an object (NULL passes no check)", async () => {
+      const missing = await checked(row({}, {
+        training: AT_MINIMUM.training, rest: { kcal: 2000 } as unknown as Day }));
+      expect(missing.error?.code).toBe("SF004");
+      expect(JSON.parse(missing.error?.details ?? "{}"))
+        .toMatchObject({ reason: "invalid_macros", dayType: "rest" });
+      const scalar = await checked(row({}, {
+        training: 5 as unknown as Day, rest: AT_MINIMUM.rest }));
+      expect(scalar.error?.code).toBe("SF004");
+      expect(await rows()).toHaveLength(0);
+    });
+  });
+
   describe("profile", () => {
     it("raises profile_required (SF002) with no stored profile and none sent", async () => {
       await resetUser(userId);
@@ -203,20 +217,57 @@ run("write_target_revision_checked (database)", () => {
       expect((await checked(row())).error?.code).toBe("SF002");
     });
 
-    it("uses the settings the route sends as floor_profile only when none are stored", async () => {
+    it("judges height and goal on the floor_profile the route sends, over the stored ones", async () => {
       await resetUser(userId);
       const floorProfile = { sex: "female", birth_year: 1968, height_cm: 170.2, weight_kg: 72.575,
         goal: "recomp" };
       const out = await checked(row({ floor_profile: floorProfile }));
       expect(out.error).toBeNull();
       expect(out.data).toMatchObject({ protein_g_min: 145, kcal_min: 1430 });
-      // A stored profile wins: 200 cm and 100 kg give a higher minimum than the sent 170 cm persona
-      // (protein 200 g, so kcal 4 x 200 + 850 = 1,650; kcal is checked first).
+      // The sent 170.2 cm recomp profile beats the stored 200 cm maintain one: a profile edit is
+      // judged on the profile the target was derived from (the stored one lags the edit).
+      // min(100 kg, 30 x 1.702^2 = 86.9 kg) x 2.0 = 174 g protein, kcal 4 x 174 + 850 = 1,546.
       await resetUser(userId);
-      await seedProfile({ height_cm: 200, weight_kg: 100 });
-      const stored = await checked(row({ floor_profile: floorProfile }));
+      await seedProfile({ height_cm: 200, weight_kg: 100, goal: "maintain" });
+      const sent = await checked(row({ floor_profile: floorProfile }));
+      expect(JSON.parse(sent.error?.details ?? "{}"))
+        .toEqual({ floor: "kcal", dayType: "training", minimum: 1546 });
+      // Without a floor_profile the stored profile decides (200 cm, 100 kg, maintain: 1.8 x 100
+      // = 180 g protein, kcal 4 x 180 + 850 = 1,570).
+      const stored = await checked(row());
       expect(JSON.parse(stored.error?.details ?? "{}"))
-        .toEqual({ floor: "kcal", dayType: "training", minimum: 1650 });
+        .toEqual({ floor: "kcal", dayType: "training", minimum: 1570 });
+    });
+  });
+
+  describe("pace-cleared copy", () => {
+    const copy = (over: Record<string, unknown> = {}) => row({
+      floor_exempt: "pace_cleared_copy", goal_rate_bp_week: 0, kcal_min: 1650, protein_g_min: 150,
+      fat_g_min: 50, carb_g_min: 100, kcal_min_source: "legacy_default", ...over,
+    }, { training: day(120, 150, 40), rest: day(120, 150, 40) });
+
+    it("is written below the floors and on a profile that cannot derive, keeping its own minima", async () => {
+      await seedProfile({ height_cm: null });
+      const out = await checked(copy());
+      expect(out.error).toBeNull();
+      expect(out.data).toMatchObject({ protein_g: 120, kcal_min: 1650, protein_g_min: 150,
+        kcal_min_source: "legacy_default" });
+    });
+
+    it("is judged like any row without the flag, or with a pace", async () => {
+      const plain = await checked(copy({ floor_exempt: undefined }));
+      expect(plain.error?.code).toBe("SF001");
+      const paced = await checked(copy({ goal_rate_bp_week: -50 }));
+      expect(paced.error?.code).toBe("SF001");
+      expect(await rows()).toHaveLength(0);
+    });
+
+    it("still refuses macros that do not add up", async () => {
+      const out = await checked(copy({}), null);
+      expect(out.error).toBeNull();
+      const bad = await checked(row({ floor_exempt: "pace_cleared_copy", goal_rate_bp_week: 0 },
+        { training: { kcal: 3000, protein: 120, carbs: 150, fat: 40 }, rest: AT_MINIMUM.rest }));
+      expect(bad.error?.code).toBe("SF004");
     });
   });
 
@@ -256,6 +307,27 @@ run("write_target_revision_checked (database)", () => {
       row({ effective_from: "2026-10-02", request_id: crypto.randomUUID() }));
       expect(out.error?.code).toBe("SF001");
       expect(await rows()).toHaveLength(0);
+    });
+
+    it("refuses a predecessor dated after the revision (the active reader would pick it)", async () => {
+      const out = await checked(row({ request_id: crypto.randomUUID() }),
+        row({ effective_from: "2026-10-04", request_id: crypto.randomUUID() },
+          { training: day(100, 60, 30), rest: day(100, 60, 30) }));
+      expect(out.error?.code).toBe("22023");
+      expect(await rows()).toHaveLength(0);
+    });
+
+    it("a replay never inserts a predecessor, even an unseen or unchecked one", async () => {
+      const rr = crypto.randomUUID();
+      const first = await checked(row({ request_id: rr }),
+        row({ effective_from: "2026-10-02", request_id: crypto.randomUUID() }));
+      expect(first.error).toBeNull();
+      const lowOther = row({ effective_from: "2026-10-03" },
+        { training: day(0, 0, 0), rest: day(0, 0, 0) });
+      const replay = await checked(row({ request_id: rr }), lowOther);
+      expect(replay.error).toBeNull();
+      expect(replay.data).toEqual(first.data);
+      expect(await rows()).toHaveLength(2);
     });
 
     it("replays both halves of a pair", async () => {
@@ -455,6 +527,15 @@ run("approve_target_proposal through the checked writer (database)", () => {
       first_opened_at: "2026-09-20T17:00:00Z", ...PROFILE });
   });
   afterAll(async () => { if (userId) await resetUser(userId); });
+
+  it("takes the settings lock before the target lock, as the checked writer does (no 40P01)", () => {
+    const def = runSql("select pg_get_functiondef('public.approve_target_proposal(uuid,uuid)'::regprocedure)");
+    const settings = def.indexOf(":user_settings:settings");
+    const target = def.indexOf("hashtextextended(p_user_id::text, 0)");
+    expect(settings).toBeGreaterThan(-1);
+    expect(settings).toBeLessThan(target);
+    expect(def).toContain("write_target_revision_checked");
+  });
 
   it("approves a proposal at the minima, stamped with the computed floors", async () => {
     const id = await proposal({ kcalTrain: 1430, kcalRest: 1430, proteinG: 145, fatG: 50, carbG: 100 });

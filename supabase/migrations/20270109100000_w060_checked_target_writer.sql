@@ -31,12 +31,21 @@
 --   The row is then stored by write_target_revision with the minima this function computed
 --   (kcal_min_source = 'macro_minimum'); any minimum the caller sent is ignored.
 --   In a pair write (p_predecessor) only p_row is checked; the predecessor is the row an Undo would
---   restore, and is checked if and when it is restored.
+--   restore, and is checked if and when it is restored. It may not be dated after p_row (the
+--   active reader takes the newest date first), and a replay never inserts a predecessor.
+--   A day with a missing macro or a non-object macros value is SF004 invalid_macros.
 --
--- Profile for the first write. A derive request from onboarding reaches the server before the
--- phone has synced the profile it was derived from. The route therefore sends the settings the
--- target was derived from as p_row.floor_profile {sex, birth_year, height_cm, weight_kg, goal}.
--- Each field is used ONLY when the stored user_settings value is null: a stored profile always wins.
+-- Profile the floors are judged on. A derive request reaches the server before the phone has
+-- synced the profile edit it was derived from (onboarding, or a goal or height change). The route
+-- therefore sends the settings the target was derived from as p_row.floor_profile
+-- {sex, birth_year, height_cm, weight_kg, goal}. For height and goal the floor_profile value wins
+-- over the stored one (the target is judged against the profile it was derived from, so a
+-- lose_fat to maintain edit is not refused at the old goal's protein); sex and birth year are
+-- only checked present; the weight is the weigh-in log first, then floor_profile.weight_kg.
+-- Pace-cleared copy. A row with floor_exempt = 'pace_cleared_copy' and a pace of 0 skips the
+-- profile and floor checks (macros are still checked for NULLs, negatives and the Atwater sum) and
+-- keeps its own minima. The server recompute uses it to end a paced revision's pace when a hold
+-- begins on an account whose profile cannot derive: ending the pace must never be refused.
 --
 -- PRIVILEGES. service_role only, like the old writers (20261228090000). account_floor gets no
 -- grant: the writer is its only caller.
@@ -113,8 +122,8 @@ declare
   v_factor double precision;
   v_protein numeric;
 begin
-  select coalesce(us.height_cm, nullif(p_profile->>'height_cm', '')::numeric),
-         coalesce(us.goal, nullif(p_profile->>'goal', ''))
+  select coalesce(nullif(p_profile->>'height_cm', '')::numeric, us.height_cm),
+         coalesce(nullif(p_profile->>'goal', ''), us.goal)
     into v_height, v_goal
     from (select 1) one
     left join public.user_settings us on us.user_id = p_user_id;
@@ -168,6 +177,7 @@ declare
   v_macro_kcal numeric;
   v_pred jsonb;
   v_rev jsonb;
+  v_exempt boolean;
 begin
   perform _sync_assert_caller(p_user_id);
   if p_row->'training_macros' is null or p_row->'rest_macros' is null then
@@ -187,8 +197,10 @@ begin
         select current into v_existing_pred from change_log
           where user_id = p_user_id and entity = 'target_profiles' and op_id = v_pred_request_id;
       end if;
+      -- A replay never inserts: the predecessor is the revision written just before this one.
       if v_existing_pred is null then
-        v_existing_pred := write_target_revision(p_user_id, p_predecessor);
+        select to_jsonb(tp) into v_existing_pred from target_profiles tp
+          where tp.user_id = p_user_id and tp.rev = (v_existing->>'rev')::integer - 1;
       end if;
       return jsonb_build_object('predecessor', v_existing_pred, 'revision', v_existing);
     end if;
@@ -196,29 +208,43 @@ begin
 
   -- 1. The profile the floors need.
   select * into v_settings from user_settings where user_id = p_user_id;
-  if coalesce(v_settings.sex, nullif(v_fallback->>'sex', '')) is null
+  v_exempt := coalesce(p_row->>'floor_exempt', '') = 'pace_cleared_copy'
+    and coalesce((p_row->>'goal_rate_bp_week')::integer, 0) = 0;
+  if not v_exempt and (
+     coalesce(v_settings.sex, nullif(v_fallback->>'sex', '')) is null
      or coalesce(v_settings.birth_year, nullif(v_fallback->>'birth_year', '')::integer) is null
-     or coalesce(v_settings.height_cm, nullif(v_fallback->>'height_cm', '')::numeric) is null
-     or coalesce(v_settings.goal, nullif(v_fallback->>'goal', '')) is null then
+     or coalesce(nullif(v_fallback->>'height_cm', '')::numeric, v_settings.height_cm) is null
+     or coalesce(nullif(v_fallback->>'goal', ''), v_settings.goal) is null) then
     raise exception 'profile_required' using errcode = 'SF002';
   end if;
-  select w.kg into v_weight
-    from account_body_mass_kg(p_user_id, (p_row->>'effective_from')::date) w;
-  v_weight := coalesce(v_weight, nullif(v_fallback->>'weight_kg', '')::numeric);
-  select * into v_floor from account_floor(p_user_id, v_weight, v_fallback);
+  -- The predecessor is history: it is never judged, so it must never be the active revision. It
+  -- may not be dated after the revision, or the active reader (newest date first) would pick it.
+  if p_predecessor is not null
+     and (p_predecessor->>'effective_from')::date > (p_row->>'effective_from')::date then
+    raise exception 'predecessor_after_revision' using errcode = '22023';
+  end if;
+  if not v_exempt then
+    select w.kg into v_weight
+      from account_body_mass_kg(p_user_id, (p_row->>'effective_from')::date) w;
+    v_weight := coalesce(v_weight, nullif(v_fallback->>'weight_kg', '')::numeric);
+    select * into v_floor from account_floor(p_user_id, v_weight, v_fallback);
+  else
+    select null::numeric as protein_g_min, null::numeric as fat_g_min,
+           null::integer as kcal_min into v_floor;
+  end if;
 
   -- 2. A pin below a minimum is refused even when the resolved day was clamped above it.
   v_pin_kcal := (p_row->>'pin_training_kcal')::numeric;
-  if v_pin_kcal is not null and v_pin_kcal < v_floor.kcal_min then
+  if not v_exempt and v_pin_kcal is not null and v_pin_kcal < v_floor.kcal_min then
     raise exception 'below_floor' using errcode = 'SF001', detail = jsonb_build_object(
       'floor', 'kcal', 'dayType', 'training', 'minimum', v_floor.kcal_min)::text;
   end if;
   v_pin_kcal := (p_row->>'pin_rest_kcal')::numeric;
-  if v_pin_kcal is not null and v_pin_kcal < v_floor.kcal_min then
+  if not v_exempt and v_pin_kcal is not null and v_pin_kcal < v_floor.kcal_min then
     raise exception 'below_floor' using errcode = 'SF001', detail = jsonb_build_object(
       'floor', 'kcal', 'dayType', 'rest', 'minimum', v_floor.kcal_min)::text;
   end if;
-  if (p_row->>'pin_protein_g')::numeric is not null
+  if not v_exempt and (p_row->>'pin_protein_g')::numeric is not null
      and (p_row->>'pin_protein_g')::numeric < v_floor.protein_g_min then
     raise exception 'below_floor' using errcode = 'SF001', detail = jsonb_build_object(
       'floor', 'protein', 'dayType', 'training', 'minimum', v_floor.protein_g_min)::text;
@@ -231,6 +257,12 @@ begin
     v_protein := (v_macros->>'protein')::numeric;
     v_carbs := (v_macros->>'carbs')::numeric;
     v_fat := (v_macros->>'fat')::numeric;
+    -- A day without all four numbers cannot be judged (a NULL compares as neither true nor false).
+    if jsonb_typeof(v_macros) is distinct from 'object'
+       or v_kcal is null or v_protein is null or v_carbs is null or v_fat is null then
+      raise exception 'invalid_macros' using errcode = 'SF004', detail = jsonb_build_object(
+        'reason', 'invalid_macros', 'dayType', v_day)::text;
+    end if;
     if v_protein < 0 or v_carbs < 0 or v_fat < 0 then
       raise exception 'invalid_macros' using errcode = 'SF004', detail = jsonb_build_object(
         'reason', 'negative_macro', 'dayType', v_day, 'kcal', v_kcal,
@@ -242,24 +274,25 @@ begin
         'reason', 'kcal_mismatch', 'dayType', v_day, 'kcal', v_kcal,
         'macroKcal', v_macro_kcal)::text;
     end if;
-    if v_kcal < v_floor.kcal_min then
+    if not v_exempt and v_kcal < v_floor.kcal_min then
       raise exception 'below_floor' using errcode = 'SF001', detail = jsonb_build_object(
         'floor', 'kcal', 'dayType', v_day, 'minimum', v_floor.kcal_min)::text;
     end if;
-    if v_fat < v_floor.fat_g_min then
+    if not v_exempt and v_fat < v_floor.fat_g_min then
       raise exception 'below_floor' using errcode = 'SF001', detail = jsonb_build_object(
         'floor', 'fat', 'dayType', v_day, 'minimum', v_floor.fat_g_min)::text;
     end if;
-    if v_protein < v_floor.protein_g_min then
+    if not v_exempt and v_protein < v_floor.protein_g_min then
       raise exception 'below_floor' using errcode = 'SF001', detail = jsonb_build_object(
         'floor', 'protein', 'dayType', v_day, 'minimum', v_floor.protein_g_min)::text;
     end if;
   end loop;
 
   -- 6. Store with the minima this function computed; the caller's own are replaced.
-  v_floors := jsonb_build_object(
+  -- A pace-cleared copy keeps the minima of the revision it copies.
+  v_floors := case when v_exempt then '{}'::jsonb else jsonb_build_object(
     'kcal_min', v_floor.kcal_min, 'protein_g_min', v_floor.protein_g_min,
-    'fat_g_min', v_floor.fat_g_min, 'carb_g_min', 100, 'kcal_min_source', 'macro_minimum');
+    'fat_g_min', v_floor.fat_g_min, 'carb_g_min', 100, 'kcal_min_source', 'macro_minimum') end;
   if p_predecessor is not null then
     v_pred := write_target_revision(p_user_id, p_predecessor || v_floors);
   end if;
@@ -311,22 +344,40 @@ $$;
 do $migration$
 declare
   definition text;
-  from_text constant text := 'null::target_profiles, write_target_revision(p_user_id, v_payload));';
-  to_text constant text := 'null::target_profiles, write_target_revision_checked(p_user_id, v_payload));';
+  patched text;
+  write_from constant text := 'null::target_profiles, write_target_revision(p_user_id, v_payload));';
+  write_to constant text := 'null::target_profiles, write_target_revision_checked(p_user_id, v_payload));';
+  lock_from constant text := 'perform pg_advisory_xact_lock(hashtextextended(p_user_id::text, 0));';
+  lock_to constant text :=
+    'perform pg_advisory_xact_lock(hashtextextended(p_user_id::text || '':user_settings:settings'', 0));'
+    || E'\n  ' || lock_from;
   occurrences integer;
 begin
   select pg_get_functiondef('public.approve_target_proposal(uuid,uuid)'::regprocedure)
     into definition;
-  if position('write_target_revision_checked' in definition) > 0 then
-    return;
+  patched := definition;
+  if position('write_target_revision_checked' in patched) = 0 then
+    occurrences := (length(patched) - length(replace(patched, write_from, ''))) / length(write_from);
+    if occurrences <> 1 then
+      raise exception 'w060 (approve_target_proposal): write anchor occurs % times, expected once; refusing a partial function',
+        occurrences;
+    end if;
+    patched := replace(patched, write_from, write_to);
   end if;
-  occurrences := (length(definition) - length(replace(definition, from_text, '')))
-    / length(from_text);
-  if occurrences <> 1 then
-    raise exception 'w060 (approve_target_proposal): anchor occurs % times, expected once; refusing a partial function',
-      occurrences;
+  -- The checked writer takes the settings lock, then the target lock. Approval took the target
+  -- lock first, so a concurrent checked write and approval could each wait on the other (40P01).
+  -- Approval now takes the settings lock first, in the same order as every other writer.
+  if position(':user_settings:settings' in patched) = 0 then
+    occurrences := (length(patched) - length(replace(patched, lock_from, ''))) / length(lock_from);
+    if occurrences <> 1 then
+      raise exception 'w060 (approve_target_proposal): lock anchor occurs % times, expected once; refusing a partial function',
+        occurrences;
+    end if;
+    patched := replace(patched, lock_from, lock_to);
   end if;
-  execute replace(definition, from_text, to_text);
+  if patched <> definition then
+    execute patched;
+  end if;
 end;
 $migration$;
 

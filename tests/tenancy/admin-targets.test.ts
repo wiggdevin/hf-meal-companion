@@ -44,7 +44,7 @@ const revision = (owner: string, kcal: number) => ({ user_id: owner, effective_f
   input_activity_level: "moderate", input_goal: "maintain", formula_name: "tenancy" });
 
 const pin = { mode: "grams", effectiveFrom: DATE, kcalTrain: 2400, kcalRest: 2200,
-  grams: { proteinG: 140, fatG: 70, carbG: 300 } } as const;
+  grams: { proteinG: 140, fatG: 70, carbG: 302 } } as const;
 
 describe.skipIf(!HAS_BRANCH || !HAS_DB)("target writes (service role) stay with their account (canary)", () => {
   let a: TestUser;

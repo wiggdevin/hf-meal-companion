@@ -165,15 +165,32 @@ export async function writeDerivedTargets(
 }
 
 /**
- * Write a revision exactly as given, but through the checked writer: a copy below today's floor
- * is refused like any other. Only the server recompute calls it, to supersede a paced revision at
- * a 0 pace when the profile cannot derive (lib/server/target-recompute.ts); nothing taken from a
- * request body reaches it.
+ * Write a revision exactly as given, through the checked writer's pace-cleared-copy mode. Only the
+ * server recompute calls it, to supersede a paced revision at a 0 pace when the profile cannot
+ * derive (lib/server/target-recompute.ts); nothing taken from a request body reaches it.
  */
 export async function writeRevisionCopy(
   userId: string, revision: TargetRevision,
 ): Promise<TargetRevision> {
-  return persistRevision(userId, revision, revision.effectiveFrom);
+  // Ending a pace must never be refused: when a hold begins on an account whose profile cannot
+  // derive (or whose old pin is under today's floor), the copy is a pace-cleared copy of a
+  // revision that is already active. The writer still checks its macros, skips the profile and
+  // floor checks, and keeps the minima the copy carries (migration 20270109100000).
+  const floors = revision.floors;
+  if (!floors) throw new Error("A pace-cleared copy needs the revision's minima");
+  const payload = {
+    ...revisionPayload(revision, revision.effectiveFrom),
+    floor_exempt: "pace_cleared_copy",
+    kcal_min: floors.kcalMin,
+    protein_g_min: floors.proteinGMin,
+    fat_g_min: floors.fatGMin,
+    carb_g_min: floors.carbGMin,
+    kcal_min_source: floors.kcalMinSource,
+  };
+  const row = await writeRevisionRow(userId, payload);
+  const persisted = targetRevisionFromProfile(row);
+  if (!persisted) throw new Error("Target authority returned an incomplete revision");
+  return persisted;
 }
 
 /**
@@ -389,13 +406,19 @@ export async function authorTargets(
   // The calories are the user's, never replaced: each day keeps its protein and fat and takes the
   // carbohydrate that is left. A day that leaves none is refused; the checked writer judges the
   // floors (calories, fat, protein) against the account's own weight, height and goal.
-  const day = (kcal: number, dayType: "training" | "rest") => {
-    const carbs = Math.round(
+  const day = (kcal: number, dayType: "training" | "rest", carbG?: number) => {
+    const carbs = carbG ?? Math.round(
       (kcal - KCAL_PER_G_PROTEIN * raw.proteinG - KCAL_PER_G_FAT * raw.fatG) / KCAL_PER_G_CARB);
     if (carbs < 0) throw invalidMacrosError(dayType);
     return { kcal, protein: raw.proteinG, carbs, fat: raw.fatG };
   };
-  const resolved = { training: day(req.kcalTrain, "training"), rest: day(req.kcalRest, "rest") };
+  // Typed grams are the user's too: the training day keeps the carbohydrate they typed, so
+  // calories that do not match the three numbers are refused (422 kcal_mismatch), never quietly
+  // rewritten (spec 1.4). A percent split has no typed carbohydrate; the rest day takes what is left.
+  const resolved = {
+    training: day(req.kcalTrain, "training", req.mode === "grams" ? raw.carbG : undefined),
+    rest: day(req.kcalRest, "rest"),
+  };
   const [settings, eligibility] = await Promise.all([
     client.from("user_settings")
       .select("weight_kg, training_weekdays, activity_level, goal")

@@ -16,7 +16,7 @@ const SENTENCE = "That is below your minimum of 1900 kcal a day. Choose 1900 or 
 
 const {
   drainPendingTargetRevisions, persistDerivedTargetRevisionSet, readPendingTargetRevisions,
-  TargetFloorError, TargetSaveRefusedError, TargetRevisionQueuedError,
+  TargetFloorError, TargetMacroError, TargetSaveRefusedError, TargetRevisionQueuedError,
 } = await import("@/lib/targets/client");
 const { postTargets } = await import("@/lib/estimator-client");
 const { refusalMessage } = await import("@/lib/targets/refusal");
@@ -75,6 +75,26 @@ describe("a below_floor answer to a target save", () => {
       fetchImpl: vi.fn(async () => new Response(null, { status: 503 })) }))
       .rejects.toBeInstanceOf(TargetRevisionQueuedError);
     expect(await readPendingTargetRevisions(h)).toHaveLength(1);
+  });
+
+  it("a kcal_mismatch or invalid_macros answer keeps the server's sentence and is never queued", async () => {
+    const sentence = "Your calories and macros don't add up: they make 2120 kcal. Change one of them.";
+    for (const error of ["kcal_mismatch", "invalid_macros"]) {
+      const caught = await persistDerivedTargetRevisionSet(input(),
+        { fetchImpl: refuse({ error, message: sentence }), account: h, queueOnFailure: true })
+        .catch((e: unknown) => e);
+      expect(caught).toBeInstanceOf(TargetMacroError);
+      expect(caught).toMatchObject({ status: 422, code: error, message: sentence });
+      expect(refusalMessage(caught, "fallback")).toBe(sentence);
+      expect(await readPendingTargetRevisions(h)).toEqual([]);
+    }
+    // A queued save refused this way is dropped by the drain, not retried forever.
+    await expect(persistDerivedTargetRevisionSet(input(), { account: h, queueOnFailure: true,
+      fetchImpl: vi.fn(async () => new Response(null, { status: 503 })) }))
+      .rejects.toBeInstanceOf(TargetRevisionQueuedError);
+    await expect(drainPendingTargetRevisions(h, {
+      fetchImpl: refuse({ error: "kcal_mismatch", message: sentence }) }))
+      .resolves.toEqual({ posted: 0, pending: 0 });
   });
 
   it("falls back to a plain refusal when the body cannot be read as a floor", async () => {

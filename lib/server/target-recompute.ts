@@ -51,6 +51,7 @@ import { targetRevisionFromProfile } from "@/lib/targets/revision";
 import { resolveAccountDay } from "@/lib/server/account-day";
 import { fetchAllRows } from "@/lib/server/paged-read";
 import { readTargetEligibility } from "@/lib/server/target-eligibility";
+import { TargetBelowFloorError } from "@/lib/server/target-write-errors";
 import {
   isMinorOn, paceAllowed, standardProtein, type TargetEligibility,
 } from "@/lib/profile/rate-eligibility";
@@ -72,7 +73,7 @@ type SettingsRow = UserSettingsProfileRow & {
 
 export type RecomputeSkip =
   | "no_settings" | "not_onboarded" | "incomplete_profile" | "authoritative_formula"
-  | "future_revision" | "pins_differ" | "adult_only";
+  | "future_revision" | "pins_differ" | "adult_only" | "below_floor";
 
 type Derived = ReturnType<typeof deriveTargetRevision>;
 
@@ -248,7 +249,9 @@ type DayHints = Pick<RecomputeOptions, "clientDay" | "requestZone">;
 /** A 0-pace derivation, or, when the profile cannot derive, the revision itself copied at a 0
  *  pace (`copy`): its macros stay, and no later step or proposal builds on its pace. */
 type Supersede =
-  | { input: DeriveTargetRevisionInput; expected: Derived }
+  // `fallback`: the pace-cleared copy of the revision, written when the checked writer refuses the
+  // derivation as below a floor (an old pin under today's minimum): ending the pace is never refused.
+  | { input: DeriveTargetRevisionInput; expected: Derived; fallback: TargetRevision | null }
   | { copy: TargetRevision };
 
 /** The highest protein a revision sets on either day; a legacy row falls back to `protein_g`. */
@@ -294,7 +297,10 @@ async function supersedeWrites(
     const expected = deriveTargetRevision(input);
     const proteinAbove = standardProtein(dated)
       && proteinOf(profile) > Math.max(expected.training.protein, expected.rest.protein);
-    if (hasPace(profile) || proteinAbove) writes.push({ input, expected });
+    if (hasPace(profile) || proteinAbove) {
+      writes.push({ input, expected,
+        fallback: hasPace(profile) ? paceClearedCopy(profile, date) : null });
+    }
   }
   return writes;
 }
@@ -416,16 +422,31 @@ export async function recomputeDerivedTarget(
       // a later revision, and a 0 pace is the safe side of any race. The next round verifies.
       let last: TargetRevision | null = null;
       for (const write of next.writes) {
-        last = "copy" in write ? await writeRevisionCopy(userId, write.copy)
-          : await writeDerivedTargets(client, userId, write.input);
+        if ("copy" in write) { last = await writeRevisionCopy(userId, write.copy); continue; }
+        try {
+          last = await writeDerivedTargets(client, userId, write.input);
+        } catch (e) {
+          if (!(e instanceof TargetBelowFloorError) || !write.fallback) throw e;
+          last = await writeRevisionCopy(userId, write.fallback);
+        }
       }
       if (last) written = { revision: last, rounds: round, byHold: true };
       continue;
     }
     if (next.kind !== "derive") throw new Error("unreachable");
     if (options.dryRun) return { status: "would_write", active: next.active, expected: next.expected };
-    const revision = await writeDerivedTargetsIfActive(client, userId, next.input,
-      next.active?.id ?? null, next.rev);
+    let revision: TargetRevision | null;
+    try {
+      revision = await writeDerivedTargetsIfActive(client, userId, next.input,
+        next.active?.id ?? null, next.rev);
+    } catch (e) {
+      // The checked writer refuses a derivation under a floor (an old pin under today's minimum,
+      // or a weigh-in that raised it). The active revision stays; a later settings change retries.
+      if (e instanceof TargetBelowFloorError) {
+        return { status: "skipped", reason: "below_floor", active: next.active };
+      }
+      throw e;
+    }
     // null: another revision became active after this plan read it. Re-plan from the new state.
     if (revision) written = { revision, rounds: round, byHold: false };
     // The next round re-reads settings and the active revision; a match ends the run, and a newer

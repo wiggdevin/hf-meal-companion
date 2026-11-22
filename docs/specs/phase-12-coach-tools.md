@@ -27,15 +27,28 @@ Owner confirmation of the minima (protein 1.8 / 2.0 g/kg, `macroMinimumKcal`) is
   `app/api/targets/route.ts` call only the checked writers. App code no longer calls
   `write_target_revision`. `422 below_floor` carries `{ floor, dayType, minimum, message }`.
 - **Deviation: `floor_profile`.** The onboarding form posts the target before its profile op is
-  queued, so the checked writer reads weight, height, sex, birth year and goal from the stored
-  profile first and falls back to a `floor_profile` in `p_row` only for a field with no stored value.
-  A stored value always wins.
+  queued, and a goal or height edit posts it before the new value is stored. The route therefore
+  sends the settings the target was derived from as `floor_profile` in `p_row`. For height and goal
+  the sent value wins over the stored one (the target is judged on the profile it was derived from,
+  so a `lose_fat` to `maintain` edit is not refused at the old goal's protein). Sex and birth year
+  are only checked present. The weight is the weigh-in log first, then `floor_profile.weight_kg`.
+  Kidney holds and the adult floor are read server-side and never from the body.
+- **Deviation: pace-cleared copy.** A row with `floor_exempt = 'pace_cleared_copy'` and a pace of 0
+  skips the profile and floor checks (it still needs four macros per day, no negatives and kcal
+  within 9 of 4p+4c+9f) and keeps its own minima. Only the server recompute sends it, to end a pace
+  when a hold begins on an account whose profile cannot derive or whose old pin is under today's
+  floor: ending a pace is never refused.
+- **Lock order.** `approve_target_proposal` now takes the settings lock before the target lock, like
+  every checked writer, so a concurrent approval and write cannot deadlock (40P01). A replay of a
+  pair write never inserts a predecessor, and a predecessor dated after its revision is refused.
 - **Pins and the derive engine.** The derive engine does not raise a pin to the protein or calorie
   floor, so a pin under a floor is refused (`below_floor`), not raised. Grams-mode carbohydrate under
-  100 g is no longer raised.
-- **Client** (section 1.5): `TargetFloorError` (`lib/targets/refusal.ts`) is thrown for a
-  `below_floor` answer. It is never queued, and the drain removes a queued save the server now
-  refuses. Settings, the weigh-in, Undo and onboarding show the server's sentence;
+  100 g is no longer raised. Typed grams keep their training-day carbohydrate: calories that differ
+  from 4p+4c+9f by more than 9 are refused (`422 kcal_mismatch`), not rewritten.
+- **Client** (section 1.5): `TargetFloorError` and `TargetMacroError` (`lib/targets/refusal.ts`)
+  are thrown for a `below_floor`, `kcal_mismatch` or `invalid_macros` answer. They are never queued,
+  and the drain removes a queued save the server now refuses. A refused proposal approval keeps the
+  server's sentence (`ProposalRefusedError`). Settings, the weigh-in, Undo and onboarding show the server's sentence;
   `TargetModeSheet` grams mode moves each day's calories with the grams.
 - **Deviation: units from chat.** Units go through `update_profile` (`weightUnit`, `heightUnit`),
   not a new `update_setting` tool. There is no daily rate limit and no old-client gating.

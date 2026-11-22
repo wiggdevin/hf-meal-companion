@@ -107,10 +107,10 @@ describe("authored targets", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("builds each day's carbohydrate from its own calories", async () => {
+  it("keeps the typed carbohydrate on the training day and builds the rest day from its own calories", async () => {
     const { client, rpc } = clientWith((_n, args) => ({ data: {
       ...PROFILE, id: "p2", rev: 2, ...(args.p_row as object) } }));
-    await authorTargets(client, "u1", grams(2200, 1750));
+    await authorTargets(client, "u1", grams(2200, 1750, { proteinG: 135, fatG: 85, carbG: 224 }));
     expect(sentRow(rpc).training_macros).toEqual({ kcal: 2200, protein: 135, carbs: 224, fat: 85 });
     expect(sentRow(rpc).rest_macros).toEqual({ kcal: 1750, protein: 135, carbs: 111, fat: 85 });
   });

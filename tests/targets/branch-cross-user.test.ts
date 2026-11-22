@@ -73,7 +73,9 @@ run("cross-user denial and percent authority on a real branch", () => {
     // refused with the minimum, not silently raised (it used to be raised).
     const write = (proteinG: number, fatG: number, effectiveFrom: string) =>
       authorTargets(users.a.client, users.a.userId, { mode: "grams", effectiveFrom,
-        kcalTrain: 2200, kcalRest: 1750, grams: { proteinG, fatG, carbG: 300 } });
+        kcalTrain: 2200, kcalRest: 1750,
+        // The typed carbohydrate matches the calories, so only the floor can refuse it.
+        grams: { proteinG, fatG, carbG: Math.round((2200 - 4 * proteinG - 9 * fatG) / 4) } });
     const fat = await write(floors.proteinGMin + 20, 30, "2026-09-16").catch((e: unknown) => e);
     expect(fat).toBeInstanceOf(TargetBelowFloorError);
     expect(fat).toMatchObject({ status: 422, floor: "fat", minimum: floors.fatGMin });
@@ -83,6 +85,17 @@ run("cross-user denial and percent authority on a real branch", () => {
     expect(floors.proteinGMin).toBeGreaterThan(90);
     const { data } = await admin.from("target_profiles").select("id")
       .eq("user_id", users.a.userId).eq("effective_from", "2026-09-16");
+    expect(data).toEqual([]);
+  });
+
+  it("refuses typed grams whose calories do not add up, instead of rewriting the carbs (spec 1.4)", async () => {
+    // 150 P + 200 C + 80 F make 2,120 kcal; the user typed 2,000.
+    const error = await authorTargets(users.a.client, users.a.userId, { mode: "grams",
+      effectiveFrom: "2026-09-17", kcalTrain: 2000, kcalRest: 1800,
+      grams: { proteinG: 150, fatG: 80, carbG: 200 } }).catch((e: unknown) => e);
+    expect(error).toMatchObject({ status: 422, code: "kcal_mismatch" });
+    const { data } = await admin.from("target_profiles").select("id")
+      .eq("user_id", users.a.userId).eq("effective_from", "2026-09-17");
     expect(data).toEqual([]);
   });
 });
