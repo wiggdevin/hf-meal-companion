@@ -16,7 +16,7 @@
 --
 -- Replaces one function body (20270103090000); no table, grant or signature changes. Live-safe.
 -- No ordering constraint with the code: old and new builds call the same signature.
--- Down: supabase/migrations/down/20270109090000_ai_spend_live_holds.down.sql.
+-- Down: supabase/migrations/down/20270109090100_ai_spend_live_holds.down.sql.
 set local lock_timeout = '3s';
 set local statement_timeout = '30s';
 

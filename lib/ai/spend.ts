@@ -36,9 +36,9 @@ const DEFAULT_SOFT = 30;
 const DEFAULT_HARD = 100;
 const DEFAULT_SPEND_CAP_USD = 2;
 /** The whole deployment's daily ceiling across every account (scale S2), when the env is unset. */
-export const DEFAULT_GLOBAL_SPEND_CAP_USD = 150;
+export const DEFAULT_GLOBAL_SPEND_CAP_USD = 50;
 /** OD01: what background calls, across every account, may commit in a UTC day, when the env is unset. */
-export const DEFAULT_BACKGROUND_SPEND_CAP_USD = 30;
+export const DEFAULT_BACKGROUND_SPEND_CAP_USD = 10;
 /** OD01: the share of every cap (global and per account) kept for interactive turns, when the env is unset. */
 export const DEFAULT_INTERACTIVE_SHARE = 0.7;
 /** How long a reservation holds its amount when the function that made it never settles. */
@@ -79,7 +79,7 @@ export function spendCapUsd(): number {
   return usdFromEnv("AI_DAILY_SPEND_CAP_USD", DEFAULT_SPEND_CAP_USD);
 }
 
-/** Every account's UTC-day total (`AI_GLOBAL_DAILY_SPEND_CAP_USD`, default $150). */
+/** Every account's UTC-day total (`AI_GLOBAL_DAILY_SPEND_CAP_USD`, default $50). */
 export function globalSpendCapUsd(): number {
   return usdFromEnv("AI_GLOBAL_DAILY_SPEND_CAP_USD", DEFAULT_GLOBAL_SPEND_CAP_USD);
 }
@@ -96,7 +96,7 @@ export function interactiveShare(): number {
 }
 
 /** OD01: background calls' UTC-day ceiling across every account: `AI_BACKGROUND_DAILY_SPEND_CAP_USD`
- *  (default $30), never more than the global ceiling's non-interactive part (global x (1 - share)).
+ *  (default $10), never more than the global ceiling's non-interactive part (global x (1 - share)).
  *  0 stops background spend and leaves interactive turns alone. */
 export function backgroundSpendCapUsd(): number {
   const configured = usdFromEnv("AI_BACKGROUND_DAILY_SPEND_CAP_USD", DEFAULT_BACKGROUND_SPEND_CAP_USD);

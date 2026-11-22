@@ -40,12 +40,12 @@ describe("reserveSpend (scale S2: atomic reservation, fail closed)", () => {
       p_background: true, p_background_cap_usd: 4, p_interactive_reserve_usd: 1.5 }));
   });
 
-  it("defaults to the OD01 policy: $150 global, background $30, 70% interactive share", () => {
-    expect(DEFAULT_GLOBAL_SPEND_CAP_USD).toBe(150);
-    expect(DEFAULT_BACKGROUND_SPEND_CAP_USD).toBe(30);
+  it("keeps today's caps ($50 global, $10 background) and the 70% interactive share", () => {
+    expect(DEFAULT_GLOBAL_SPEND_CAP_USD).toBe(50);
+    expect(DEFAULT_BACKGROUND_SPEND_CAP_USD).toBe(10);
     expect(DEFAULT_INTERACTIVE_SHARE).toBe(0.7);
     expect(interactiveShare()).toBe(0.7);
-    expect(backgroundSpendCapUsd()).toBe(30);
+    expect(backgroundSpendCapUsd()).toBe(10);
     // The account's reserve follows the share of its own cap: 70% of $2.
     expect(interactiveReserveUsd()).toBeCloseTo(1.4, 10);
   });
@@ -95,12 +95,12 @@ describe("reserveSpend (scale S2: atomic reservation, fail closed)", () => {
       .rejects.toMatchObject({ status: 429, code: "spend_cap" });
   });
 
-  it("defaults the global ceiling to $150 and refuses a malformed env value", async () => {
+  it("defaults the global ceiling to $50 and refuses a malformed env value", async () => {
     expect(globalSpendCapUsd()).toBe(DEFAULT_GLOBAL_SPEND_CAP_USD);
-    expect(DEFAULT_GLOBAL_SPEND_CAP_USD).toBe(150);
+    expect(DEFAULT_GLOBAL_SPEND_CAP_USD).toBe(50);
     vi.stubEnv("AI_GLOBAL_DAILY_SPEND_CAP_USD", "lots");
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    expect(globalSpendCapUsd()).toBe(150);
+    expect(globalSpendCapUsd()).toBe(50);
   });
 
   it("keeps the cap-reached copy when the user cap refuses", async () => {

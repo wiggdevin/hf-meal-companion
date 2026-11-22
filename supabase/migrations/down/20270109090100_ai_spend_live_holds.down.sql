@@ -1,4 +1,4 @@
--- Reverse of 20270109090000_ai_spend_live_holds.sql: restores the 20270103090000 body, where every
+-- Reverse of 20270109090100_ai_spend_live_holds.sql: restores the 20270103090000 body, where every
 -- unsettled hold counts against the global ceiling and the background splits, expired or not.
 set local lock_timeout = '3s';
 set local statement_timeout = '30s';

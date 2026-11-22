@@ -1,5 +1,5 @@
 /**
- * W043, migration 20270109090000 `ai_spend_live_holds`: the global ceiling and the background
+ * W043, migration 20270109090100 `ai_spend_live_holds`: the global ceiling and the background
  * splits count settled spend plus LIVE (unexpired, unsettled) holds only. An abandoned hold past its
  * expiry stops counting at once, before the sweep reconciles it, so stale $0.25 OpenRouter
  * allowances cannot trip "daily AI spend cap reached" for every account. The text half runs in
@@ -12,8 +12,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { HAS_BRANCH, HAS_DB, adminClient, ensureUser, runSql, type TestUser } from "../helpers/supabase";
 
 const read = (p: string) => readFileSync(path.join(process.cwd(), p), "utf8");
-const UP = read("supabase/migrations/20270109090000_ai_spend_live_holds.sql");
-const DOWN = read("supabase/migrations/down/20270109090000_ai_spend_live_holds.down.sql");
+const UP = read("supabase/migrations/20270109090100_ai_spend_live_holds.sql");
+const DOWN = read("supabase/migrations/down/20270109090100_ai_spend_live_holds.down.sql");
 const code = (sql: string) => sql.split("\n").filter((l) => !l.trimStart().startsWith("--")).join("\n");
 
 type Reserve = { reservation_id: string | null; allowed: boolean; reason: string | null };
@@ -28,7 +28,7 @@ async function reserve(user: string, amount: number, background: boolean,
   return (data as Reserve[])[0];
 }
 
-describe("20270109090000 ai_spend_live_holds (text)", () => {
+describe("20270109090100 ai_spend_live_holds (text)", () => {
   it("is live-safe and replaces one function only", () => {
     for (const file of [UP, DOWN]) {
       expect(file).toContain("set local lock_timeout = '3s';");
@@ -46,7 +46,7 @@ describe("20270109090000 ai_spend_live_holds (text)", () => {
   });
 });
 
-describe.skipIf(!HAS_DB || !HAS_BRANCH)("20270109090000 ai_spend_live_holds (database)", () => {
+describe.skipIf(!HAS_DB || !HAS_BRANCH)("20270109090100 ai_spend_live_holds (database)", () => {
   let a: TestUser;
   let b: TestUser;
   const reset = () => runSql(`delete from public.ai_spend_reservations where user_id in ('${a.id}', '${b.id}');
