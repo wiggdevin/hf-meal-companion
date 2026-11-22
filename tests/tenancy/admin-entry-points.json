@@ -370,6 +370,10 @@
     "test": "tests/tenancy/admin-onboarding-extract.test.ts",
     "via": "@/app/api/onboarding/extract/route"
   },
+  "lib/server/ops-metrics.ts": {
+    "test": "tests/tenancy/admin-ops-metrics.test.ts",
+    "via": "@/app/api/ops/metrics/route"
+  },
   "lib/server/oura.ts": {
     "test": "tests/tenancy/admin-jobs.test.ts",
     "via": "@/app/api/jobs/oura-pull/route"
