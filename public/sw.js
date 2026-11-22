@@ -21,7 +21,7 @@
 
 // v3 (Phase 9 slice 1): a verified offline shell; the worker waits for the old build's tabs to
 // close instead of taking them over (see the activate handler).
-const CACHE_VERSION = "v3";
+const CACHE_VERSION = "v4";
 const CACHE_NAME = `hf-shell-${CACHE_VERSION}`;
 
 const SHELL_URLS = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
@@ -119,6 +119,24 @@ function networkFirst(request, fallbackToRoot) {
     );
 }
 
+// The `/log` deep link (home-screen shortcuts) is a server redirect to Today. Offline there is no
+// server, so the worker sends it on itself: to `/?log=…`, which the cached shell answers and Today
+// reads (lib/log/log-intent.ts). Only known values travel; Today validates them again.
+const LOG_MODES = ["voice", "photo", "label", "barcode", "text"];
+const SLOT_PATTERN = /^[a-z0-9-]{1,32}$/;
+
+function logTarget(url) {
+  const mode = url.searchParams.get("mode");
+  const slot = url.searchParams.get("slot");
+  const query = new URLSearchParams({ log: LOG_MODES.includes(mode) ? mode : "open" });
+  if (slot && SLOT_PATTERN.test(slot)) query.set("slot", slot);
+  return `${self.location.origin}/?${query.toString()}`;
+}
+
+function logNavigation(request, url) {
+  return fetch(request).catch(() => Response.redirect(logTarget(url), 302));
+}
+
 function cacheFirst(request) {
   return caches.match(request).then((cached) => cached || fetch(request).then((response) => putInCache(request, response)));
 }
@@ -130,6 +148,10 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
+  if (request.mode === "navigate" && url.pathname === "/log") {
+    event.respondWith(logNavigation(request, url));
+    return;
+  }
   if (request.mode === "navigate") {
     event.respondWith(networkFirst(request, true));
     return;

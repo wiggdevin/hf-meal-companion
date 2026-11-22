@@ -53,11 +53,11 @@ export default function DayTypeChip({
       aria-controls={open ? menuId : undefined}
       aria-label={dayTypeChipName(dayType, locked)}
       title={dayTypeLabel(dayType, override)}
-      className="tap relative inline-flex min-w-0 items-center justify-center"
+      className="tap relative inline-flex min-w-0 max-w-full items-center justify-center"
       style={{ width: "auto", appearance: "none", textAlign: "left" }}
     >
-      <span className="pill inline-flex min-w-0">
-        <span className={`pill-in flex h-10 min-w-10 items-center justify-center gap-2 transition-[padding] duration-200 ${open ? "pl-2.5 pr-3.5" : "px-2.5"}`}>
+      <span className="pill inline-flex min-w-0 max-w-full">
+        <span className={`pill-in flex h-10 min-w-10 max-w-full items-center justify-center gap-2 transition-[padding] duration-200 ${open ? "pl-2.5 pr-3.5" : "px-2.5"}`}>
           <span
             className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[12px] text-on-primary"
             style={{ background: tile.tile, boxShadow: "inset 0 1px 1px rgba(255,255,255,0.4)" }}

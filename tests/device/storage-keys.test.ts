@@ -80,6 +80,7 @@ const STORAGE_FILES: Record<string, string> = {
   "lib/foods/starter-seed.ts": "account: smc:u:<id>:starter-suggestions-seeded-v1",
   "lib/feedback-client.ts": "account (session): smc:u:<id>:feedback-draft",
   "lib/health/capability.ts": "device (session): smc:body_capability",
+  "lib/log/held-log-intent.ts": "device (session): smc:device:log-intent (a /log mode and slot held across onboarding, 30 min)",
   "lib/profile/onboarding-state.ts": "account: smc:u:<id>:onboarding-invite-dismissed-at",
   "lib/recipes/session-checks.ts": "account (session): smc:u:<id>:recipe-checks:<revision>",
   "lib/sync/idb.ts": "account: IndexedDB smc-u-<id>",
