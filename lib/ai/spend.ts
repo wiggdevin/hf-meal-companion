@@ -36,11 +36,11 @@ const DEFAULT_SOFT = 30;
 const DEFAULT_HARD = 100;
 const DEFAULT_SPEND_CAP_USD = 2;
 /** The whole deployment's daily ceiling across every account (scale S2), when the env is unset. */
-export const DEFAULT_GLOBAL_SPEND_CAP_USD = 50;
+export const DEFAULT_GLOBAL_SPEND_CAP_USD = 150;
 /** OD01: what background calls, across every account, may commit in a UTC day, when the env is unset. */
-export const DEFAULT_BACKGROUND_SPEND_CAP_USD = 10;
-/** OD01: the part of each account's daily cap background calls may never use, when the env is unset. */
-export const DEFAULT_INTERACTIVE_RESERVE_USD = 1;
+export const DEFAULT_BACKGROUND_SPEND_CAP_USD = 30;
+/** OD01: the share of every cap (global and per account) kept for interactive turns, when the env is unset. */
+export const DEFAULT_INTERACTIVE_SHARE = 0.7;
 /** How long a reservation holds its amount when the function that made it never settles. */
 export const RESERVATION_TTL_SECONDS = 300;
 
@@ -79,22 +79,37 @@ export function spendCapUsd(): number {
   return usdFromEnv("AI_DAILY_SPEND_CAP_USD", DEFAULT_SPEND_CAP_USD);
 }
 
-/** Every account's UTC-day total (`AI_GLOBAL_DAILY_SPEND_CAP_USD`, default $50). */
+/** Every account's UTC-day total (`AI_GLOBAL_DAILY_SPEND_CAP_USD`, default $150). */
 export function globalSpendCapUsd(): number {
   return usdFromEnv("AI_GLOBAL_DAILY_SPEND_CAP_USD", DEFAULT_GLOBAL_SPEND_CAP_USD);
 }
 
-/** OD01: background calls' UTC-day ceiling across every account (`AI_BACKGROUND_DAILY_SPEND_CAP_USD`,
- *  default $10). 0 stops background spend and leaves interactive turns alone. */
-export function backgroundSpendCapUsd(): number {
-  return usdFromEnv("AI_BACKGROUND_DAILY_SPEND_CAP_USD", DEFAULT_BACKGROUND_SPEND_CAP_USD);
+const round6 = (n: number): number => Math.round(n * 1e6) / 1e6;
+
+/** OD01: the share of each cap kept for interactive turns (`AI_INTERACTIVE_SHARE`, a number from 0
+ *  to 1, default 0.7). A malformed or out-of-range value falls back to the default, logged. */
+export function interactiveShare(): number {
+  const value = usdFromEnv("AI_INTERACTIVE_SHARE", DEFAULT_INTERACTIVE_SHARE);
+  if (value <= 1) return value;
+  console.error("AI_INTERACTIVE_SHARE must be between 0 and 1; using the default", { value });
+  return DEFAULT_INTERACTIVE_SHARE;
 }
 
-/** OD01: the share of each account's cap kept for its own interactive turns
- *  (`AI_INTERACTIVE_RESERVE_USD`, default $1 of $2). Background calls for an account may commit at
- *  most its cap less this. */
+/** OD01: background calls' UTC-day ceiling across every account: `AI_BACKGROUND_DAILY_SPEND_CAP_USD`
+ *  (default $30), never more than the global ceiling's non-interactive part (global x (1 - share)).
+ *  0 stops background spend and leaves interactive turns alone. */
+export function backgroundSpendCapUsd(): number {
+  const configured = usdFromEnv("AI_BACKGROUND_DAILY_SPEND_CAP_USD", DEFAULT_BACKGROUND_SPEND_CAP_USD);
+  return Math.min(configured, round6(globalSpendCapUsd() * (1 - interactiveShare())));
+}
+
+/** OD01: the part of each account's cap kept for its own interactive turns:
+ *  `AI_INTERACTIVE_RESERVE_USD` when set, else the interactive share of the account's cap (70% of
+ *  $2). Background calls for an account may commit at most its cap less this. */
 export function interactiveReserveUsd(): number {
-  return usdFromEnv("AI_INTERACTIVE_RESERVE_USD", DEFAULT_INTERACTIVE_RESERVE_USD);
+  const value = process.env.AI_INTERACTIVE_RESERVE_USD;
+  if (value !== undefined && value.trim().length > 0) return usdFromEnv("AI_INTERACTIVE_RESERVE_USD", 0);
+  return round6(spendCapUsd() * interactiveShare());
 }
 
 /** A hold on the daily caps for one model call, released to its actual cost by `settleSpend`. */

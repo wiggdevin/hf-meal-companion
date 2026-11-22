@@ -3,7 +3,8 @@ import path from "node:path";
 import ts from "typescript";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  DEFAULT_BACKGROUND_SPEND_CAP_USD, DEFAULT_GLOBAL_SPEND_CAP_USD, DEFAULT_INTERACTIVE_RESERVE_USD,
+  DEFAULT_BACKGROUND_SPEND_CAP_USD, DEFAULT_GLOBAL_SPEND_CAP_USD, DEFAULT_INTERACTIVE_SHARE,
+  interactiveShare,
   DEFAULT_OPENROUTER_ATTEMPT_CEILING_USD, backgroundSpendCapUsd, globalSpendCapUsd, interactiveReserveUsd,
   openRouterAttemptCeilingUsd, openRouterAttemptCost, reserveSpend, settleSpend,
 } from "@/lib/ai/spend";
@@ -26,7 +27,7 @@ describe("reserveSpend (scale S2: atomic reservation, fail closed)", () => {
       .resolves.toEqual({ id: "r1", amountUsd: 0.05 });
     expect(admin.rpc).toHaveBeenCalledWith("ai_spend_reserve_split", { p_user_id: "user-a",
       p_amount_usd: 0.05, p_user_cap_usd: 0.5, p_global_cap_usd: 12, p_ttl_seconds: 300,
-      p_background: false, p_background_cap_usd: 10, p_interactive_reserve_usd: 1 });
+      p_background: false, p_background_cap_usd: 3.6, p_interactive_reserve_usd: 0.35 });
   });
 
   it("marks a background call and sends the OD01 splits from the env", async () => {
@@ -39,11 +40,51 @@ describe("reserveSpend (scale S2: atomic reservation, fail closed)", () => {
       p_background: true, p_background_cap_usd: 4, p_interactive_reserve_usd: 1.5 }));
   });
 
-  it("defaults the background ceiling to $10 and the interactive reserve to $1 (OD01)", () => {
-    expect(backgroundSpendCapUsd()).toBe(DEFAULT_BACKGROUND_SPEND_CAP_USD);
-    expect(DEFAULT_BACKGROUND_SPEND_CAP_USD).toBe(10);
-    expect(interactiveReserveUsd()).toBe(DEFAULT_INTERACTIVE_RESERVE_USD);
-    expect(DEFAULT_INTERACTIVE_RESERVE_USD).toBe(1);
+  it("defaults to the OD01 policy: $150 global, background $30, 70% interactive share", () => {
+    expect(DEFAULT_GLOBAL_SPEND_CAP_USD).toBe(150);
+    expect(DEFAULT_BACKGROUND_SPEND_CAP_USD).toBe(30);
+    expect(DEFAULT_INTERACTIVE_SHARE).toBe(0.7);
+    expect(interactiveShare()).toBe(0.7);
+    expect(backgroundSpendCapUsd()).toBe(30);
+    // The account's reserve follows the share of its own cap: 70% of $2.
+    expect(interactiveReserveUsd()).toBeCloseTo(1.4, 10);
+  });
+
+  it("never lets background spend beat the share the interactive side keeps (global)", () => {
+    vi.stubEnv("AI_GLOBAL_DAILY_SPEND_CAP_USD", "50");
+    vi.stubEnv("AI_BACKGROUND_DAILY_SPEND_CAP_USD", "30");
+    // 30% of $50 is $15: the tighter limit wins over the configured $30.
+    expect(backgroundSpendCapUsd()).toBeCloseTo(15, 10);
+    vi.stubEnv("AI_INTERACTIVE_SHARE", "0.9");
+    expect(backgroundSpendCapUsd()).toBeCloseTo(5, 10);
+  });
+
+  it("a malformed or out-of-range share falls back to 0.7", () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    for (const bad of ["1.5", "-1", "most"]) {
+      vi.stubEnv("AI_INTERACTIVE_SHARE", bad);
+      expect(interactiveShare()).toBe(0.7);
+    }
+  });
+
+  it("an explicit AI_INTERACTIVE_RESERVE_USD beats the share", () => {
+    vi.stubEnv("AI_INTERACTIVE_RESERVE_USD", "0.5");
+    expect(interactiveReserveUsd()).toBe(0.5);
+  });
+
+  it("keeps a coach turn allowed when background spend sits at its cap (interactive call sends background:false)", async () => {
+    const calls: Record<string, unknown>[] = [];
+    const admin = adminWith(async (_fn, args) => {
+      calls.push(args);
+      // Mirror the SQL: a background hold at the background cap refuses only background calls.
+      const refused = args.p_background === true;
+      return { data: [{ reservation_id: refused ? null : "r-turn", allowed: !refused,
+        reason: refused ? "background_cap" : null, user_committed_usd: 0, global_committed_usd: 30 }], error: null };
+    });
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    await expect(reserveSpend(admin as never, "u", 0.05, { background: true })).rejects.toMatchObject({ code: "spend_cap" });
+    await expect(reserveSpend(admin as never, "u", 0.05)).resolves.toMatchObject({ id: "r-turn" });
+    expect(calls.map((c) => c.p_background)).toEqual([true, false]);
   });
 
   it.each(["background_cap", "background_user_cap"])("refuses a background call with spend_cap on %s", async (reason) => {
@@ -54,12 +95,12 @@ describe("reserveSpend (scale S2: atomic reservation, fail closed)", () => {
       .rejects.toMatchObject({ status: 429, code: "spend_cap" });
   });
 
-  it("defaults the global ceiling to $50 and refuses a malformed env value", async () => {
+  it("defaults the global ceiling to $150 and refuses a malformed env value", async () => {
     expect(globalSpendCapUsd()).toBe(DEFAULT_GLOBAL_SPEND_CAP_USD);
-    expect(DEFAULT_GLOBAL_SPEND_CAP_USD).toBe(50);
+    expect(DEFAULT_GLOBAL_SPEND_CAP_USD).toBe(150);
     vi.stubEnv("AI_GLOBAL_DAILY_SPEND_CAP_USD", "lots");
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    expect(globalSpendCapUsd()).toBe(50);
+    expect(globalSpendCapUsd()).toBe(150);
   });
 
   it("keeps the cap-reached copy when the user cap refuses", async () => {
