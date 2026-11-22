@@ -71,7 +71,7 @@ describe("chart block", () => {
     const axis = (container: HTMLElement) =>
       [...container.querySelectorAll("svg text")].map((node) => node.textContent);
 
-    it("renders a week of calories: one edged bar and target per day, weekday axis, full-date rows", () => {
+    it("renders a populated week of calories: one edged bar and target per day, weekday axis, full-date rows", () => {
       const dates = isoDays("2026-09-10", 7);
       const { container } = render(renderBlock(kcalWeek(dates), {} as never));
       const bars = [...container.querySelectorAll("[data-bar]")];

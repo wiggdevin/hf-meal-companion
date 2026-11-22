@@ -269,6 +269,15 @@ describe.skipIf(!HAS_BRANCH || !HAS_DB)("admin-client helpers answer only for th
     const forA = await chart(a.id);
     expect(forA.data.points ?? 0).toBe(0);
     expect(JSON.stringify(forA)).not.toContain(String(CANARY_WEEK_KCAL));
+    // The windowed read (lib/server/intake-window.ts, a date range rather than listed dates).
+    const trend = async (userId: string) => (await runDirectBlockTool("show_chart",
+      { chart: "kcal_week", days: 7 }, { admin: adminClient(), userId, date: today, tz: "UTC",
+        context: null, profile: {} as never, newId: () => crypto.randomUUID() })) as
+      { data: { points?: number }; block: unknown };
+    expect(JSON.stringify((await trend(b.id)).block)).toContain(String(CANARY_WEEK_KCAL));
+    const trendA = await trend(a.id);
+    expect(trendA.data.points ?? 0).toBe(0);
+    expect(JSON.stringify(trendA)).not.toContain(String(CANARY_WEEK_KCAL));
   });
 
   it("facet warming: judgments are written under the food's owner; A cannot warm B's food",
