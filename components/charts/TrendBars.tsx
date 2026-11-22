@@ -29,13 +29,18 @@ export const METRIC_CLASS: Record<TrendMetric, string> = {
   sleep: styles.sleep, activity: styles.activity, weight: styles.weight,
 };
 
+/** The three macro hues, from their gauge tokens, for charts drawn per macro. */
+export const MACRO_CLASS = { protein: styles.protein, carbs: styles.carbs, fat: styles.fat } as const;
+
 /**
  * The frame every trend chart shares: the SVG is one image with a summary name, the columns are
  * real buttons over it (each at least 44 px), and a visually hidden table carries every value.
  */
-export function ChartFrame({ cols, metric, selected, onSelect, summary, caption, valueHeading, children }: {
+export function ChartFrame({ cols, metric, tone, selected, onSelect, summary, caption, valueHeading, children }: {
   cols: TrendColumn[];
   metric: TrendMetric;
+  /** A hue class from `MACRO_CLASS` in place of the metric's own (the coach's carbs and fat). */
+  tone?: string;
   selected: number | null;
   onSelect: (index: number) => void;
   summary: string;
@@ -45,7 +50,7 @@ export function ChartFrame({ cols, metric, selected, onSelect, summary, caption,
 }) {
   const box = plotBox(CHART_WIDTH, CHART_HEIGHT, { top: 8, bottom: FOOT });
   const slots = columns(cols.length, box);
-  return <div className={`relative ${METRIC_CLASS[metric]}`}>
+  return <div className={`relative ${tone ?? METRIC_CLASS[metric]}`}>
     <svg className={styles.chart} viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} role="img" aria-label={summary}>
       <line className={styles.baseline} x1={box.left} x2={box.right} y1={box.bottom} y2={box.bottom} />
       {children}
@@ -67,9 +72,10 @@ export function ChartFrame({ cols, metric, selected, onSelect, summary, caption,
 }
 
 /** Daily or weekly bars, with each column's own target as a dashed rule across it. */
-export default function TrendBars({ cols, metric, selected, onSelect, summary, caption, valueHeading }: {
+export default function TrendBars({ cols, metric, tone, selected, onSelect, summary, caption, valueHeading }: {
   cols: TrendColumn[];
   metric: TrendMetric;
+  tone?: string;
   selected: number | null;
   onSelect: (index: number) => void;
   summary: string;
@@ -81,7 +87,7 @@ export default function TrendBars({ cols, metric, selected, onSelect, summary, c
   const max = niceCeil(cols.flatMap((col) => [col.value, col.target])) ?? 1;
   const slots = columns(cols.length, box);
   const drawn = bars(cols.map((col) => col.value), box, max, { fill: 0.56, maxWidth: 28 });
-  return <ChartFrame cols={cols} metric={metric} selected={selected} onSelect={onSelect} summary={summary}
+  return <ChartFrame cols={cols} metric={metric} tone={tone} selected={selected} onSelect={onSelect} summary={summary}
     caption={caption} valueHeading={valueHeading}>
     {drawn.map((bar) => {
       const col = cols[bar.index];

@@ -17,6 +17,7 @@ type Query = {
   equals: Record<string, unknown>;
   limit: number | null;
   orders: { column: string; ascending: boolean }[];
+  gte?: Record<string, unknown>;
 };
 
 function database(
@@ -31,7 +32,8 @@ function database(
       select: (columns: string) => { query.columns = columns; return chain; },
       eq: (column: string, value: unknown) => { query.equals[column] = value; return chain; },
       neq: () => chain, lte: () => chain, lt: () => chain,
-      in: () => chain, is: () => chain, gte: () => chain,
+      in: () => chain, is: () => chain,
+      gte: (column: string, value: unknown) => { query.gte = { ...query.gte, [column]: value }; return chain; },
       order: (column: string, options?: { ascending?: boolean }) => {
         query.orders.push({ column, ascending: options?.ascending ?? true });
         return chain;
@@ -43,7 +45,8 @@ function database(
       maybeSingle: async () => ({ data: answer(query).data[0] ?? null, error: null }),
       single: async () => ({ data: answer(query).data[0] ?? null, error: null }),
       then: (resolve: (value: { data: unknown[]; error: null }) => unknown) => {
-        queries.push({ ...query, equals: { ...query.equals }, orders: [...query.orders] });
+        queries.push({ ...query, equals: { ...query.equals }, orders: [...query.orders],
+          ...(query.gte ? { gte: { ...query.gte } } : {}) });
         return Promise.resolve(answer(query) as { data: unknown[]; error: null }).then(resolve);
       },
       insert: (row: Record<string, unknown>) => { writes.push({ table, row }); return chain; },
@@ -408,5 +411,81 @@ describe("server block persistence", () => {
     const block = result.messages.at(-1)?.blocks?.[0];
     expect(block).toMatchObject({ kind: "chart", chart: "kcal_week", days: 7 });
     expect(block?.kind === "chart" ? block.series[0].points : []).toHaveLength(7);
+  });
+  it("fast-paths a two-week macros trend from the account's logged days, bounded to that window", async () => {
+    const writes: { table: string; row: Record<string, unknown> }[] = [];
+    const queries: Query[] = [];
+    const loggedDates = new Set(["2026-09-10", "2026-09-19"]);
+    const client = database(writes, (query) => {
+      if (query.table === "target_profiles") return { data: [TARGET_PROFILE_ROW], error: null };
+      if (query.table === "daily_energy" && query.columns === "local_date") {
+        return { data: [...loggedDates].map((local_date) => ({ local_date })), error: null };
+      }
+      if (query.table === "log_entries" && typeof query.equals.local_date === "string"
+          && loggedDates.has(query.equals.local_date)) {
+        return { data: [loggedEntry(query.equals.local_date)], error: null };
+      }
+      return { data: [], error: null };
+    }, queries);
+    const classified = {
+      intent: "show_chart", confidence: 0.98, args: { chart: "macros_trend", days: 14 },
+      argConfidence: { chart: 1, days: 1 }, raw: {},
+    };
+
+    const result = await runTurn(client, client, "user-1", {
+      ...request, text: "show my macros over the last 2 weeks",
+    }, {
+      generate: vi.fn() as never,
+      classifyIntent: vi.fn().mockResolvedValue(classified) as never,
+      verifyReply: vi.fn().mockResolvedValue({ flagged: false, p: null }) as never,
+      newId: (() => { let n = 0; return () => `generated-${++n}`; })(),
+    });
+
+    expect(queries.filter((query) => query.columns === "local_date")).toEqual([expect.objectContaining({
+      table: "daily_energy", limit: 14, gte: { local_date: "2026-09-06" },
+    })]);
+    expect(result).toMatchObject({ fastPath: true, toolsUsed: ["show_chart"] });
+    const block = result.messages.at(-1)?.blocks?.[0];
+    expect(block).toMatchObject({ kind: "chart", chart: "macros_trend", days: 14, unit: "g" });
+    const series = block?.kind === "chart" ? block.series : [];
+    expect(series.find((row) => row.label === "Protein")?.points).toEqual([
+      { x: "2026-09-10", y: 80 }, { x: "2026-09-19", y: 80 },
+    ]);
+    expect(series.find((row) => row.label === "Protein target")?.points.map((point) => point.x))
+      .toEqual(["2026-09-10", "2026-09-19"]);
+  });
+
+  it("hands the model only the macros_trend chart name and point count, never its values", async () => {
+    const writes: { table: string; row: Record<string, unknown> }[] = [];
+    const loggedDates = new Set(["2026-09-10", "2026-09-19"]);
+    const client = database(writes, (query) => {
+      if (query.table === "target_profiles") return { data: [TARGET_PROFILE_ROW], error: null };
+      if (query.table === "daily_energy" && query.columns === "local_date") {
+        return { data: [...loggedDates].map((local_date) => ({ local_date })), error: null };
+      }
+      if (query.table === "log_entries" && typeof query.equals.local_date === "string"
+          && loggedDates.has(query.equals.local_date)) {
+        return { data: [loggedEntry(query.equals.local_date)], error: null };
+      }
+      return { data: [], error: null };
+    });
+    const generate = vi.fn()
+      .mockResolvedValueOnce({ kind: "tool", calls: [{ name: "show_chart", args: { chart: "macros_trend", days: 30 } }] })
+      .mockResolvedValueOnce({ kind: "final", text: "Here is your month." });
+
+    const result = await runTurn(client, client, "user-1", { ...request, text: "how did my month go" }, {
+      generate: generate as never,
+      classifyIntent: vi.fn().mockResolvedValue(null) as never,
+      verifyReply: vi.fn().mockResolvedValue({ flagged: false, p: null }) as never,
+      newId: (() => { let n = 0; return () => `generated-${++n}`; })(),
+    });
+
+    expect(result.messages.at(-1)?.blocks?.[0]).toMatchObject({ kind: "chart", chart: "macros_trend", days: 30 });
+    const seen = JSON.stringify(generate.mock.calls[1]);
+    expect(seen).toContain('\\"chart\\":\\"macros_trend\\"');
+    expect(seen).toContain('\\"points\\":12');
+    for (const leak of ["Protein target", "Carbs target", "partialDays", "2026-09-10"]) {
+      expect(seen).not.toContain(leak);
+    }
   });
 });

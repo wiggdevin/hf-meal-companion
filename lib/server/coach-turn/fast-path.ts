@@ -171,7 +171,8 @@ async function chartFastPath(
     content = block?.kind === "chart"
       ? block.chart === "weight_trend" ? "Here is your weight trend."
         : block.chart === "kcal_week" ? "Here are your recent logged days."
-          : "Here are today's macros."
+          : block.chart === "macros_trend" ? "Here are your protein, carbs and fat by logged day."
+            : "Here are today's macros."
       : ((hydrated.data as { message?: string }).message ?? content);
   } catch (error) {
     console.error("coach chart fast path failed", {

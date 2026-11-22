@@ -14,6 +14,7 @@ vi.mock("@/lib/ai/typesafe", () => ({
 }));
 
 import {
+  chartSpanDays,
   classifyIntent,
   extractNumbers,
   hintLine,
@@ -247,6 +248,43 @@ describe("intent pre-pass", () => {
     });
     expect(isFastPathEligible(result!, message)).toBe(true);
     expect(hintLine(result!)).toContain("Likely intent: show_chart (0.90)");
+  });
+
+  it.each([
+    ["show my weight trend", { chart: "weight_trend" }],
+    ["how am I doing this week", { chart: "kcal_week" }],
+    ["show my macros", { chart: "macros_today" }],
+    ["show my calories this week", { chart: "kcal_week" }],
+  ] as const)("keeps the existing chart routing for %s", async (message, args) => {
+    systemOneMock.mockResolvedValue(answers("show_chart", 0.93));
+    const result = await classifyIntent(message, context);
+    expect(result?.args).toEqual(args);
+    expect(isFastPathEligible(result!, message)).toBe(true);
+  });
+
+  it.each([
+    ["how has my protein been this month", { chart: "macros_trend", days: 30 }],
+    ["show my macros over the last 2 weeks", { chart: "macros_trend", days: 14 }],
+    ["chart my carbs for the past fortnight", { chart: "macros_trend", days: 14 }],
+    ["how has my protein been", { chart: "macros_trend" }],
+    ["my fat intake over the last ninety days", { chart: "macros_trend", days: 90 }],
+    ["calories last 30 days", { chart: "kcal_week", days: 30 }],
+    ["show my calories this month", { chart: "kcal_week", days: 30 }],
+    ["kcal over the past three weeks", { chart: "kcal_week", days: 21 }],
+  ] as const)("routes the nutrition trend request %s", async (message, args) => {
+    systemOneMock.mockResolvedValue(answers("show_chart", 0.93));
+    const result = await classifyIntent(message, context);
+    expect(result).toMatchObject({ intent: "show_chart", args });
+    expect(result?.args).toEqual(args);
+    expect(isFastPathEligible(result!, message)).toBe(true);
+    if ("days" in args) expect(hintLine(result!)).toContain(`days=${args.days}`);
+  });
+
+  it("reads a window, not a rate, and not body fat", () => {
+    expect(chartSpanDays("protein a day over the last 2 weeks")).toBe(14);
+    expect(chartSpanDays("how much protein a day")).toBeNull();
+    expect(chartSpanDays("this week and the last month")).toBe(30);
+    expect(chartSpanDays("show my macros")).toBeNull();
   });
 
   it("requires 0.95 confidence for a mutating fast path", async () => {

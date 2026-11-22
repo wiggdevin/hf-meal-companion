@@ -43,7 +43,10 @@ type IntentArgs = ActionIntentArgs & {
   update_profile: MissingArgs;
   set_targets: MissingArgs;
   use_shopping_list: MissingArgs;
-  show_chart: MissingArgs & { chart?: "weight_trend" | "macros_today" | "kcal_week" };
+  show_chart: MissingArgs & {
+    chart?: "weight_trend" | "macros_today" | "kcal_week" | "macros_trend";
+    days?: number;
+  };
   question: MissingArgs;
   other: MissingArgs;
 };
@@ -81,10 +84,50 @@ function noulConfidence(answer: { noul?: number } | undefined): number {
   return typeof value === "number" ? Math.max(value, 1 - value) : 0;
 }
 
+const COUNT_WORDS: Record<string, number> = {
+  a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
+  ten: 10, twelve: 12, fourteen: 14, thirty: 30, sixty: 60, ninety: 90,
+};
+const SPAN_UNIT_DAYS: Record<string, number> = { day: 1, week: 7, fortnight: 14, month: 30 };
+
+/**
+ * The window a chart request names, in days (the widest one named), clamped later to 7..90 by the
+ * hydrator: "last 30 days", "past 2 weeks", "this month" (30), "a fortnight". Null when it names
+ * none. "This week" is 7, which `kcal_week` reads as its original last seven logged days.
+ */
+export function chartSpanDays(message: string): number | null {
+  const spans: number[] = [];
+  const counted = /\b(\d{1,3}|a|an|one|two|three|four|five|six|seven|eight|nine|ten|twelve|fourteen|thirty|sixty|ninety)\s+(day|week|fortnight|month)s?\b/gi;
+  for (const [, rawCount, rawUnit] of message.matchAll(counted)) {
+    const raw = rawCount.toLowerCase();
+    const unit = rawUnit.toLowerCase();
+    // "protein a day" is a rate, not a window.
+    if (unit === "day" && (raw === "a" || raw === "an")) continue;
+    const count = /^\d+$/.test(raw) ? Number(raw) : COUNT_WORDS[raw];
+    if (count > 0) spans.push(count * SPAN_UNIT_DAYS[unit]);
+  }
+  for (const [, unit] of message.matchAll(/\b(?:this|last|past|the)\s+(week|fortnight|month)\b/gi)) {
+    spans.push(SPAN_UNIT_DAYS[unit.toLowerCase()]);
+  }
+  return spans.length > 0 ? Math.max(...spans) : null;
+}
+
+const MACRO_WORDS = /\b(?:macros?|protein|carbs?|carbohydrates?|fats?)\b/i;
+/** Asked over time without a window: "how has my protein been", "my macros lately". */
+const OVER_TIME = /\b(?:trends?|over time|lately|recently|by day|each day|daily)\b|\bhow (?:has|have)\b.*\bbeen\b/i;
+
 function chartArgs(message: string): IntentArgs["show_chart"] {
   if (/\b(?:weight|weigh[- ]?in|body mass)\b/i.test(message)) return { chart: "weight_trend" };
-  if (/\bmacros?\b/i.test(message)) return { chart: "macros_today" };
-  if (/\b(?:week|weekly|calories|kcal)\b/i.test(message)) return { chart: "kcal_week" };
+  const span = chartSpanDays(message);
+  if (MACRO_WORDS.test(message)) {
+    if (span !== null) return { chart: "macros_trend", days: span };
+    if (OVER_TIME.test(message)) return { chart: "macros_trend" };
+    if (/\bmacros?\b/i.test(message)) return { chart: "macros_today" };
+  }
+  if (/\b(?:week|weekly|calories|kcal)\b/i.test(message)) {
+    // "this week" keeps the original seven logged days; a named longer window becomes `days`.
+    return span !== null && span !== 7 ? { chart: "kcal_week", days: span } : { chart: "kcal_week" };
+  }
   return { missing: ["chart"] };
 }
 
@@ -156,7 +199,8 @@ export async function classifyIntent(
     }
     case "show_chart": {
       const args = chartArgs(message);
-      return result(intent, confidence, args, args.chart ? { chart: 1 } : {}, raw);
+      return result(intent, confidence, args,
+        args.chart ? { chart: 1, ...(args.days !== undefined ? { days: 1 } : {}) } : {}, raw);
     }
     case "update_profile":
     case "set_targets":

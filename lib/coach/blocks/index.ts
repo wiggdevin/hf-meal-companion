@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { hydrateChart, type ChartArgs, type KcalChartRow, type WeightChartRow }
-  from "@/lib/coach/blocks/hydrate-chart";
+import {
+  hydrateChart, KCAL_WEEK_DEFAULT_DAYS, MACROS_TREND_DEFAULT_DAYS, trendDays,
+  type ChartArgs, type KcalChartRow, type MacroChartRow, type WeightChartRow,
+} from "@/lib/coach/blocks/hydrate-chart";
 import { hydrateFoodIdeas } from "@/lib/coach/blocks/hydrate-food-ideas";
 import { hydrateFoodSearch, type FoodSearchArgs }
   from "@/lib/coach/blocks/hydrate-food-search";
@@ -12,7 +14,7 @@ import type { NormalizedSample } from "@/lib/health/contract";
 import { localDateOf, rollUpDay } from "@/lib/health/daily";
 import type { ConstraintProfile } from "@/lib/policy/constraints";
 import type { CoachContext } from "@/lib/server/coach-context";
-import { buildDayContext } from "@/lib/server/day-context";
+import { buildDayContext, type DayContext } from "@/lib/server/day-context";
 import { RECIPE_IDEAS_INSTEAD } from "@/lib/recipe-pilot-copy";
 
 export type DirectBlockToolName = "show_chart" | "quick_replies";
@@ -74,25 +76,65 @@ async function weightRows(ctx: BlockHydrationContext, days: number): Promise<Wei
   });
 }
 
-async function kcalRows(ctx: BlockHydrationContext): Promise<KcalChartRow[]> {
+/** At most this many day contexts are built at once: a 90-day chart must not open ~90 × 7 queries. */
+const DAY_CONTEXT_CONCURRENCY = 6;
+
+async function mapLimited<T, R>(items: readonly T[], limit: number, run: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++;
+      out[index] = await run(items[index]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
+/**
+ * The account's logged days, oldest first, each as its server day context (consumed, the revision
+ * in force, partial flags). `days` set: the logged dates within that many calendar days ending
+ * today. `days` absent: the last `limit` logged dates, however old (the original `kcal_week` rule).
+ */
+async function loggedDays(ctx: BlockHydrationContext, limit: number, days?: number): Promise<DayContext[]> {
   // daily_energy has one row per user and logged date, so the database — not this process — owns
-  // both distinctness and the seven-day bound. (The old energy_kcal_calc filter on daily_totals
-  // skipped a day whose items carried only reported energy.)
-  const { data, error } = await ctx.admin.from("daily_energy").select("local_date")
-    .eq("user_id", ctx.userId)
-    .lte("local_date", ctx.date).order("local_date", { ascending: false }).limit(7);
+  // both distinctness and the bound. (The old energy_kcal_calc filter on daily_totals skipped a
+  // day whose items carried only reported energy.)
+  let query = ctx.admin.from("daily_energy").select("local_date")
+    .eq("user_id", ctx.userId).lte("local_date", ctx.date);
+  if (days !== undefined) query = query.gte("local_date", shiftDate(ctx.date, -(days - 1)));
+  const { data, error } = await query.order("local_date", { ascending: false }).limit(limit);
   if (error) throw error;
   const dates = (data ?? []).flatMap((row) => {
     const date = (row as { local_date?: unknown }).local_date;
     return typeof date === "string" ? [date] : [];
   }).sort();
-  const days = await Promise.all(dates.map((date) => date === ctx.date && ctx.context
-    ? ctx.context.day
-    : buildDayContext(ctx.admin, ctx.userId, date, ctx.tz)));
+  return mapLimited(dates, DAY_CONTEXT_CONCURRENCY, (date) => date === ctx.date && ctx.context
+    ? Promise.resolve(ctx.context.day)
+    : buildDayContext(ctx.admin, ctx.userId, date, ctx.tz));
+}
+
+async function kcalRows(ctx: BlockHydrationContext, days?: number): Promise<KcalChartRow[]> {
+  const limit = trendDays(days, KCAL_WEEK_DEFAULT_DAYS);
+  const logged = await loggedDays(ctx, limit, days === undefined ? undefined : limit);
   // A day with no target revision has no target row to chart; omit it rather than invent a number.
-  return days.flatMap((day) => day.targets === null ? [] : [{
+  return logged.flatMap((day) => day.targets === null ? [] : [{
     localDate: day.date, consumedKcal: day.consumed.kcal, targetKcal: day.targets.kcal,
   }]);
+}
+
+async function macroRows(ctx: BlockHydrationContext, days?: number): Promise<MacroChartRow[]> {
+  const window = trendDays(days, MACROS_TREND_DEFAULT_DAYS);
+  // Same source and day rule as kcal_week, except that a day with no target revision keeps its
+  // eaten points and only loses its target point. `partial` is macros_today's rule, day by day.
+  return (await loggedDays(ctx, window, window)).map((day) => ({
+    localDate: day.date,
+    consumed: { protein: day.consumed.protein, carbs: day.consumed.carbs, fat: day.consumed.fat },
+    target: day.targets
+      ? { protein: day.targets.protein, carbs: day.targets.carbs, fat: day.targets.fat } : null,
+    partial: day.consumedPartial || day.nutritionUnchecked === true,
+  }));
 }
 
 /** The account's own display unit (`user_settings.weight_unit`), so a chart opened right after a
@@ -127,12 +169,16 @@ async function chartBlock(args: ChartArgs, ctx: BlockHydrationContext): Promise<
       } : undefined,
     });
   }
-  return hydrateChart(args, { id: ctx.newId(), kcalRows: await kcalRows(ctx) });
+  if (args.chart === "macros_trend") {
+    // Never the model's: its acknowledgement below is the chart name and point count only.
+    return hydrateChart(args, { id: ctx.newId(), macroRows: await macroRows(ctx, args.days) });
+  }
+  return hydrateChart(args, { id: ctx.newId(), kcalRows: await kcalRows(ctx, args.days) });
 }
 
 function emptyChartMessage(chart: ChartArgs["chart"]): string {
   if (chart === "weight_trend") return "No weigh-ins yet.";
-  if (chart === "kcal_week") return "No logged days yet.";
+  if (chart === "kcal_week" || chart === "macros_trend") return "No logged days yet.";
   return "Today's macro data is unavailable.";
 }
 

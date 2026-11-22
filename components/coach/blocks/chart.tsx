@@ -38,7 +38,8 @@ function KcalWeek({ block, label }: { block: ChartBlockV1; label: string }) {
   const targets = values(block.series, "target");
   const peak = Math.max(1, ...consumed.map((point) => point.y), ...targets.values());
   const step = CHART_WIDTH / Math.max(7, consumed.length);
-  const barWidth = Math.min(24, step - 6);
+  // Up to 90 days (kcal_week `days`): 24 px at seven bars, still a gap between bars at ninety.
+  const barWidth = Math.max(1, Math.min(24, step * 0.6));
   const y = (value: number) => CHART_HEIGHT - (Math.max(0, value) / peak) * CHART_HEIGHT;
   const targetPath = consumed.map((point, index) =>
     `${index === 0 ? "M" : "L"}${index * step + step / 2},${y(targets.get(point.x) ?? 0)}`

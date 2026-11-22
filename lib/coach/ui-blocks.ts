@@ -182,7 +182,7 @@ export const chartBlockV1Schema = z.object({
   kind: z.literal("chart"),
   v: z.literal(1),
   id: z.string().min(1),
-  chart: z.enum(["weight_trend", "macros_today", "kcal_week"]),
+  chart: z.enum(["weight_trend", "macros_today", "kcal_week", "macros_trend"]),
   days: z.number().int().positive().optional(),
   series: z.array(z.object({
     label: z.string().min(1).max(80),
@@ -191,12 +191,15 @@ export const chartBlockV1Schema = z.object({
   unit: z.string().max(32),
   caption: z.string().max(240),
   /**
-   * `macros_today` only: the day holds a partly measured recipe serving, or its partial check could
+   * `macros_today` (and `macros_trend`): the day holds a partly measured recipe serving, or its partial check could
    * not run (#21). "Consumed" is then a lower bound and what is left an upper bound ("at most").
    * Set by the server hydrator (lib/coach/blocks/hydrate-chart.ts), never by the model; absent
-   * when the day is whole.
+   * when the day is whole. `macros_trend`: at least one charted day is partial; `partialDays` names
+   * them.
    */
   partial: z.boolean().optional(),
+  /** `macros_trend` only: the charted dates whose eaten figures are a lower bound. Server-set. */
+  partialDays: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).max(90).optional(),
 });
 
 export const quickRepliesBlockV1Schema = z.object({

@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import ChartBlock from "@/components/coach/blocks/chart";
+import MacroTrendBlock from "@/components/coach/blocks/macro-trend";
 import DietaryProfileProposalBlock from "@/components/coach/blocks/dietary_profile";
 import FoodIdeasBlock from "@/components/coach/blocks/food_ideas";
 import FoodSearchBlock from "@/components/coach/blocks/food_search";
@@ -22,7 +23,8 @@ export function renderBlock(block: UiBlock | unknown, ctx: CoachBlockContext): R
   }
   const valid = parsed.data;
   if (valid.kind === "log_draft") return <LogDraftBlock key={valid.id} block={valid} ctx={ctx} />;
-  if (valid.kind === "chart") return <ChartBlock key={valid.id} block={valid} />;
+  if (valid.kind === "chart") return valid.chart === "macros_trend"
+    ? <MacroTrendBlock key={valid.id} block={valid} /> : <ChartBlock key={valid.id} block={valid} />;
   if (valid.kind === "quick_replies") return <QuickRepliesBlock key={valid.id} block={valid} ctx={ctx} />;
   if (valid.kind === "food_search") return <FoodSearchBlock key={valid.id} block={valid} ctx={ctx} />;
   if (valid.kind === "recipe_results") return <RecipeResultsBlock key={valid.id}
