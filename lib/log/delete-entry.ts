@@ -131,6 +131,31 @@ async function readServerRev(h: AccountHandle, entryId: string): Promise<number 
   }
 }
 
+/**
+ * What the server holds for this entry now: its revision and filed day, or that it is tombstoned.
+ * Re-log Undo (lib/log/relog-batch.ts) checks this against the revision it created before it takes
+ * anything back, because `completeDelete` deletes at whatever revision the server holds by then.
+ * A missing row is "unreadable", as in `readServerRev`: no row is not proof of no entry.
+ */
+export async function readServerEntry(
+  h: AccountHandle, entryId: string,
+): Promise<{ rev: number; date: string | null } | "gone" | "unreadable"> {
+  const read = async (): Promise<{ rev: number; date: string | null } | "gone" | "unreadable"> => {
+    try {
+      const current = await withAccount(h, () => browserClient().from("log_entries")
+        .select("id, rev, deleted_at, local_date").eq("id", entryId).maybeSingle());
+      if (current.error) return "unreadable";
+      const row = current.data as { rev?: unknown; deleted_at?: unknown; local_date?: unknown } | null;
+      if (row !== null && row.deleted_at) return "gone";
+      if (typeof row?.rev !== "number") return "unreadable";
+      return { rev: row.rev, date: typeof row.local_date === "string" ? row.local_date : null };
+    } catch {
+      return "unreadable";
+    }
+  };
+  return withinBudget(read(), "commit", "unreadable");
+}
+
 /** Queue the delete the drain will send. Never at a revision the server has not confirmed. */
 async function queueDelete(h: AccountHandle, entryId: string, baseRev: number): Promise<boolean> {
   try {

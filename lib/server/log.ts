@@ -348,7 +348,8 @@ export async function applyLogEntry(
     // A retry keeps its marks, judged from the STORED items — never the retry body, which may differ.
     const response = await ok(client, userId, req, Number(row.rev));
     const stored = await storedItemFlags(client, userId, req, response.items);
-    return stored.length > 0 ? { ...response, flagged: stored } : response;
+    const replayed = { ...response, replayed: true as const };
+    return stored.length > 0 ? { ...replayed, flagged: stored } : replayed;
   }
   if (result.status === "conflict") {
     return { status: "conflict", current_rev: result.current_rev as number,
