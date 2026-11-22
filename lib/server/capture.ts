@@ -190,15 +190,15 @@ async function assertNotDuplicate(
   if (priorCall.data) throw new DuplicateRequest((priorCall.data as { id: string }).id);
 }
 
+type CapRead = { usedToday: number; soft: number; hard: number; state: CapState };
+
 /**
- * Writes one `blocked` ai_calls row and refuses at the hard cap; the soft cap only warns. The day
- * the cap counts is the account's stored zone (UTC as the logged last resort), never the zone the
- * request names: a caller could otherwise pick a zone whose midnight just passed and reset the
- * count (audit A143).
+ * Reads today's count against the caps. Read only: it writes nothing, so it can run beside the
+ * duplicate probe. The day the cap counts is the account's stored zone (UTC as the logged last
+ * resort), never the zone the request names: a caller could otherwise pick a zone whose midnight
+ * just passed and reset the count (audit A143).
  */
-async function assertUnderCaps(
-  admin: SupabaseClient, userId: string, purpose: CapturePurpose, inputHash: string
-): Promise<{ usedToday: number; soft: number; state: CapState }> {
+async function readCaps(admin: SupabaseClient, userId: string): Promise<CapRead> {
   const { zone } = resolveAccountDay({ purpose: "capture cap",
     storedZone: await readAccountZone(admin, userId) });
   const used = await admin.rpc("ai_calls_today",
@@ -210,15 +210,40 @@ async function assertUnderCaps(
   const usedToday = Number(used.data ?? 0);
   const soft = softCap();
   const hard = hardCap();
-  const state = capState(usedToday, soft, hard);
-  if (state === "blocked") {
+  return { usedToday, soft, hard, state: capState(usedToday, soft, hard) };
+}
+
+/** Writes one `blocked` ai_calls row and refuses at the hard cap; the soft cap only warns. */
+async function enforceCaps(
+  admin: SupabaseClient, userId: string, purpose: CapturePurpose, inputHash: string, caps: CapRead,
+): Promise<{ usedToday: number; soft: number; state: CapState }> {
+  if (caps.state === "blocked") {
     await writeBlockedCall(admin, {
       userId, purpose, provider: "google", model: MODELS[purpose],
-      sdkVersion: installedGenai().version, inputHash, error: `daily cap ${hard} reached`,
+      sdkVersion: installedGenai().version, inputHash, error: `daily cap ${caps.hard} reached`,
     });
     throw new HttpError(429, "spend_cap", "That is today's capture limit. Search still works.");
   }
-  return { usedToday, soft, state };
+  return { usedToday: caps.usedToday, soft: caps.soft, state: caps.state };
+}
+
+/**
+ * The two pre-model checks, read together (fast logging 2026-11-21): the duplicate probe and the
+ * cap read do not depend on each other. The order of the ANSWERS is unchanged: a duplicate is
+ * answered first and writes nothing, then the cap refuses and writes its `blocked` row. Both are
+ * settled before this returns, so the model is never called past the cap.
+ */
+async function assertUnderCaps(
+  client: SupabaseClient, admin: SupabaseClient, userId: string, purpose: CapturePurpose,
+  inputHash: string, since: string,
+): Promise<{ usedToday: number; soft: number; state: CapState }> {
+  const [duplicate, caps] = await Promise.allSettled([
+    assertNotDuplicate(client, userId, purpose, inputHash, since),
+    readCaps(admin, userId),
+  ]);
+  if (duplicate.status === "rejected") throw duplicate.reason;
+  if (caps.status === "rejected") throw caps.reason;
+  return enforceCaps(admin, userId, purpose, inputHash, caps.value);
 }
 
 async function resolveFoodRef(
@@ -556,6 +581,12 @@ export async function proposeDraft(
   // Phase 13 §9 R3: the attestation is checked before the media is read, and again by the payload
   // builder before anything is serialised. Off, capture refuses with 503 nous_unconfirmed.
   assertGeminiAttested();
+  // The account's food rules are needed only at grounding, after the model answers, but read now
+  // so the round trip hides behind the media, the checks and the model. A failure is held and
+  // thrown where it was always thrown (at grounding); a refusal before then leaves it unawaited,
+  // so it is marked handled here.
+  const profileRead = loadUserProfile(client);
+  profileRead.catch(() => undefined);
   const media = await loadMedia(admin, userId, req, deps.fetchOwnedObject ?? fetchOwnedObjectImpl);
   const text = req.method === "text" ? req.text : undefined;
   const payload = capturePayload(purpose,
@@ -563,8 +594,7 @@ export async function proposeDraft(
   const inputHash = inputHashFor(payload.parts, payload.media);
 
   const since = new Date(now() - DUPLICATE_WINDOW_MS).toISOString();
-  await assertNotDuplicate(client, userId, purpose, inputHash, since);
-  const { usedToday, soft, state } = await assertUnderCaps(admin, userId, purpose, inputHash);
+  const { usedToday, soft, state } = await assertUnderCaps(client, admin, userId, purpose, inputHash, since);
 
   // Owner request 2026-10-02: text, photo and label ask OpenRouter first (lib/ai/capture.ts), the
   // Gemini payload above stays the fallback.
@@ -599,7 +629,7 @@ export async function proposeDraft(
   // T0 §4: every item is grounded at the same time, and `Promise.all` preserves the model's
   // order, so what the user reads on the confirm sheet is still the order the model said it in.
   const groundStarted = Date.now();
-  const profile = await loadUserProfile(client);
+  const profile = await profileRead;
   const results = await Promise.all(parsed.items.map(
     (item) => groundItem(client, userId, item, label, profile, searchFoods)
       .catch((error: unknown) => ungroundable(item, error))));
