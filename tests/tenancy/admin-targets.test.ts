@@ -16,6 +16,7 @@ import {
 import { activeProfile, authorTargets } from "@/lib/server/targets";
 import { decideProposal } from "@/lib/server/proposals";
 import { HttpError } from "@/lib/server/auth";
+import { seedFloorProfile } from "../helpers/floor-profile";
 import { purge } from "./seed";
 import { assertLocalTargets } from "./target-guard";
 
@@ -43,7 +44,7 @@ const revision = (owner: string, kcal: number) => ({ user_id: owner, effective_f
   input_activity_level: "moderate", input_goal: "maintain", formula_name: "tenancy" });
 
 const pin = { mode: "grams", effectiveFrom: DATE, kcalTrain: 2400, kcalRest: 2200,
-  grams: { proteinG: 140, fatG: 70, carbG: 300 } } as const;
+  grams: { proteinG: 140, fatG: 70, carbG: 302 } } as const;
 
 describe.skipIf(!HAS_BRANCH || !HAS_DB)("target writes (service role) stay with their account (canary)", () => {
   let a: TestUser;
@@ -57,6 +58,9 @@ describe.skipIf(!HAS_BRANCH || !HAS_DB)("target writes (service role) stay with 
     [a, b] = await Promise.all([ensureUser("a"), ensureUser("b")]);
     await purge([a.id, b.id]);
     [asA, asB] = await Promise.all([userClient(a), userClient(b)]);
+    // The checked writer reads each account's own profile for its floors (SF002 without one).
+    await seedFloorProfile(adminClient(), a.id, { goal: "maintain" });
+    await seedFloorProfile(adminClient(), b.id, { goal: "maintain" });
     await insert("target_profiles", revision(a.id, 2000));
     await insert("target_profiles", revision(b.id, CANARY_KCAL));
     bProposal = await insert("target_proposals", { user_id: b.id, proposed: {},
@@ -66,8 +70,17 @@ describe.skipIf(!HAS_BRANCH || !HAS_DB)("target writes (service role) stay with 
   afterAll(async () => { await purge([a.id, b.id]); });
 
   it("A's session cannot reach the writers itself", async () => {
-    const { error } = await asA.rpc("write_target_revision", { p_user_id: a.id, p_row: {} });
-    expect(error?.code).toBe("42501");
+    for (const [name, args] of [
+      ["write_target_revision", { p_user_id: a.id, p_row: {} }],
+      ["write_target_revision_checked", { p_user_id: a.id, p_row: {} }],
+      ["write_target_revision_if_active_checked",
+        { p_user_id: a.id, p_row: {}, p_expected_id: null, p_expected_settings_rev: null }],
+      ["account_floor", { p_user_id: a.id, p_weight_kg: 70 }],
+      ["account_body_mass_kg", { p_user_id: a.id, p_effective_date: DATE }],
+    ] as const) {
+      const { error } = await asA.rpc(name, args as Record<string, unknown>);
+      expect(error?.code, name).toBe("42501");
+    }
   });
 
   it("A's pinned revision is written for A only; B's canary stays in force", async () => {

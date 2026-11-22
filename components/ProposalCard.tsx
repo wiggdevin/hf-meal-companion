@@ -10,7 +10,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { MacroLine } from "@/components/nutrition/MacroText";
-import { decideProposalOnline } from "@/lib/estimator-client";
+import { decideProposalOnline, ProposalRefusedError } from "@/lib/estimator-client";
 import type { ProposalSummary, ProposedTargets } from "@/lib/api-types";
 import { proposalActivitySentence } from "@/lib/proposal";
 import ActionFeedbackToast, { COMMIT_FEEDBACK_MS, useActionFeedback } from "@/components/ui/ActionFeedback";
@@ -29,6 +29,7 @@ const STALE_PROPOSAL_ERROR = "This proposal changed — reload to see the latest
 /** decideProposalOnline throws `decide failed: ${res.status}` on any non-2xx (lib/estimator-client.ts);
  *  a 409 means write_target_proposal already superseded this proposal server-side. */
 export function decideErrorMessage(err: unknown): string {
+  if (err instanceof ProposalRefusedError) return err.message;
   if (err instanceof Error && /\b409\b/.test(err.message)) return STALE_PROPOSAL_ERROR;
   return GENERIC_DECIDE_ERROR;
 }

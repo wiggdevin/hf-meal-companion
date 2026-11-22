@@ -8,26 +8,30 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { HttpError } from "@/lib/server/auth";
 import {
   deriveTargetRevision, targetSourceFor, type DeriveTargetRevisionInput,
-  type TargetRevisionFloors,
 } from "@/lib/profile/derive";
 import type { Goal, TargetRevision, TargetSeed } from "@/lib/types";
 import {
-  applyFloors, percentToGrams, resolveProfileMacros, validatePercentProfile,
-  type MacroFloors,
+  percentToGrams, resolveProfileMacros, validatePercentProfile, KCAL_PER_G_CARB,
+  KCAL_PER_G_FAT, KCAL_PER_G_PROTEIN, type MacroFloors,
 } from "@/lib/targets/percent";
 import type { TargetProfile, TargetsRequest, TargetsResponse } from "@/lib/api-types";
 import { targetRevisionFromProfile, targetSeedFromProfile } from "@/lib/targets/revision";
 import { ACCOUNT_DAY_LAST_RESORT_ZONE, accountDay, isoDateIn } from "@/lib/server/account-day";
 import { readTargetEligibility } from "@/lib/server/target-eligibility";
+import { floorProfileOf } from "@/lib/server/target-floor-profile";
 import {
   AdultOnlyError, paceAllowed, type TargetEligibility,
 } from "@/lib/profile/rate-eligibility";
 import { RATE_PRESETS_BP, validateRate } from "@/lib/profile/rate-goal";
 import {
-  rpcWriteTargetRevision, rpcWriteTargetRevisionIfActive, rpcWriteTargetRevisionPair,
+  rpcWriteTargetRevisionChecked, rpcWriteTargetRevisionIfActiveChecked,
 } from "@/lib/server/target-writes";
+import {
+  invalidMacrosError, mapTargetWriteError,
+} from "@/lib/server/target-write-errors";
 
 export { targetRevisionFromProfile } from "@/lib/targets/revision";
+export { TargetBelowFloorError, mapTargetWriteError } from "@/lib/server/target-write-errors";
 
 export class FloorViolationError extends HttpError {
   constructor(code: string, message: string,
@@ -74,11 +78,16 @@ function seedColumns(seed: TargetSeed | null) {
   };
 }
 
+/**
+ * The row `write_target_revision_checked` stores. The three minima, `carb_g_min` and the
+ * minimum's source are computed by the writer from the account's own weight, height and goal,
+ * so a row carries none of them (a value sent there is ignored).
+ */
 function revisionPayload(
   revision: TargetRevision,
   effectiveFrom = revision.effectiveFrom,
-  floors?: TargetRevisionFloors,
   requestId?: string,
+  settings?: DeriveTargetRevisionInput["settings"],
 ) {
   return {
     effective_from: effectiveFrom,
@@ -100,27 +109,23 @@ function revisionPayload(
     // TDEE step E1: the frozen seed travels with the revision, so restore and Undo keep it.
     ...seedColumns(revision.seed ?? null),
     ...(requestId ? { request_id: requestId } : {}),
-    ...(floors ? {
-      kcal_min: floors.kcalMin,
-      kcal_min_source: floors.kcalMinSource,
-      protein_g_min: floors.proteinGMin,
-      fat_g_min: floors.fatGMin,
-      carb_g_min: floors.carbGMin,
-    } : {}),
+    ...(settings ? { floor_profile: floorProfileOf(settings) } : {}),
   };
 }
 
 /**
- * Every write goes through the service-role RPCs (lib/server/target-writes.ts) for `userId`, the
- * id the caller verified; `authenticated` cannot execute them (migration 20261228090000), so the
- * checks in this module cannot be skipped from a phone. Reads stay on the caller's client.
+ * Every write goes through `write_target_revision_checked` on the service-role client
+ * (lib/server/target-writes.ts) for `userId`, the id the caller verified; `authenticated` cannot
+ * execute it (migration 20270109100000), so the checks in this module and in the writer cannot be
+ * skipped from a phone. A refusal throws its typed error (`mapTargetWriteError`). Reads stay on
+ * the caller's client.
  */
 async function writeRevisionRow(
   userId: string,
   payload: Record<string, unknown>,
 ): Promise<TargetProfile> {
-  const { data, error } = await rpcWriteTargetRevision(userId, payload);
-  if (error) throw error;
+  const { data, error } = await rpcWriteTargetRevisionChecked(userId, payload);
+  if (error) throw mapTargetWriteError(error);
   return data as TargetProfile;
 }
 
@@ -128,11 +133,11 @@ async function persistRevision(
   userId: string,
   revision: TargetRevision,
   effectiveFrom?: string,
-  floors?: TargetRevisionFloors,
   requestId?: string,
+  settings?: DeriveTargetRevisionInput["settings"],
 ): Promise<TargetRevision> {
   const row = await writeRevisionRow(
-    userId, revisionPayload(revision, effectiveFrom, floors, requestId));
+    userId, revisionPayload(revision, effectiveFrom, requestId, settings));
   const persisted = targetRevisionFromProfile(row);
   if (!persisted) throw new Error("Target authority returned an incomplete revision");
   return persisted;
@@ -156,25 +161,43 @@ export async function writeDerivedTargets(
 ): Promise<TargetRevision> {
   const input = await withEligibility(client, userId, rawInput);
   const revision = deriveTargetRevision({ ...input, source: targetSourceFor(input.settings) });
-  return persistRevision(userId, revision, undefined, revision.floors, requestId);
+  return persistRevision(userId, revision, undefined, requestId, input.settings);
 }
 
 /**
- * Write a revision exactly as given (`write_target_revision`, unconditional). Only the server
- * recompute calls it, to supersede a paced revision at a 0 pace when the profile cannot derive
- * (lib/server/target-recompute.ts); nothing taken from a request body reaches it.
+ * Write a revision exactly as given, through the checked writer's pace-cleared-copy mode. Only the
+ * server recompute calls it, to supersede a paced revision at a 0 pace when the profile cannot
+ * derive (lib/server/target-recompute.ts); nothing taken from a request body reaches it.
  */
 export async function writeRevisionCopy(
   userId: string, revision: TargetRevision,
 ): Promise<TargetRevision> {
-  return persistRevision(userId, revision, revision.effectiveFrom, revision.floors);
+  // Ending a pace must never be refused: when a hold begins on an account whose profile cannot
+  // derive (or whose old pin is under today's floor), the copy is a pace-cleared copy of a
+  // revision that is already active. The writer still checks its macros, skips the profile and
+  // floor checks, and keeps the minima the copy carries (migration 20270109100000).
+  const floors = revision.floors;
+  if (!floors) throw new Error("A pace-cleared copy needs the revision's minima");
+  const payload = {
+    ...revisionPayload(revision, revision.effectiveFrom),
+    floor_exempt: "pace_cleared_copy",
+    kcal_min: floors.kcalMin,
+    protein_g_min: floors.proteinGMin,
+    fat_g_min: floors.fatGMin,
+    carb_g_min: floors.carbGMin,
+    kcal_min_source: floors.kcalMinSource,
+  };
+  const row = await writeRevisionRow(userId, payload);
+  const persisted = targetRevisionFromProfile(row);
+  if (!persisted) throw new Error("Target authority returned an incomplete revision");
+  return persisted;
 }
 
 /**
  * Like writeDerivedTargets, but only while `expectedActiveId` (null: no active revision) is still
  * the revision active on the new row's date and, when given, `expectedSettingsRev` is still the
  * `user_settings` rev the caller derived from. Returns null and writes nothing otherwise
- * (`write_target_revision_if_active`).
+ * (`write_target_revision_if_active_checked`).
  */
 export async function writeDerivedTargetsIfActive(
   client: SupabaseClient, userId: string, rawInput: DeriveTargetRevisionInput,
@@ -182,9 +205,10 @@ export async function writeDerivedTargetsIfActive(
 ): Promise<TargetRevision | null> {
   const input = await withEligibility(client, userId, rawInput);
   const revision = deriveTargetRevision({ ...input, source: input.source ?? targetSourceFor(input.settings) });
-  const { data, error } = await rpcWriteTargetRevisionIfActive(userId,
-    revisionPayload(revision, undefined, revision.floors), expectedActiveId, expectedSettingsRev);
-  if (error) throw error;
+  const { data, error } = await rpcWriteTargetRevisionIfActiveChecked(userId,
+    revisionPayload(revision, undefined, undefined, input.settings),
+    expectedActiveId, expectedSettingsRev);
+  if (error) throw mapTargetWriteError(error);
   if ((data as { conflict?: unknown } | null)?.conflict === true) return null;
   const persisted = targetRevisionFromProfile(data as TargetProfile);
   if (!persisted) throw new Error("Target authority returned an incomplete revision");
@@ -201,13 +225,13 @@ async function plannedRevision(
   client: SupabaseClient,
   userId: string,
   write: TargetRevisionWrite,
-): Promise<{ revision: TargetRevision; floors: TargetRevisionFloors }> {
+): Promise<{ revision: TargetRevision; settings: DeriveTargetRevisionInput["settings"] }> {
   const input = await withEligibility(client, userId, write.input);
   const revision = deriveTargetRevision({
     ...input,
     source: targetSourceFor(input.settings),
   });
-  return { revision, floors: revision.floors };
+  return { revision, settings: input.settings };
 }
 
 /** The optional Undo predecessor and the real write share one database transaction. */
@@ -239,10 +263,10 @@ export async function writeTargetRevisionSet(
     plannedRevision(client, userId, held(predecessor, predecessorEligibility ?? currentEligibility)),
     plannedRevision(client, userId, held(current)),
   ]);
-  const { data, error } = await rpcWriteTargetRevisionPair(userId,
-    revisionPayload(prior.revision, undefined, prior.floors, predecessor.requestId),
-    revisionPayload(next.revision, undefined, next.floors, current.requestId));
-  if (error) throw error;
+  const { data, error } = await rpcWriteTargetRevisionChecked(userId,
+    revisionPayload(next.revision, undefined, current.requestId, next.settings),
+    revisionPayload(prior.revision, undefined, predecessor.requestId, prior.settings));
+  if (error) throw mapTargetWriteError(error);
   const rows = data as { predecessor?: TargetProfile; revision?: TargetProfile };
   const persistedPredecessor = rows.predecessor
     ? targetRevisionFromProfile(rows.predecessor)
@@ -275,7 +299,7 @@ export async function restoreTargetRevision(
     ...previous,
     effectiveFrom,
     inputs: { ...previous.inputs, effectiveDate: effectiveFrom },
-  }, effectiveFrom, previous.floors);
+  }, effectiveFrom);
 }
 
 /** The floor set in force comes only from the active canonical revision. */
@@ -379,12 +403,22 @@ export async function authorTargets(
   const raw = req.mode === "percent"
     ? percentToGrams(req.kcalTrain, req.percent as NonNullable<TargetsRequest["percent"]>)
     : (req.grams as NonNullable<TargetsRequest["grams"]>);
-  const floored = applyFloors(req.kcalTrain, raw, floors);
-  const resolved = resolveProfileMacros({
-    kcalTrain: floored.kcal,
-    kcalRest: Math.max(req.kcalRest, floors.kcalMin),
-    ...floored.grams,
-  }, floors);
+  // The calories are the user's, never replaced: each day keeps its protein and fat and takes the
+  // carbohydrate that is left. A day that leaves none is refused; the checked writer judges the
+  // floors (calories, fat, protein) against the account's own weight, height and goal.
+  const day = (kcal: number, dayType: "training" | "rest", carbG?: number) => {
+    const carbs = carbG ?? Math.round(
+      (kcal - KCAL_PER_G_PROTEIN * raw.proteinG - KCAL_PER_G_FAT * raw.fatG) / KCAL_PER_G_CARB);
+    if (carbs < 0) throw invalidMacrosError(dayType);
+    return { kcal, protein: raw.proteinG, carbs, fat: raw.fatG };
+  };
+  // Typed grams are the user's too: the training day keeps the carbohydrate they typed, so
+  // calories that do not match the three numbers are refused (422 kcal_mismatch), never quietly
+  // rewritten (spec 1.4). A percent split has no typed carbohydrate; the rest day takes what is left.
+  const resolved = {
+    training: day(req.kcalTrain, "training", req.mode === "grams" ? raw.carbG : undefined),
+    rest: day(req.kcalRest, "rest"),
+  };
   const [settings, eligibility] = await Promise.all([
     client.from("user_settings")
       .select("weight_kg, training_weekdays, activity_level, goal")
@@ -405,7 +439,7 @@ export async function authorTargets(
     rest_macros: resolved.rest,
     pin_training_kcal: req.kcalTrain,
     pin_rest_kcal: req.kcalRest,
-    pin_protein_g: floored.grams.proteinG,
+    pin_protein_g: raw.proteinG,
     input_weight_kg: Number.isFinite(weight) && weight > 0 ? weight : null,
     input_weight_source: Number.isFinite(weight) && weight > 0 ? "onboarding" : null,
     input_training_weekdays: settings.data?.training_weekdays ?? null,
@@ -415,19 +449,13 @@ export async function authorTargets(
     protein_pct: req.percent?.proteinPct ?? null,
     fat_pct: req.percent?.fatPct ?? null,
     carb_pct: req.percent?.carbPct ?? null,
-    kcal_min: floors.kcalMin,
-    protein_g_min: floors.proteinGMin,
-    fat_g_min: floors.fatGMin,
-    carb_g_min: floors.carbGMin,
-    // A manual row keeps the rate and the minimum's provenance of the revision it pins over
-    // (step D); before this the database default zeroed a confirmed rate on every pin.
-    // A held account (pregnancy, eating disorder, kidney disease, clinician diet) keeps 0.
+    // A manual row keeps the rate of the revision it pins over (step D); before this the database
+    // default zeroed a confirmed rate on every pin. A held account (pregnancy, eating disorder,
+    // kidney disease, clinician diet) keeps 0. The minima and their source are the writer's.
     goal_rate_bp_week: goalRateBpWeek,
-    kcal_min_source: active.kcal_min_source ?? "legacy_default",
     // Pins change the numbers, not the formula start the engine learns from (step E1).
     ...seedColumns(targetSeedFromProfile(active)),
     max_weekly_kcal_step: req.maxWeeklyKcalStep ?? 150,
   });
-  const response = targetsFromProfile(profile);
-  return { ...response, raisedToFloor: floored.raisedToFloor || response.raisedToFloor };
+  return targetsFromProfile(profile);
 }

@@ -21,7 +21,7 @@ import { forgetLoggedEntry } from "@/lib/log/delete-entry";
 import { opIdFor } from "@/lib/log/op-id";
 import { savedFrom } from "@/lib/log/outcome";
 import { NUTRITION_UNCHECKED_COPY, commitNutritionUnchecked } from "@/lib/nutrition-display";
-import { instantAt } from "@/lib/coach/apply-shared";
+import { draftEatenAt, draftZone } from "@/lib/capture/draft-eaten-at";
 import type { SlotId } from "@/lib/types";
 import type { LogDraftBlockV1, ResolvedBarcodeDraft } from "@/lib/coach/ui-blocks";
 import Notice from "@/components/ui/Notice";
@@ -64,13 +64,14 @@ const savedNote = (result: Parameters<typeof commitNutritionUnchecked>[0]) =>
   commitNutritionUnchecked(result) ? NUTRITION_UNCHECKED_COPY : undefined;
 
 async function commitBarcode(
-  block: LogDraftBlockV1, edits: BarcodeDraftEdits, tz: string,
+  block: LogDraftBlockV1, edits: BarcodeDraftEdits, accountTz: string, savedAt?: string,
 ): Promise<LogDraftCommit> {
   if (!isBarcodeDraft(block.draft)) throw new Error("That barcode draft is no longer available.");
   const entryId = opIdFor(block.id, undefined);
   const itemId = opIdFor(`${block.id}:item:0`, undefined);
-  const at = instantAt(block.localDate, "12:00", tz);
-  if (!at) throw new Error("That draft date is no longer available.");
+  const tz = draftZone(block, accountTz);
+  const at = tz ? draftEatenAt(block, tz, new Date(), savedAt) : null;
+  if (!tz || !at) throw new Error("That draft date is no longer available.");
   const revision = toCachedRevision(edits.match, block.draft.gtin14);
   const request = buildCommitRequest({
     entryId, eatenAt: at, tz, slot: edits.slot, method: "barcode",
@@ -91,12 +92,13 @@ async function commitBarcode(
 }
 
 async function commitCapture(
-  block: LogDraftBlockV1, edits: CaptureDraftEdits, tz: string,
+  block: LogDraftBlockV1, edits: CaptureDraftEdits, accountTz: string, savedAt?: string,
 ): Promise<LogDraftCommit> {
   if (!isCaptureDraft(block.draft)) throw new Error("That photo draft is no longer available.");
   const entryId = opIdFor(block.id, undefined);
-  const eatenAt = instantAt(block.localDate, "12:00", tz);
-  if (!eatenAt) throw new Error("That draft date is no longer available.");
+  const tz = draftZone(block, accountTz);
+  const eatenAt = tz ? draftEatenAt(block, tz, new Date(), savedAt) : null;
+  if (!tz || !eatenAt) throw new Error("That draft date is no longer available.");
   const result = await commitDraft(block.draft, edits.items, {
     entryId, eatenAt, tz, slot: edits.slot ?? slotOf(block),
     saveLabelAsFood: edits.saveLabelAsFood,
@@ -228,7 +230,7 @@ export default function LogDraftBlock({ block, ctx }: {
             onCommit={(edits) => void runCommit(() =>
               ctx.commitBarcode
                 ? ctx.commitBarcode(block, edits)
-                : commitBarcode(block, edits, ctx.tz))}
+                : commitBarcode(block, edits, ctx.tz, ctx.messageCreatedAt))}
             onSearchManually={() => { if (!claimed.current) ctx.onSearchManually(block); }}
             onDismiss={dismiss}
           />
@@ -243,7 +245,7 @@ export default function LogDraftBlock({ block, ctx }: {
             onCommit={(edits) => void runCommit(() =>
               ctx.commitCapture
                 ? ctx.commitCapture(block, edits)
-                : commitCapture(block, edits, ctx.tz))}
+                : commitCapture(block, edits, ctx.tz, ctx.messageCreatedAt))}
             onSearchManually={() => { if (!claimed.current) ctx.onSearchManually(block); }}
             onDismiss={dismiss}
             onRerunAsLabel={block.method === "photo" ? () => ctx.rerunAsLabel(block) : undefined}

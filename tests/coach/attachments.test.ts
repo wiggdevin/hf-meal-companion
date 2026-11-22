@@ -527,4 +527,52 @@ describe("coach attachment turns", () => {
     ]);
     expect(second.messages[1]).toMatchObject({ blocks: [{ method: "label" }] });
   });
+
+  describe("F-108: the card keeps the capture's own time and zone", () => {
+    // 16:05 UTC on 19 Sep 2026 is 10:05 in Denver.
+    const SERVER_NOW = Date.parse("2026-09-19T16:05:00.000Z");
+    const serverClock = () => SERVER_NOW;
+
+    it("stamps a barcode card with its validated scannedAt and the scan's zone", async () => {
+      const db = database(catalog());
+      const req = barcodeRequest();
+      const result = await runTurn(db.client, db.client, USER, {
+        ...req, tz: "America/New_York",
+        attachment: { ...req.attachment, scannedAt: "2026-09-19T10:00:00-06:00", tz: "America/Denver" },
+      }, { now: serverClock, newId: ids() });
+      expect(result.messages[1]).toMatchObject({ blocks: [{
+        capturedAt: "2026-09-19T16:00:00.000Z", capturedTz: "America/Denver" }] });
+    });
+
+    it("refuses a scannedAt in the future and stamps the server's clock instead", async () => {
+      const db = database(catalog());
+      const req = barcodeRequest();
+      const result = await runTurn(db.client, db.client, USER, {
+        ...req, attachment: { ...req.attachment, scannedAt: "2026-09-19T23:00:00.000Z" },
+      }, { now: serverClock, newId: ids() });
+      expect(result.messages[1]).toMatchObject({ blocks: [{
+        capturedAt: "2026-09-19T16:05:00.000Z", capturedTz: "America/Denver" }] });
+    });
+
+    it("stamps a photo with the pick instant, and a rerun as a label keeps it", async () => {
+      const db = database();
+      const propose = vi.fn()
+        .mockResolvedValueOnce(captureDraft("photo")).mockResolvedValueOnce(captureDraft("label"));
+      const photo = { kind: "capture" as const, v: 1 as const, method: "photo" as const, mediaPath: MEDIA,
+        localDate: "2026-09-19", slot: "meal-2" as const, pickedAt: "2026-09-19T15:40:00.000Z",
+        tz: "America/Denver" };
+      const first = await runTurn(db.client, db.client, USER, {
+        threadId: null, messageId: MESSAGE, text: "", tz: "America/Denver", attachment: photo,
+      }, { attachment: { propose }, now: serverClock, newId: ids() });
+      // The rerun is sent later, from a phone now in New York; the card keeps the pick's time and zone.
+      const second = await runTurn(db.client, db.client, USER, {
+        threadId: first.threadId, messageId: "3f1b1a2c-0000-4000-8000-000000000007", text: "",
+        tz: "America/New_York", attachment: { ...photo, method: "label" },
+      }, { attachment: { propose }, now: () => SERVER_NOW + 3_600_000, newId: ids() });
+      for (const result of [first, second]) {
+        expect(result.messages[1]).toMatchObject({ blocks: [{
+          capturedAt: "2026-09-19T15:40:00.000Z", capturedTz: "America/Denver" }] });
+      }
+    });
+  });
 });

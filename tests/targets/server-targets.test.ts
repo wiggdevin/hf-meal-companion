@@ -89,7 +89,7 @@ describe("target authority", () => {
       operation: "derive", input: { settings, latestWeighInKg: 60,
         today: "2026-09-19", trainingWeekdays: [1, 3, 4, 5] },
     });
-    expect(rpc).toHaveBeenCalledWith("write_target_revision", expect.objectContaining({
+    expect(rpc).toHaveBeenCalledWith("write_target_revision_checked", expect.objectContaining({
       p_user_id: "u1", p_row: expect.objectContaining({ formula_name: "profile-energy-v1" }),
     }));
   });
@@ -105,14 +105,18 @@ describe("manual target authoring", () => {
     });
   });
 
-  it("keeps the active revision's rate and minimum source on a manual row (step D)", async () => {
+  it("keeps the active revision's rate on a manual row (step D); the writer owns the minima", async () => {
     const { client, rpc } = clientWith({ ...PROFILE, goal_rate_bp_week: -50,
       kcal_min_source: "macro_minimum" }, { goal: "lose_fat" });
     await authorTargets(client, "u1", { mode: "grams", effectiveFrom: "2026-09-14",
       kcalTrain: 2200, kcalRest: 1750, grams: { proteinG: 135, fatG: 85, carbG: 200 } });
-    expect(rpc).toHaveBeenCalledWith("write_target_revision", expect.objectContaining({
-      p_row: expect.objectContaining({ goal_rate_bp_week: -50, kcal_min_source: "macro_minimum" }),
+    expect(rpc).toHaveBeenCalledWith("write_target_revision_checked", expect.objectContaining({
+      p_row: expect.objectContaining({ goal_rate_bp_week: -50 }),
     }));
+    const sent = (rpc.mock.calls.at(-1)?.[1] as { p_row: Record<string, unknown> }).p_row;
+    for (const key of ["kcal_min", "protein_g_min", "fat_g_min", "carb_g_min", "kcal_min_source"]) {
+      expect(sent).not.toHaveProperty(key);
+    }
   });
 
   // W007 review: an inherited rate is checked against the stored goal like a sent one.
@@ -123,19 +127,10 @@ describe("manual target authoring", () => {
     for (const answers of [{ goal: "maintain" }, { goal: "gain_muscle" }, {}]) {
       const { client, rpc } = clientWith(inherited, answers);
       await authorTargets(client, "u1", body);
-      expect(rpc).toHaveBeenCalledWith("write_target_revision", expect.objectContaining({
+      expect(rpc).toHaveBeenCalledWith("write_target_revision_checked", expect.objectContaining({
         p_row: expect.objectContaining({ goal_rate_bp_week: 0 }),
       }));
     }
-  });
-
-  it("labels a manual row built on a pre-D revision as legacy_default", async () => {
-    const { client, rpc } = clientWith(PROFILE);
-    await authorTargets(client, "u1", { mode: "grams", effectiveFrom: "2026-09-14",
-      kcalTrain: 2200, kcalRest: 1750, grams: { proteinG: 135, fatG: 85, carbG: 200 } });
-    expect(rpc).toHaveBeenCalledWith("write_target_revision", expect.objectContaining({
-      p_row: expect.objectContaining({ goal_rate_bp_week: 0, kcal_min_source: "legacy_default" }),
-    }));
   });
 
   // W007 (audit 2026-10-10 A004): the authored rate is a preset for the account's stored goal.
@@ -224,7 +219,6 @@ describe("pace holds on every server write (onboarding v2 G1-G3)", () => {
     const { client: kidney, rpc: kidneyRpc } = clientWith(null, { conditions: ["dialysis"] });
     await writeTargetRevisionSet(kidney, "u1", derive(loseSettings()));
     expect((row(kidneyRpc).training_macros as { protein: number }).protein).toBe(64); // 80 × 0.8
-    expect(row(kidneyRpc).protein_g_min).toBe(64);
     expect(row(kidneyRpc).goal_rate_bp_week).toBe(0);
   });
 

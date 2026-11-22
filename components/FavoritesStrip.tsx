@@ -37,8 +37,10 @@ export async function loadFavoritesForStrip(): Promise<FavoriteRow[] | null> {
  * behind "All"). With `limit` (the Foods page) the chips wrap, and past the limit a "Show all N"
  * row opens the rest in place — no sideways scroll area (owner, 2026-10-04).
  */
-export default function FavoritesStrip({ initial, onPick, limit }: {
+export default function FavoritesStrip({ initial, onPick, limit, disabled = false }: {
   initial?: FavoriteRow[]; onPick?: (row: FavoriteRow) => void; limit?: number;
+  /** A pick is already running (the log sheet's one-tap re-log): every chip waits. */
+  disabled?: boolean;
 }) {
   const [rows, setRows] = useState<FavoriteRow[]>(initial ?? []);
   const [failed, setFailed] = useState(false);
@@ -88,7 +90,7 @@ export default function FavoritesStrip({ initial, onPick, limit }: {
   // With no pick handler a food chip has nowhere to go (its link would be the page it is on), so it
   // is a plain tag, not something that looks tappable and does nothing.
   const chip = (row: FavoriteRow) => onPick
-    ? <Button variant="tertiary" size="sm" className={WRAP} onClick={() => onPick(row)}>{row.name}</Button>
+    ? <Button variant="tertiary" size="sm" className={WRAP} disabled={disabled} onClick={() => onPick(row)}>{row.name}</Button>
     : row.kind === "food"
       ? <span className="well inline-flex min-h-9 max-w-full items-center break-words rounded-xl px-3 py-1.5 text-caption text-graphite">
         {row.name}

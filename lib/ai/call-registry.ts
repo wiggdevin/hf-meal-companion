@@ -44,12 +44,13 @@ export type CallSite = {
 };
 
 /**
- * OD01: purposes no person waits on — the weekly review (a cron) and facet warming. Their spend
+ * OD01: purposes no person waits on — the weekly review (a cron), facet warming and the deferred
+ * coach log sanity check (`log_sanity`, run after the reply is sent). Their spend
  * reservations count against the background ceiling and never use an account's interactive
  * reserve (lib/ai/spend.ts `reserveSpend`). Every other purpose is interactive.
  */
 export const BACKGROUND_PURPOSES: ReadonlySet<string> =
-  new Set(["weeklyReview", "food_facets"] satisfies RegisteredPurpose[]);
+  new Set(["weeklyReview", "food_facets", "log_sanity"] satisfies RegisteredPurpose[]);
 
 export const CALL_REGISTRY = {
   // ---- Jev (TypeSafe System One) --------------------------------------------------------------

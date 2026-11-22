@@ -12,6 +12,7 @@ import { accountDay } from "@/lib/server/account-day";
 import { readTargetEligibility } from "@/lib/server/target-eligibility";
 import { activeProfile } from "@/lib/server/targets";
 import { rpcApproveTargetProposal } from "@/lib/server/target-writes";
+import { mapTargetWriteError } from "@/lib/server/target-write-errors";
 import { AdultOnlyError, paceAllowed } from "@/lib/profile/rate-eligibility";
 import type {
   DecideRequest, DecideResponse, ProposalSummary, ProposedTargets,
@@ -87,8 +88,11 @@ export async function decideProposal(
     await assertApprovalEligible(client, userId);
     // Service role (lib/server/target-writes.ts): `authenticated` cannot execute the approval
     // (migration 20261228090000), so the eligibility check above cannot be skipped.
+    // The approval writes its revision through `write_target_revision_checked` (migration
+    // 20270109100000): a proposal below the account's floor is refused (422 `below_floor`) and
+    // stays pending.
     const { data, error } = await rpcApproveTargetProposal(userId, proposalId);
-    if (error) throw error;
+    if (error) throw mapTargetWriteError(error);
     const result = data as { status: string; target_profile_id?: string; current?: Record<string, unknown> };
     if (result.status === "not_found") throw new HttpError(404, "not_found", "No such proposal.");
     if (result.status === "conflict") {

@@ -13,11 +13,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { bindAccount, unbindAccount } from "@/lib/device/account";
 import { createOnboardingState } from "@/lib/profile/onboarding-state";
 import { defaultSettings } from "@/lib/store";
-import { saveOnboardingPlan, type SaveOnboardingPlanDeps } from "@/lib/onboarding/save-plan";
+import {
+  PROFILE_REQUIRED_ERROR, saveOnboardingPlan, type SaveOnboardingPlanDeps,
+} from "@/lib/onboarding/save-plan";
 import { CONSTRAINT_SAVE_WARNING } from "@/lib/profile/onboarding-client";
 import { STARTER_RULE_CHANGED_ERROR } from "@/lib/foods/starter-client";
 import { legacyInstanceFromCatalog, profileInstancesForLegacyFlags } from "@/lib/policy/profiles/legacy-flags";
-import { TargetSaveRefusedError } from "@/lib/targets/client";
+import { TargetFloorError, TargetSaveRefusedError } from "@/lib/targets/client";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const rules = { avoid_allergens: [], avoid_food_ref_ids: [], banned_categories: [], conditions: [], notes: null };
@@ -241,5 +243,21 @@ describe("saveOnboardingPlan", () => {
       settings: defaultSettings(), onboardingState: createOnboardingState(defaultSettings()),
     }, baseDeps({ persistPlan: vi.fn(async () => { throw new TargetSaveRefusedError(400, "bad_request"); }) }));
     expect(other).toEqual({ ok: false, error: "save targets failed: 400" });
+  });
+
+  it("shows the server's sentence for a floor refusal and a plain retry line for profile_required", async () => {
+    const sentence = "That is below your minimum of 1500 kcal a day. Choose 1500 or more.";
+    const floor = await saveOnboardingPlan({
+      settings: defaultSettings(), onboardingState: createOnboardingState(defaultSettings()),
+    }, baseDeps({ persistPlan: vi.fn(async () => {
+      throw new TargetFloorError("kcal", "rest", 1500, sentence);
+    }) }));
+    expect(floor).toEqual({ ok: false, error: sentence });
+    const needed = await saveOnboardingPlan({
+      settings: defaultSettings(), onboardingState: createOnboardingState(defaultSettings()),
+    }, baseDeps({ persistPlan: vi.fn(async () => {
+      throw new TargetSaveRefusedError(409, "profile_required");
+    }) }));
+    expect(needed).toMatchObject({ ok: false, error: PROFILE_REQUIRED_ERROR });
   });
 });

@@ -50,9 +50,11 @@ import AuthGate, {
   applyAccountOnboardingRead,
   isAuthExempt,
   sessionUserId,
+  holdLogIntentAcross,
   signedOutHref,
 } from "./AuthGate";
 import { accountDisposition } from "@/lib/profile/onboarding-state";
+import { takeHeldLogIntent } from "@/lib/log/held-log-intent";
 import { currentAccountOrNull } from "@/lib/device/account";
 import { __setDepartureDeps } from "@/lib/device/departure";
 import { grantAllLocks, newPage } from "@/tests/helpers/new-page";
@@ -141,6 +143,30 @@ describe("signedOutHref", () => {
 
   it("omits next for a null pathname", () => {
     expect(signedOutHref(null)).toBe("/sign-in");
+  });
+
+  // Fast logging: a /log request opened while signed out must survive the sign-in round trip.
+  it("keeps the query, so a log request opened while signed out still opens after sign-in", () => {
+    expect(signedOutHref("/", "?log=voice&slot=meal-2")).toBe(`/sign-in?next=${encodeURIComponent("/?log=voice&slot=meal-2")}`);
+    expect(signedOutHref("/body", "?d=2026-11-21")).toBe(`/sign-in?next=${encodeURIComponent("/body?d=2026-11-21")}`);
+    expect(signedOutHref("/", "")).toBe("/sign-in");
+    expect(signedOutHref("/", "?")).toBe("/sign-in");
+  });
+});
+
+describe("holdLogIntentAcross (forced onboarding)", () => {
+  it("holds a validated /log request when the gate sends the account to onboarding", () => {
+    window.sessionStorage.clear();
+    holdLogIntentAcross("/onboarding", "/", "?log=barcode&slot=meal-3&d=2026-11-21");
+    expect(takeHeldLogIntent()).toEqual({ mode: "barcode", slot: "meal-3" });
+  });
+
+  it("holds nothing on any other navigation, or with no request", () => {
+    window.sessionStorage.clear();
+    holdLogIntentAcross(null, "/", "?log=voice");
+    holdLogIntentAcross("/", "/onboarding", "?log=voice");
+    holdLogIntentAcross("/onboarding", "/", "?d=2026-11-21");
+    expect(takeHeldLogIntent()).toBeNull();
   });
 });
 

@@ -39,9 +39,12 @@ import {
   BADGE_MINE_CLASS, BADGE_MINE_STYLE, BADGE_USDA_CLASS, BADGE_USDA_STYLE,
   ROW_CLASS, ROW_META_CLASS, ROW_STYLE, ROW_TITLE_CLASS, SECTION_LABEL_CLASS,
 } from "@/components/LogFoodSheet.styles";
-import type { LoggedFood, Macros, SlotId } from "@/lib/types";
+import type { LoggedFood, Macros, SlotId, StoredDay } from "@/lib/types";
 import KcalText from "@/components/ui/KcalText";
 import Notice from "@/components/ui/Notice";
+import RecentMealsRow from "@/components/RecentMealsRow";
+import type { RelogStart } from "@/components/today/useRelogBatches";
+import { useSheetRelog } from "@/components/today/useSheetRelog";
 import { NUTRITION_UNCHECKED_COPY, PARTIAL_NOTE, commitNutritionUnchecked } from "@/lib/nutrition-display";
 
 const FLAG_LABEL: Record<string, string> = { gluten: "gluten", dairy: "dairy", apple: "apple" };
@@ -87,6 +90,9 @@ export default function LogFoodSheet({
   onCapture,
   onScan,
   at,
+  days,
+  onRelog,
+  relogPending = false,
 }: {
   mode: "food" | "meal";
   mine: Record<string, Food>;
@@ -108,6 +114,13 @@ export default function LogFoodSheet({
   onCapture: (method: CaptureMethod) => void;
   /** Present only when NEXT_PUBLIC_FEATURE_SCAN=1 — app/page.tsx decides, as QuickActions does. */
   onScan?: () => void;
+  /** Today's synced days, for the recents row and a star's last portion. */
+  days?: Record<string, StoredDay>;
+  /** A one-tap re-log (recents, a star, Same as yesterday), run by Today's batches; one that logged
+   *  something closes this sheet, one that logged nothing says so here (useSheetRelog). */
+  onRelog?: RelogStart;
+  /** A re-log, Undo or Retry is running on Today: every re-log control here waits too. */
+  relogPending?: boolean;
 }) {
   const router = useRouter();
   const [view, setView] = useState<View>(mode === "meal" ? "meal" : "search");
@@ -140,6 +153,8 @@ export default function LogFoodSheet({
    *  on the view the user is still on, with their pick, amount or meal kept (FluidVoice F01-F09). */
   const commitFeedback = useActionFeedback();
   const commitNotice = <ActionFeedbackToast notice={commitFeedback.notice} onDismiss={commitFeedback.dismiss} />;
+  const relogs = useSheetRelog({ onRelog: mode === "food" ? onRelog : undefined, onClose,
+    notify: commitFeedback.notify, inFlightRef: inFlight, setSubmitting, at, slot, days: days ?? {} });
   /** Sends one commit and throws a refusal's reason, so the shared feedback reads one verdict. */
   const committed = (send: () => ReturnType<typeof commitLogEntry>) => commitFeedback.run(async () => {
     const result = await send();
@@ -242,7 +257,9 @@ export default function LogFoodSheet({
 
   /** Favorites-strip tap (lane L): a recipe has no catalog pick to cache, so it only routes to
    *  the recipe screen — quick-logging a serving from the chip is a follow-up ticket. */
-  function handleFavoritePick(fav: FavoriteRow) {
+  async function handleFavoritePick(fav: FavoriteRow) {
+    // Fast logging: a star logged before is logged again at its last portion, in one tap.
+    if (relogs.canRelog(fav) && await relogs.relogFavorite(fav)) return;
     if (fav.kind === "recipe") {
       router.push("/foods#recipes");
       return;
@@ -667,15 +684,18 @@ export default function LogFoodSheet({
         <div className="flex flex-col gap-2.5">
           {mode === "meal" && <Button variant="tertiary" block onClick={() => setView("meal")}>Back to the meal</Button>}
           <Button variant="tertiary" block onClick={onSomethingElse}>Not here? Type it from the label…</Button>
+          {commitNotice}
         </div>
       }
     >
       <div className="flex flex-col gap-4">
         {captureRow}
+        {onRelog && mode === "food" && <RecentMealsRow days={days ?? {}} slot={slot} at={at} busy={submitting || relogPending}
+          onRelog={(entries, key) => void relogs.relog(entries, key)} />}
         {blocked && <Notice tone="error" title={blocked} className="mb-2" />}
         {useCatalog ? (
           <>
-            <FavoritesStrip onPick={handleFavoritePick} />
+            <FavoritesStrip onPick={(fav) => void handleFavoritePick(fav)} disabled={submitting || relogPending} />
             {favoriteNote && <Notice tone="neutral" title={favoriteNote} />}
             <CatalogSearch mine={mine} autoFocus onPick={pickCatalogRow} />
           </>

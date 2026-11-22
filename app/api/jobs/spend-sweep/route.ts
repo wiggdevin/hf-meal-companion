@@ -43,12 +43,16 @@ async function run(req: Request): Promise<Response> {
     await enforceRateLimit("jobs:spend-sweep", 12, 3600);
     const admin = adminClient();
     let passes = 0;
+    // One bounded sweep on every tick, even when nothing has expired: it also prunes settled
+    // reservations and history older than the retention window.
+    await rpcNumber(admin, "ai_spend_sweep", { p_max: PASS_MAX });
+    passes += 1;
     let remaining = await rpcNumber(admin, "ai_spend_expired_count");
     while (remaining > 0 && Date.now() - startedAt < BUDGET_MS) {
       const worked = await rpcNumber(admin, "ai_spend_sweep", { p_max: PASS_MAX });
       passes += 1;
       const left = await rpcNumber(admin, "ai_spend_expired_count");
-      // Another sweep holds the single-flight lock, or nothing moved: try again next run.
+      // Nothing moved: try again next run.
       if (worked === 0 && left >= remaining) { remaining = left; break; }
       remaining = left;
     }

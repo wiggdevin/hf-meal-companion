@@ -301,7 +301,7 @@ describe("the target authority revision", () => {
     expect(settingsWithTargetRevision(next, backdated, today)).toBe(next);
   });
 
-  it("persists derivation through write_target_revision and returns the assigned revision", async () => {
+  it("persists derivation through write_target_revision_checked and returns the assigned revision", async () => {
     const rpc = vi.fn(async () => ({ data: REVISION_ROW, error: null }));
     const result = await writeDerivedTargets(asAdmin({ rpc }), REVISION_ROW.user_id, {
       settings: completeSettings(),
@@ -312,7 +312,7 @@ describe("the target authority revision", () => {
       eligibility: NO_HOLDS,
     });
 
-    expect(rpc).toHaveBeenCalledWith("write_target_revision", {
+    expect(rpc).toHaveBeenCalledWith("write_target_revision_checked", {
       p_user_id: REVISION_ROW.user_id,
       p_row: expect.objectContaining({
         target_source: "derived",
@@ -322,17 +322,14 @@ describe("the target authority revision", () => {
         training_macros: expect.any(Object),
         rest_macros: expect.any(Object),
         goal_rate_bp_week: 0,
-        kcal_min: 1326,
-        kcal_min_source: "macro_minimum",
-        protein_g_min: 119,
-        fat_g_min: 50,
-        carb_g_min: 100,
+        // The profile the writer can floor itself on until the settings op stores it.
+        floor_profile: expect.objectContaining({ sex: "female", goal: expect.any(String) }),
       }),
     });
     expect(result.revision).toBe(4);
   });
 
-  it("stores the account's macro minimum, never a 1,500 kcal male floor (step D)", async () => {
+  it("sends no minima: the checked writer computes them, never a 1,500 kcal male floor (step D)", async () => {
     const rpc = vi.fn(async () => ({ data: { ...REVISION_ROW,
       input_weight_source: "onboarding", input_weight_kg: 80 }, error: null }));
     await writeDerivedTargets(asAdmin({ rpc }), REVISION_ROW.user_id, {
@@ -345,11 +342,12 @@ describe("the target authority revision", () => {
       eligibility: NO_HOLDS,
     });
 
-    // 80 kg at 165 cm: protein basis 30 × 1.65² = 81.7 → 80 kg → 160 g; 640 + 450 + 400.
-    expect(rpc).toHaveBeenCalledWith("write_target_revision", expect.objectContaining({
-      p_row: expect.objectContaining({ kcal_min: 1490, kcal_min_source: "macro_minimum",
-        goal_rate_bp_week: -50, fat_g_min: 50, carb_g_min: 100 }),
-    }));
+    const sent = (rpc.mock.calls.at(-1) as unknown as [string, { p_row: Record<string, unknown> }])[1].p_row;
+    expect(sent).toMatchObject({ goal_rate_bp_week: -50 });
+    for (const key of ["kcal_min", "protein_g_min", "fat_g_min", "carb_g_min", "kcal_min_source"]) {
+      expect(sent).not.toHaveProperty(key);
+    }
+    // 80 kg at 165 cm: 160 g protein and 1,490 kcal are the writer's to compute (its test).
   });
 
   it("undo copies the selected prior row through the same revision RPC", async () => {
@@ -377,18 +375,13 @@ describe("the target authority revision", () => {
       "2026-09-20",
     );
 
-    expect(rpc).toHaveBeenCalledWith("write_target_revision", expect.objectContaining({
+    expect(rpc).toHaveBeenCalledWith("write_target_revision_checked", expect.objectContaining({
       p_user_id: REVISION_ROW.user_id,
       p_row: expect.objectContaining({
         target_source: "derived",
         training_macros: REVISION_ROW.training_macros,
         pin_training_kcal: null,
-        kcal_min: REVISION_ROW.kcal_min,
-        kcal_min_source: "macro_minimum",
         goal_rate_bp_week: -50,
-        protein_g_min: REVISION_ROW.protein_g_min,
-        fat_g_min: REVISION_ROW.fat_g_min,
-        carb_g_min: REVISION_ROW.carb_g_min,
       }),
     }));
     expect(result).toMatchObject({ revision: 5, training: REVISION_ROW.training_macros,

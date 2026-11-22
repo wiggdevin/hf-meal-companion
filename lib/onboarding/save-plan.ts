@@ -108,6 +108,10 @@ export const FOODS_CHANGED_ELSEWHERE_ERROR =
 export const RATE_NOT_ELIGIBLE_ERROR =
   "Your saved health answers keep your calories about where you burn, so there's no pace to set. Tap Use this plan again.";
 
+/** `409 profile_required`: the server holds no complete profile for the checked write yet. */
+export const PROFILE_REQUIRED_ERROR =
+  "We couldn't read your profile answers yet. Check your connection, then tap Use this plan again.";
+
 function refusal(error: unknown): { error: string; code: SavePlanRefusal } | null {
   if (error instanceof AdultOnlyError) return { error: error.message, code: "adult_only" };
   if (!(error instanceof TargetSaveRefusedError)) return null;
@@ -291,6 +295,10 @@ export async function saveOnboardingPlan(
     // The write's own recheck found a rule saved since the read: back to Foods, like the preflight.
     if (error instanceof Error && error.message === STARTER_RULE_CHANGED_ERROR) {
       return { ok: false, code: "starter_rules", error: error.message };
+    }
+    // A floor refusal already carries the server's sentence (its message), shown as it is.
+    if (error instanceof TargetSaveRefusedError && error.code === "profile_required") {
+      return { ok: false, error: PROFILE_REQUIRED_ERROR };
     }
     return { ok: false, error: error instanceof Error ? error.message : ONBOARDING_SYNC_WARNING };
   }

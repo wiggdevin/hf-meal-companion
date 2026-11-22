@@ -5,7 +5,12 @@
  *  (lib/server/target-eligibility.ts). A held account derives at a 0 pace whatever
  *  `goalRateBpWeek` the body carries (the revision's `inputs.goalRateBpWeek` says 0), and kidney
  *  disease takes standard protein. Under 18 on the revision's date answers 422 `adult_only` and
- *  writes nothing. */
+ *  writes nothing.
+ *
+ *  Every write goes through `write_target_revision_checked` (migration 20270109100000), which
+ *  takes the minima from the account's own weight, height and goal: below them the answer is
+ *  422 `below_floor` with `floor`, `dayType` and `minimum`; macros that do not add up are 422
+ *  `kcal_mismatch` or `invalid_macros`; no profile is 409 `profile_required`. */
 import { z } from "zod";
 import { requireUser } from "@/lib/server/auth";
 import { jsonError, readJson } from "@/lib/server/http";
@@ -13,7 +18,7 @@ import { enforceRateLimit } from "@/lib/server/ratelimit";
 import { requestIp } from "@/lib/server/request-ip";
 import {
   activeTargets, authorTargets, FloorViolationError, restoreTargetRevision,
-  writeTargetRevisionSet,
+  TargetBelowFloorError, writeTargetRevisionSet,
 } from "@/lib/server/targets";
 import { BODY_FAT_SOURCES, type Settings, type TargetRevision } from "@/lib/types";
 import { validateRate } from "@/lib/profile/rate-goal";
@@ -162,6 +167,12 @@ export async function POST(req: Request): Promise<Response> {
     // Under 18 on the revision's date: no plan is built (owner decision 2026-10-08).
     if (e instanceof AdultOnlyError) {
       return Response.json({ error: e.code, message: e.message }, { status: 422 });
+    }
+    // Below the account's minimum calories, fat or protein: the checked writer refused and wrote
+    // nothing. The body names the floor so a phone can show it (jsonError sends only `message`).
+    if (e instanceof TargetBelowFloorError) {
+      return Response.json({ error: e.code, message: e.message, floor: e.floor,
+        dayType: e.dayType, minimum: e.minimum }, { status: 422 });
     }
     if (e instanceof FloorViolationError) {
       return Response.json({ error: e.code, message: e.message,

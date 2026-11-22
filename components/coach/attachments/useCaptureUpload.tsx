@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Sheet from "@/components/Sheet";
 import Button from "@/components/ui/Button";
-import { attachmentMoment } from "@/components/coach/attachments/context";
+import { captureInstant, type CaptureInstant } from "@/components/coach/attachments/capture-instant";
 import { signAndUpload } from "@/lib/capture-client";
 import type { CoachAttachment } from "@/lib/coach/attachments";
 import { resizeImage } from "@/lib/media/resize";
@@ -20,8 +20,9 @@ export function useCaptureUpload(
 ) {
   const [status, setStatus] = useState<Status>(null);
 
-  async function upload(file: File, method: CaptureMethod = "photo"): Promise<void> {
-    const at = now();
+  /** `captured`: the instant the file was picked, kept by the caller for every retry. */
+  async function upload(file: File, method: CaptureMethod = "photo", captured?: CaptureInstant): Promise<void> {
+    const { at, moment } = captured ?? captureInstant(now());
     setStatus({ busy: true, message: null });
     try {
       const photo = await resizeImage(file);
@@ -30,10 +31,9 @@ export function useCaptureUpload(
         setStatus({ busy: false, message: uploaded.outcome.message });
         return;
       }
-      const moment = attachmentMoment(at);
       onAttachment({
         kind: "capture", v: 1, method, mediaPath: uploaded.path,
-        localDate: moment.localDate, slot: moment.slot,
+        localDate: moment.localDate, slot: moment.slot, pickedAt: at.toISOString(), tz: moment.tz,
       }, SENT[method]);
       setStatus(null);
     } catch {

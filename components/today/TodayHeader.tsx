@@ -19,8 +19,10 @@ export default function TodayHeader({ eyebrow, title, greeting, trailing, back }
 }) {
   return <header className="flex flex-col gap-3 px-1">
     <div className="flex min-h-11 items-center justify-between gap-3">
-      <HfLogo variant="monogram" tone="auto" height={36} decorative />
-      {trailing && <div className="flex shrink-0 items-center gap-2">{trailing}</div>}
+      <span className="shrink-0"><HfLogo variant="monogram" tone="auto" height={36} decorative /></span>
+      {/* min-w-0: on a 375 px phone the controls share the row; the day-type chip is the one that
+          gives way (it truncates its name), never the row itself. */}
+      {trailing && <div className="flex min-w-0 items-center justify-end gap-2">{trailing}</div>}
     </div>
     <div className="flex min-w-0 flex-col">
       {back && <Link href={back.href} onClick={back.onClick}

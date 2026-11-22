@@ -39,27 +39,54 @@ const DEFAULT_SPEND_CAP_USD = 2;
 export const DEFAULT_GLOBAL_SPEND_CAP_USD = 50;
 /** OD01: what background calls, across every account, may commit in a UTC day, when the env is unset. */
 export const DEFAULT_BACKGROUND_SPEND_CAP_USD = 10;
-/** OD01: the part of each account's daily cap background calls may never use, when the env is unset. */
-export const DEFAULT_INTERACTIVE_RESERVE_USD = 1;
-/** How long a reservation holds its amount when the function that made it never settles. */
-export const RESERVATION_TTL_SECONDS = 300;
+/** OD01: the share of every cap (global and per account) kept for interactive turns, when the env is unset. */
+export const DEFAULT_INTERACTIVE_SHARE = 0.7;
+/**
+ * How long a hold keeps its amount when the function that made it never settles. Derived from the
+ * longest a call can run: the interactive routes (coach, plan/document) declare maxDuration 60 s
+ * and one OpenRouter call times out at 20 s, so an interactive hold lives 60 s + a 30 s margin
+ * = 90 s. Background work runs in the job routes (maxDuration 300 s), so its hold stays 300 s.
+ * Change a route's maxDuration and these together. The database accepts 30-900 s.
+ */
+export const INTERACTIVE_RESERVATION_TTL_SECONDS = 90;
+export const BACKGROUND_RESERVATION_TTL_SECONDS = 300;
+
+/** The largest USD figure any spend env var may carry; a bigger value is a typo, not a cap. */
+const MAX_ENV_USD = 1_000_000;
+/** The largest one-attempt OpenRouter allowance (the default is 0.25). */
+export const MAX_OPENROUTER_ATTEMPT_CEILING_USD = 5;
+
+/** A plain decimal only (digits, one optional fraction): no sign, hex, exponent, Infinity or NaN. */
+function strictDecimal(raw: string | undefined): number | null {
+  if (raw === undefined) return null;
+  const text = raw.trim();
+  if (!/^\d{1,9}(\.\d{1,9})?$/.test(text)) return null;
+  const n = Number(text);
+  return Number.isFinite(n) && n <= MAX_ENV_USD ? n : null;
+}
 
 function usdFromEnv(name: string, fallback: number): number {
   const value = process.env[name];
   if (value === undefined || value.trim().length === 0) return fallback;
-  const raw = Number(value);
-  if (!Number.isFinite(raw) || raw < 0) {
-    console.error(`${name} is not a non-negative number; using the default`, { value });
+  const parsed = strictDecimal(value);
+  if (parsed === null) {
+    console.error(`${name} is not a plain non-negative decimal; using the default`, { value });
     return fallback;
   }
-  return raw;
+  return parsed;
 }
 
 /** `AI_OPENROUTER_ATTEMPT_CEILING_USD`, which must be a number > 0 (else the default, logged). */
 export function openRouterAttemptCeilingUsd(): number {
   const value = usdFromEnv("AI_OPENROUTER_ATTEMPT_CEILING_USD", DEFAULT_OPENROUTER_ATTEMPT_CEILING_USD);
-  if (value > 0) return value;
-  console.error("AI_OPENROUTER_ATTEMPT_CEILING_USD must be greater than 0; using the default", { value });
+  if (value > 0 && value <= MAX_OPENROUTER_ATTEMPT_CEILING_USD) return value;
+  if (value > MAX_OPENROUTER_ATTEMPT_CEILING_USD) {
+    // Clamp, never shrink: a larger configured allowance keeps the largest hold we allow.
+    console.error("AI_OPENROUTER_ATTEMPT_CEILING_USD is above the maximum; clamping",
+      { value, max: MAX_OPENROUTER_ATTEMPT_CEILING_USD });
+    return MAX_OPENROUTER_ATTEMPT_CEILING_USD;
+  }
+  console.error("AI_OPENROUTER_ATTEMPT_CEILING_USD must be above 0; using the default", { value });
   return DEFAULT_OPENROUTER_ATTEMPT_CEILING_USD;
 }
 
@@ -84,17 +111,38 @@ export function globalSpendCapUsd(): number {
   return usdFromEnv("AI_GLOBAL_DAILY_SPEND_CAP_USD", DEFAULT_GLOBAL_SPEND_CAP_USD);
 }
 
-/** OD01: background calls' UTC-day ceiling across every account (`AI_BACKGROUND_DAILY_SPEND_CAP_USD`,
- *  default $10). 0 stops background spend and leaves interactive turns alone. */
-export function backgroundSpendCapUsd(): number {
-  return usdFromEnv("AI_BACKGROUND_DAILY_SPEND_CAP_USD", DEFAULT_BACKGROUND_SPEND_CAP_USD);
+const round6 = (n: number): number => Math.round(n * 1e6) / 1e6;
+
+/** OD01: the share of each cap kept for interactive turns (`AI_INTERACTIVE_SHARE`, a plain decimal
+ *  above 0 and at most 1, default 0.7). Anything else (malformed, hex, negative, above 1, or so
+ *  small it rounds to 0 at six places) falls back to the default, logged. */
+export function interactiveShare(): number {
+  const raw = process.env.AI_INTERACTIVE_SHARE;
+  if (raw === undefined || raw.trim().length === 0) return DEFAULT_INTERACTIVE_SHARE;
+  const parsed = strictDecimal(raw);
+  const value = parsed === null || !(parsed > 0 && parsed <= 1) ? null : round6(parsed);
+  if (value !== null && value > 0) return value;
+  console.error("AI_INTERACTIVE_SHARE must be a plain decimal above 0 and at most 1; using the default",
+    { value: raw });
+  return DEFAULT_INTERACTIVE_SHARE;
 }
 
-/** OD01: the share of each account's cap kept for its own interactive turns
- *  (`AI_INTERACTIVE_RESERVE_USD`, default $1 of $2). Background calls for an account may commit at
- *  most its cap less this. */
+/** OD01: background calls' UTC-day ceiling across every account: `AI_BACKGROUND_DAILY_SPEND_CAP_USD`
+ *  (default $10), never more than the global ceiling's non-interactive part (global x (1 - share)).
+ *  0 stops background spend and leaves interactive turns alone. */
+export function backgroundSpendCapUsd(): number {
+  const configured = usdFromEnv("AI_BACKGROUND_DAILY_SPEND_CAP_USD", DEFAULT_BACKGROUND_SPEND_CAP_USD);
+  return Math.min(configured, round6(globalSpendCapUsd() * (1 - interactiveShare())));
+}
+
+/** OD01: the part of each account's cap kept for its own interactive turns:
+ *  `AI_INTERACTIVE_RESERVE_USD` when set, else the interactive share of the account's cap (70% of
+ *  $2). Background calls for an account may commit at most its cap less this. */
 export function interactiveReserveUsd(): number {
-  return usdFromEnv("AI_INTERACTIVE_RESERVE_USD", DEFAULT_INTERACTIVE_RESERVE_USD);
+  const derived = round6(spendCapUsd() * interactiveShare());
+  // A malformed, negative, hex or non-finite override falls back to the derived reserve (never 0,
+  // which would leave background calls free to use the account's whole cap).
+  return usdFromEnv("AI_INTERACTIVE_RESERVE_USD", derived);
 }
 
 /** A hold on the daily caps for one model call, released to its actual cost by `settleSpend`. */
@@ -123,7 +171,11 @@ const usd = (n: unknown): number => (typeof n === "number" ? n : Number(n));
 export async function reserveSpend(
   admin: SupabaseClient, userId: string, amountUsd: number, opts: { background?: boolean } = {},
 ): Promise<SpendReservation> {
-  const amount = Number.isFinite(amountUsd) && amountUsd > 0 ? amountUsd : 0;
+  // A NaN, Infinity or negative estimate is a pricing bug: fail closed, never a $0 hold.
+  if (typeof amountUsd !== "number" || !Number.isFinite(amountUsd) || amountUsd < 0) {
+    throw unavailable(userId, new Error(`invalid spend estimate: ${String(amountUsd)}`));
+  }
+  const amount = amountUsd;
   const cap = spendCapUsd();
   const globalCap = globalSpendCapUsd();
   const background = opts.background === true;
@@ -131,7 +183,7 @@ export async function reserveSpend(
   try {
     result = await admin.rpc("ai_spend_reserve_split", {
       p_user_id: userId, p_amount_usd: amount, p_user_cap_usd: cap,
-      p_global_cap_usd: globalCap, p_ttl_seconds: RESERVATION_TTL_SECONDS,
+      p_global_cap_usd: globalCap, p_ttl_seconds: background ? BACKGROUND_RESERVATION_TTL_SECONDS : INTERACTIVE_RESERVATION_TTL_SECONDS,
       p_background: background, p_background_cap_usd: backgroundSpendCapUsd(),
       p_interactive_reserve_usd: interactiveReserveUsd(),
     });
@@ -206,7 +258,8 @@ export async function settleSpend(
   if (Math.random() < (opts.sweepChance ?? SWEEP_CHANCE)) await sweepSpend(admin);
 }
 
-/** About one settle in 50 also runs the bounded sweep, in its own transaction after the settle. */
+/** About one settle in 50 also runs the bounded sweep, in its own transaction after the settle.
+ *  Every sweep takes the one budget lock (migration 20270109090100), so it stays short (p_max 100). */
 const SWEEP_CHANCE = 0.02;
 
 /** Reconciles expired holds and prunes old rows (`ai_spend_sweep`). Never throws. */

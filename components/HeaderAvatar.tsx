@@ -20,7 +20,7 @@ export default function HeaderAvatar() {
   }, []);
 
   return (
-    <Link href="/settings" aria-label="Profile and preferences" className="tap inline-flex items-center justify-center">
+    <Link href="/settings" aria-label="Profile and preferences" className="tap inline-flex shrink-0 items-center justify-center">
       <span className="pill inline-flex">
         <span className="pill-in grid size-10 place-items-center rounded-full text-body-sm font-medium text-charcoal">
           {initial}

@@ -3,7 +3,8 @@ import path from "node:path";
 import ts from "typescript";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  DEFAULT_BACKGROUND_SPEND_CAP_USD, DEFAULT_GLOBAL_SPEND_CAP_USD, DEFAULT_INTERACTIVE_RESERVE_USD,
+  DEFAULT_BACKGROUND_SPEND_CAP_USD, DEFAULT_GLOBAL_SPEND_CAP_USD, DEFAULT_INTERACTIVE_SHARE,
+  interactiveShare, spendCapUsd, INTERACTIVE_RESERVATION_TTL_SECONDS, BACKGROUND_RESERVATION_TTL_SECONDS,
   DEFAULT_OPENROUTER_ATTEMPT_CEILING_USD, backgroundSpendCapUsd, globalSpendCapUsd, interactiveReserveUsd,
   openRouterAttemptCeilingUsd, openRouterAttemptCost, reserveSpend, settleSpend,
 } from "@/lib/ai/spend";
@@ -25,8 +26,8 @@ describe("reserveSpend (scale S2: atomic reservation, fail closed)", () => {
     await expect(reserveSpend(admin as never, "user-a", 0.05))
       .resolves.toEqual({ id: "r1", amountUsd: 0.05 });
     expect(admin.rpc).toHaveBeenCalledWith("ai_spend_reserve_split", { p_user_id: "user-a",
-      p_amount_usd: 0.05, p_user_cap_usd: 0.5, p_global_cap_usd: 12, p_ttl_seconds: 300,
-      p_background: false, p_background_cap_usd: 10, p_interactive_reserve_usd: 1 });
+      p_amount_usd: 0.05, p_user_cap_usd: 0.5, p_global_cap_usd: 12, p_ttl_seconds: 90,
+      p_background: false, p_background_cap_usd: 3.6, p_interactive_reserve_usd: 0.35 });
   });
 
   it("marks a background call and sends the OD01 splits from the env", async () => {
@@ -36,14 +37,77 @@ describe("reserveSpend (scale S2: atomic reservation, fail closed)", () => {
       reason: null, user_committed_usd: 0.1, global_committed_usd: 1 }], error: null }));
     await reserveSpend(admin as never, "user-a", 0.05, { background: true });
     expect(admin.rpc).toHaveBeenCalledWith("ai_spend_reserve_split", expect.objectContaining({
-      p_background: true, p_background_cap_usd: 4, p_interactive_reserve_usd: 1.5 }));
+      p_background: true, p_background_cap_usd: 4, p_interactive_reserve_usd: 1.5,
+      p_ttl_seconds: 300 }));
   });
 
-  it("defaults the background ceiling to $10 and the interactive reserve to $1 (OD01)", () => {
-    expect(backgroundSpendCapUsd()).toBe(DEFAULT_BACKGROUND_SPEND_CAP_USD);
+  it("holds an interactive call for 90 s and a background call for 300 s", () => {
+    expect(INTERACTIVE_RESERVATION_TTL_SECONDS).toBe(90);
+    expect(BACKGROUND_RESERVATION_TTL_SECONDS).toBe(300);
+  });
+
+  it.each([NaN, Infinity, -Infinity, -0.01])("fails closed on a %s estimate (503, no rpc, never a $0 hold)",
+    async (bad) => {
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const admin = adminWith(async () => ({ data: [], error: null }));
+      await expect(reserveSpend(admin as never, "u", bad))
+        .rejects.toMatchObject({ status: 503, code: "spend_unavailable" });
+      await expect(reserveSpend(admin as never, "u", bad, { background: true }))
+        .rejects.toMatchObject({ status: 503, code: "spend_unavailable" });
+      expect(admin.rpc).not.toHaveBeenCalled();
+    });
+
+  it("still reserves a legitimate zero estimate", async () => {
+    const admin = adminWith(async () => ({ data: [{ reservation_id: "r0", allowed: true,
+      reason: null, user_committed_usd: 0, global_committed_usd: 0 }], error: null }));
+    await expect(reserveSpend(admin as never, "u", 0)).resolves.toEqual({ id: "r0", amountUsd: 0 });
+  });
+
+  it("keeps today's caps ($50 global, $10 background) and the 70% interactive share", () => {
+    expect(DEFAULT_GLOBAL_SPEND_CAP_USD).toBe(50);
     expect(DEFAULT_BACKGROUND_SPEND_CAP_USD).toBe(10);
-    expect(interactiveReserveUsd()).toBe(DEFAULT_INTERACTIVE_RESERVE_USD);
-    expect(DEFAULT_INTERACTIVE_RESERVE_USD).toBe(1);
+    expect(DEFAULT_INTERACTIVE_SHARE).toBe(0.7);
+    expect(interactiveShare()).toBe(0.7);
+    expect(backgroundSpendCapUsd()).toBe(10);
+    // The account's reserve follows the share of its own cap: 70% of $2.
+    expect(interactiveReserveUsd()).toBeCloseTo(1.4, 10);
+  });
+
+  it("never lets background spend beat the share the interactive side keeps (global)", () => {
+    vi.stubEnv("AI_GLOBAL_DAILY_SPEND_CAP_USD", "50");
+    vi.stubEnv("AI_BACKGROUND_DAILY_SPEND_CAP_USD", "30");
+    // 30% of $50 is $15: the tighter limit wins over the configured $30.
+    expect(backgroundSpendCapUsd()).toBeCloseTo(15, 10);
+    vi.stubEnv("AI_INTERACTIVE_SHARE", "0.9");
+    expect(backgroundSpendCapUsd()).toBeCloseTo(5, 10);
+  });
+
+  it("a malformed or out-of-range share falls back to 0.7", () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    for (const bad of ["1.5", "-1", "most"]) {
+      vi.stubEnv("AI_INTERACTIVE_SHARE", bad);
+      expect(interactiveShare()).toBe(0.7);
+    }
+  });
+
+  it("an explicit AI_INTERACTIVE_RESERVE_USD beats the share", () => {
+    vi.stubEnv("AI_INTERACTIVE_RESERVE_USD", "0.5");
+    expect(interactiveReserveUsd()).toBe(0.5);
+  });
+
+  it("keeps a coach turn allowed when background spend sits at its cap (interactive call sends background:false)", async () => {
+    const calls: Record<string, unknown>[] = [];
+    const admin = adminWith(async (_fn, args) => {
+      calls.push(args);
+      // Mirror the SQL: a background hold at the background cap refuses only background calls.
+      const refused = args.p_background === true;
+      return { data: [{ reservation_id: refused ? null : "r-turn", allowed: !refused,
+        reason: refused ? "background_cap" : null, user_committed_usd: 0, global_committed_usd: 30 }], error: null };
+    });
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    await expect(reserveSpend(admin as never, "u", 0.05, { background: true })).rejects.toMatchObject({ code: "spend_cap" });
+    await expect(reserveSpend(admin as never, "u", 0.05)).resolves.toMatchObject({ id: "r-turn" });
+    expect(calls.map((c) => c.p_background)).toEqual([true, false]);
   });
 
   it.each(["background_cap", "background_user_cap"])("refuses a background call with spend_cap on %s", async (reason) => {
@@ -90,16 +154,94 @@ describe("reserveSpend (scale S2: atomic reservation, fail closed)", () => {
   });
 });
 
+describe("spend env parsing", () => {
+  const BAD = ["abc", "NaN", "Infinity", "-Infinity", "-1", "-0.5", "0x10", "0x0", "1e2", "1e-3", "+1",
+    "1,5", "1 2", ".", "1.", ".5", "1e999", "9999999999"];
+
+  it.each(BAD)("AI_INTERACTIVE_RESERVE_USD=%j falls back to the derived $1.40, not 0", (bad) => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubEnv("AI_INTERACTIVE_RESERVE_USD", bad);
+    expect(interactiveReserveUsd()).toBeCloseTo(1.4, 10);
+  });
+
+  it("AI_INTERACTIVE_RESERVE_USD accepts plain decimals, including an explicit 0", () => {
+    for (const [raw, want] of [["0", 0], ["0.5", 0.5], ["1", 1], ["2", 2], [" 1.25 ", 1.25]] as const) {
+      vi.stubEnv("AI_INTERACTIVE_RESERVE_USD", raw);
+      expect(interactiveReserveUsd()).toBe(want);
+    }
+    vi.stubEnv("AI_INTERACTIVE_RESERVE_USD", "");
+    expect(interactiveReserveUsd()).toBeCloseTo(1.4, 10);
+  });
+
+  it("the derived reserve follows a valid share and cap", () => {
+    vi.stubEnv("AI_INTERACTIVE_SHARE", "0.5");
+    vi.stubEnv("AI_DAILY_SPEND_CAP_USD", "4");
+    expect(interactiveReserveUsd()).toBe(2);
+  });
+
+  it.each([...BAD, "0", "0.0", "0.0000001", "0.0000004", "1.000001", "2", "100"])(
+    "AI_INTERACTIVE_SHARE=%j falls back to 0.7", (bad) => {
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+      vi.stubEnv("AI_INTERACTIVE_SHARE", bad);
+      expect(interactiveShare()).toBe(0.7);
+    });
+
+  it.each([["0.000001", 0.000001], ["0.1", 0.1], ["0.5", 0.5], ["0.7", 0.7], ["1", 1], ["1.0", 1],
+    [" 0.25 ", 0.25]])("AI_INTERACTIVE_SHARE=%j parses to %d", (raw, want) => {
+    vi.stubEnv("AI_INTERACTIVE_SHARE", raw);
+    expect(interactiveShare()).toBe(want);
+  });
+
+  it("a share of 1 leaves background nothing; a bad share never zeroes the background cap", () => {
+    vi.stubEnv("AI_INTERACTIVE_SHARE", "1");
+    expect(backgroundSpendCapUsd()).toBe(0);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubEnv("AI_INTERACTIVE_SHARE", "0x1");
+    expect(backgroundSpendCapUsd()).toBe(10);
+  });
+
+  it.each(["abc", "-5", "0x20", "1e1", "Infinity"])("a bad cap %j falls back to its default", (bad) => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubEnv("AI_GLOBAL_DAILY_SPEND_CAP_USD", bad);
+    expect(globalSpendCapUsd()).toBe(50);
+    vi.stubEnv("AI_DAILY_SPEND_CAP_USD", bad);
+    expect(spendCapUsd()).toBe(2);
+  });
+
+  it("a cap of 0 is the kill switch and parses", () => {
+    vi.stubEnv("AI_DAILY_SPEND_CAP_USD", "0");
+    expect(spendCapUsd()).toBe(0);
+  });
+});
+
 describe("the OpenRouter allowance", () => {
   it("must be a number above zero; anything else falls back to the default, logged", () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.stubEnv("AI_OPENROUTER_ATTEMPT_CEILING_USD", "0.4");
     expect(openRouterAttemptCeilingUsd()).toBe(0.4);
-    for (const bad of ["0", "-1", "lots"]) {
+    for (const bad of ["0", "-1", "lots", "0x1", "Infinity", "NaN"]) {
       vi.stubEnv("AI_OPENROUTER_ATTEMPT_CEILING_USD", bad);
       expect(openRouterAttemptCeilingUsd()).toBe(DEFAULT_OPENROUTER_ATTEMPT_CEILING_USD);
     }
     expect(log).toHaveBeenCalled();
+  });
+
+  it("accepts the boundary 5 and clamps anything above it to 5, never shrinking the hold", () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubEnv("AI_OPENROUTER_ATTEMPT_CEILING_USD", "5");
+    expect(openRouterAttemptCeilingUsd()).toBe(5);
+    expect(log).not.toHaveBeenCalled();
+    for (const big of ["5.000001", "5.01", "1000"]) {
+      vi.stubEnv("AI_OPENROUTER_ATTEMPT_CEILING_USD", big);
+      expect(openRouterAttemptCeilingUsd()).toBe(5);
+    }
+    expect(log).toHaveBeenCalled();
+  });
+
+  it("rejects an interactive share just above 1 before rounding", () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubEnv("AI_INTERACTIVE_SHARE", "1.0000001");
+    expect(interactiveShare()).toBe(0.7);
   });
 
   it("logs an attempt that cost more than the allowance and still records it in full", () => {
@@ -202,6 +344,6 @@ describe("OD01 background purposes", () => {
   it("are all registered purposes", async () => {
     const { BACKGROUND_PURPOSES, CALL_REGISTRY } = await import("@/lib/ai/call-registry");
     for (const purpose of BACKGROUND_PURPOSES) expect(Object.keys(CALL_REGISTRY)).toContain(purpose);
-    expect([...BACKGROUND_PURPOSES].sort()).toEqual(["food_facets", "weeklyReview"]);
+    expect([...BACKGROUND_PURPOSES].sort()).toEqual(["food_facets", "log_sanity", "weeklyReview"]);
   });
 });

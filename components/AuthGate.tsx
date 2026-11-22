@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { holdLogIntent } from "@/lib/log/held-log-intent";
+import { parseLogIntent } from "@/lib/log/log-intent";
 import { browserClient } from "@/lib/supabase/client";
 import { captureTimeZone } from "@/lib/sync/settings";
 import { currentAccountOrNull, onAccountReady, SESSION_CHECK_EVENT } from "@/lib/device/account";
@@ -64,11 +66,15 @@ export function isAuthExempt(pathname: string | null): boolean {
  * Where the "Signed out" card's sign-in link goes — back to the page you were on, the same
  * `next` rule middleware.ts applies to every server-side redirect (production smoke 2026-09-13,
  * feature "body": a session that expires on a deep page like /body must not drop you on Today
- * after you sign back in).
+ * after you sign back in). The query comes along too, as middleware keeps it: a `/?log=voice` link
+ * opened while signed out still opens the capture after sign-in.
  */
-export function signedOutHref(pathname: string | null): string {
-  if (!pathname || pathname === "/") return "/sign-in";
-  return `/sign-in?next=${encodeURIComponent(pathname)}`;
+export function signedOutHref(pathname: string | null, search = ""): string {
+  if (!pathname) return "/sign-in";
+  const query = search && search !== "?" ? (search.startsWith("?") ? search : `?${search}`) : "";
+  const target = `${pathname}${query}`;
+  if (target === "/") return "/sign-in";
+  return `/sign-in?next=${encodeURIComponent(target)}`;
 }
 
 /* ---------------------------------------------------------------------------------------- */
@@ -202,6 +208,13 @@ export function gateRedirect(gate: Gate, pathname: string | null): "/onboarding"
   return null;
 }
 
+/** A `/log` request that meets forced onboarding is held for Today, not dropped with the address. */
+export function holdLogIntentAcross(destination: string | null, pathname: string | null, search: string): void {
+  if (destination !== "/onboarding") return;
+  const intent = parseLogIntent(search, pathname ?? "/");
+  if (intent) holdLogIntent(intent);
+}
+
 export function gateForDisposition(disposition: OnboardingDisposition): Gate {
   return disposition === "force" ? "onboarding" : "in";
 }
@@ -270,6 +283,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
       setBlocked(false);
       setGate(next);
       const destination = gateRedirect(next, pathname);
+      holdLogIntentAcross(destination, pathname, window.location.search);
       if (destination) router.replace(destination);
     };
 
@@ -375,7 +389,9 @@ export default function AuthGate({ children }: { children: ReactNode }) {
 
   const view = gateView(gate, pathname, blocked, boot === "ready", boot === "failed");
   if (view === "children") return <ActivityPromptProvider>{children}</ActivityPromptProvider>;
-  if (view === "signed-out") return <SignedOutCard href={signedOutHref(pathname)} />;
+  if (view === "signed-out") {
+    return <SignedOutCard href={signedOutHref(pathname, typeof window === "undefined" ? "" : window.location.search)} />;
+  }
   if (view === "blocked" || view === "adoption-failed") {
     const retry = (): void => {
       // Adoption runs only at a cold start: Retry is a fresh page.

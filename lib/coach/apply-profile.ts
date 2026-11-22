@@ -9,12 +9,14 @@ import { loadStore, saveStore } from "@/lib/store";
 import { isProfileComplete, settingsWithBodyFatProvenance } from "@/lib/profile/energy";
 import { targetSourceFor } from "@/lib/profile/derive";
 import { settingsWithGoalRate } from "@/lib/profile/rate-goal";
+import { announceSettingsChanged } from "@/lib/settings-events";
 import { mutateUserSettings, USER_SETTINGS_KEY } from "@/lib/sync/outbox";
 import { settingsProfileToRow } from "@/lib/sync/user-settings";
 import {
   persistDerivedTargetRevisionSet, restoreTargetRevisionOnline, settingsWithTargetRevision,
   type TargetPredecessor,
 } from "@/lib/targets/client";
+import { undoRestore } from "@/lib/targets/refusal";
 import { targetDayFor } from "@/lib/targets/revision";
 import { latestWeighInKg } from "@/lib/today/water-and-weight";
 import type { Settings } from "@/lib/types";
@@ -22,6 +24,8 @@ import type { Settings } from "@/lib/types";
 type ProfileAction = Extract<CoachAction, { kind: "update_profile" }>;
 type TargetsAction = Extract<CoachAction, { kind: "set_targets" }>;
 type SettingsToken = Extract<UndoToken, { kind: "update_profile" | "set_targets" }>;
+
+const UNIT_FIELDS: readonly (keyof Settings)[] = ["weightUnit", "heightUnit"];
 
 function snapshot(settings: Settings): Settings {
   return structuredClone(settings);
@@ -146,6 +150,19 @@ export async function applyUpdateProfile(
   const previous = snapshot(store.settings);
   const { kind: _kind, actionId: _actionId, flagged: _flagged, ...fields } = action;
   void _kind; void _actionId; void _flagged;
+  const touched = Object.keys(fields) as (keyof Settings)[];
+  const unitTouched = touched.filter((field) => UNIT_FIELDS.includes(field));
+  if (unitTouched.length === touched.length) {
+    // Units only (W060): they change how numbers are shown, never a number or a target. One key
+    // per field is queued (`syncProfileSettings` writes only the named columns), no target is
+    // derived or written, and the Undo token holds those keys alone, so Undo restores them and
+    // nothing else (it does not restore a target revision).
+    const unitsNext: Settings = { ...store.settings, ...fields };
+    await syncProfileSettings(unitsNext, h, touched);
+    writeSettings(h, unitsNext);
+    announceSettingsChanged();
+    return { status: "applied", token: { kind: "update_profile", previous, fields: touched } };
+  }
   let next: Settings = settingsWithGoalRate(store.settings,
     settingsWithBodyFatProvenance(store.settings, { ...store.settings, ...fields }));
   let undoPrevious = previous;
@@ -155,7 +172,6 @@ export async function applyUpdateProfile(
     undoPrevious = persisted.undoPrevious;
   }
   // A body-fat change can clear the scan label, so Undo must put the label back with the value.
-  const touched = Object.keys(fields) as (keyof Settings)[];
   const provenance: (keyof Settings)[] = touched.includes("bodyFatPct")
     ? ["bodyFatSource", "bodyFatMeasuredOn"] : [];
   // A goal change resets the rate, so Undo must put the old rate back with the old goal.
@@ -163,6 +179,7 @@ export async function applyUpdateProfile(
   await syncProfileSettings(next, h, [...touched, ...provenance, ...rate,
     ...(isProfileComplete(next) ? ["trainingKcal", "restKcal", "proteinG"] as const : [])]);
   writeSettings(h, next);
+  if (unitTouched.length > 0) announceSettingsChanged();
   return { status: "applied", token: { kind: "update_profile", previous: undoPrevious,
     fields: [...new Set([...touched, ...provenance, ...rate, "activeTargetProfile" as const])] } };
 }
@@ -208,13 +225,17 @@ export async function undoSettingsAction(
 ): Promise<void> {
   const h = accountHandle();
   let next = restoreFields(loadStore().settings, token.previous, token.fields);
-  const revisionId = token.previous.activeTargetProfile?.id;
+  // A units-only token names no target revision (`activeTargetProfile` is not in its fields), so
+  // its Undo puts the units back and writes no target.
+  const revisionId = token.fields.includes("activeTargetProfile")
+    ? token.previous.activeTargetProfile?.id : undefined;
   if (revisionId) {
-    const restored = await restoreTargetRevisionOnline(
-      revisionId, effectiveDate(ctx), ctx.fetchImpl, h);
+    const restored = await undoRestore(() => restoreTargetRevisionOnline(
+      revisionId, effectiveDate(ctx), ctx.fetchImpl, h));
     next = settingsWithTargetRevision(next, restored);
   }
   await syncProfileSettings(next, h, [...token.fields,
     ...(revisionId ? ["trainingKcal", "restKcal", "proteinG"] as const : [])]);
   writeSettings(h, next);
+  if (token.fields.some((field) => UNIT_FIELDS.includes(field))) announceSettingsChanged();
 }

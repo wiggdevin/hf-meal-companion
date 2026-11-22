@@ -7,15 +7,18 @@
  * which one; anything else (no code, an unknown code, offline, an unreadable one) leaves the photo
  * to the AI as a plate, menu or label, where "This was a nutrition label" can still re-read it.
  */
-import { attachmentMoment } from "@/components/coach/attachments/context";
+import { captureInstant, type CaptureInstant } from "@/components/coach/attachments/capture-instant";
 import type { BarcodeMatch, BarcodeResponse } from "@/lib/barcode/client";
 import { resolveScan } from "@/lib/barcode/resolve-scan";
 import { readBarcodeFromStill } from "@/lib/barcode/still";
 import type { CoachAttachment } from "@/lib/coach/attachments";
 import { currentAccountOrNull } from "@/lib/device/account";
 
-export function barcodeAttachment(response: BarcodeResponse, match: BarcodeMatch, at: Date): CoachAttachment {
-  const moment = attachmentMoment(at);
+/** `captured`: the instant frozen when the photo was picked or the code scanned; now otherwise. */
+export function barcodeAttachment(
+  response: BarcodeResponse, match: BarcodeMatch, captured: CaptureInstant = captureInstant(),
+): CoachAttachment {
+  const { at, moment } = captured;
   return {
     kind: "barcode",
     v: 1,
@@ -25,12 +28,13 @@ export function barcodeAttachment(response: BarcodeResponse, match: BarcodeMatch
     localDate: moment.localDate,
     slot: moment.slot,
     scannedAt: at.toISOString(),
+    tz: moment.tz,
   };
 }
 
 export type PhotoBarcode =
   | { kind: "product"; attachment: CoachAttachment; text: string }
-  | { kind: "choose"; response: Extract<BarcodeResponse, { status: "ambiguous" }> }
+  | { kind: "choose"; response: Extract<BarcodeResponse, { status: "ambiguous" }>; captured: CaptureInstant }
   /** Send the photo the usual way. */
   | { kind: "photo" }
   /** The account changed while this ran: do nothing at all. */
@@ -41,9 +45,13 @@ export type PhotoBarcodeDeps = {
   resolve?: typeof resolveScan;
   account?: typeof currentAccountOrNull;
   now?: () => Date;
+  /** The instant the photo was picked, frozen by the caller; read here at entry otherwise. */
+  captured?: CaptureInstant;
 };
 
 export async function barcodeInPhoto(file: Blob, deps: PhotoBarcodeDeps = {}): Promise<PhotoBarcode> {
+  // Frozen before the decode and the lookup, never read again after them.
+  const captured = deps.captured ?? captureInstant((deps.now ?? (() => new Date()))());
   const gtin = await (deps.read ?? readBarcodeFromStill)(file);
   if (!gtin) return { kind: "photo" };
   const h = (deps.account ?? currentAccountOrNull)();
@@ -59,8 +67,8 @@ export async function barcodeInPhoto(file: Blob, deps: PhotoBarcodeDeps = {}): P
   const response = outcome.response;
   if (response.status === "resolved") {
     return { kind: "product", text: `Scanned ${response.match.description}`,
-      attachment: barcodeAttachment(response, response.match, (deps.now ?? (() => new Date()))()) };
+      attachment: barcodeAttachment(response, response.match, captured) };
   }
-  if (response.status === "ambiguous") return { kind: "choose", response };
+  if (response.status === "ambiguous") return { kind: "choose", response, captured };
   return { kind: "photo" };
 }

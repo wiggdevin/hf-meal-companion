@@ -8,6 +8,8 @@ import { useDockIntents, type DockIntent } from "@/components/coach/attachments/
 import { useBroadcastDockComposerState, type DockComposerState } from "@/components/coach/use-dock-composer-state";
 import { COMPOSER_OFFLINE_COPY } from "@/lib/coach/chat-state";
 import type { SpeechHandlers } from "@/lib/coach/speech-api";
+import { announceSettingsChanged } from "@/lib/settings-events";
+import { loadStore, saveStore } from "@/lib/store";
 
 /** Stands in for CoachShell broadcasting its own composer state (the hook's real production
  *  path) rather than crafting the window event by hand — a render this file's own `cleanup()`
@@ -209,6 +211,19 @@ describe("the High Frequency bubble on /coach", () => {
     expect(screen.queryByRole("button", { name: /Send weigh-in/ })).toBeNull();
     stop();
     expect(received).toBe("");
+  });
+
+  // W060: a unit switched from chat reaches a weigh-in field that is already open.
+  it("re-reads the weight unit when the coach changes it while the weigh-in field is open", () => {
+    render(<TabBar />);
+    fireEvent.click(screen.getByRole("button", { name: "Attach" }));
+    fireEvent.click(screen.getByRole("button", { name: "Weigh in" }));
+    expect(screen.getByRole("textbox", { name: "Weight in lb" })).toBeTruthy();
+    const store = loadStore();
+    saveStore({ ...store, settings: { ...store.settings, weightUnit: "kg" } }, { silent: true });
+    act(() => { announceSettingsChanged(); });
+    expect(screen.getByRole("textbox", { name: "Weight in kg" })).toBeTruthy();
+    saveStore({ ...store, settings: { ...store.settings, weightUnit: "lb" } }, { silent: true });
   });
 
   it("carries the turn's own pending/success glow onto the field's one control", () => {
