@@ -1,14 +1,14 @@
 /** Curated, account-filtered starters from the bundled USDA food list. */
-import { starterFacetOutcome } from "./starter-evidence";
+import { starterSuggestionEvidence } from "./starter-evidence";
 import { dbFood } from "@/lib/food-db";
 import type { Profile } from "@/lib/constraints-client";
 import type { Food, FoodRole, FoodStatus, FoodUnit } from "@/lib/foods";
-import { profileFacetOutcome } from "@/lib/policy/profiles/hard-rules";
-import { isActiveHardRule, type ProfileInstance } from "@/lib/policy/profiles/types";
-import { allergenKey } from "@/lib/policy/allergens";
-import { profileDefinition } from "@/lib/policy/profiles/catalog";
+import type { ProfileInstance } from "@/lib/policy/profiles/types";
+import { activeHardRulesFor } from "@/lib/policy/profiles/account-rules";
+import type { ConstraintProfile } from "@/lib/policy/constraints";
+import { suggestionFoodIdentity, suggestionItemsVerdict } from "@/lib/coach/suggest-verdict";
 import {
-  LEGACY_PREFERENCE_FLAGS, profileInstancesForLegacyFlags, type LegacyPreferenceFlag,
+  LEGACY_PREFERENCE_FLAGS, legacyProfileIdsFor, type LegacyPreferenceFlag,
 } from "@/lib/policy/profiles/legacy-flags";
 
 export type DietStyle = "omnivore" | "pescatarian" | "vegetarian" | "vegan";
@@ -84,153 +84,123 @@ export function dietStyle(flags: readonly string[]): DietStyle {
   return "omnivore";
 }
 
-/**
- * One concern per allergen for a starter: wheat and gluten are the same concern here (W014, audit
- * 2026-10-10 A041), so an account that avoids either never sees a starter tagged with the other.
- */
-function allergenConcern(name: string): string {
-  const key = allergenKey(name);
-  return key === "wheat" ? "gluten" : key;
-}
-
 /** Why one starter is withheld: the rule in the user's words, and whether the starter breaks it or just cannot be checked against it. */
 export type StarterRuleHit = { rule: string; verdict: "violates" | "unverified" };
 
-function profileRuleName(profileId: string): string {
-  const label = profileDefinition(profileId)?.label
-    ?? profileId.replace(/^legacy_/, "").replaceAll("_", " ");
-  return `${label.charAt(0).toLowerCase()}${label.slice(1)} rule`;
+const NO_FLAGS: readonly string[] = [];
+const FOOD_RULES = "food rules";
+
+/** Flags the evaluator reads as preference flags (the 12 legacy ones; anything else is ignored). */
+function preferenceFlagsFor(flags: readonly string[]): LegacyPreferenceFlag[] {
+  return LEGACY_PREFERENCE_FLAGS.filter((flag) => flags.includes(flag));
 }
 
 /**
- * The first rule one starter breaks, or null when it passes every rule set. A hard-rule facet that
- * neither the starter's curated evidence nor the generic policy evidence can clear is "unverified":
- * that one starter is withheld, never the whole list (W062).
+ * The inputs `evaluatePolicy` reads for an account, built the way lib/server/policy-profile.ts
+ * builds them: the legacy flags are preference flags, and the instances are the profile's hard
+ * rules. A flag's own synthesized instance (and the stored row a flag already covers) is never
+ * added a second time as a profile rule, exactly as the server never adds one: the flag is the
+ * person's current choice and reaches the evaluator as a preference flag. `legacy_no_pork` and
+ * `legacy_no_beef` exist only as a synthesis of those flags, so they fold back into the flags.
+ */
+export function starterPolicyInputs(
+  flags: readonly string[], profile: Profile, instances: readonly ProfileInstance[], asOf: Date,
+): { profile: ConstraintProfile; preferenceFlags: LegacyPreferenceFlag[] } {
+  const preferenceFlags = new Set(preferenceFlagsFor(flags));
+  for (const instance of instances) {
+    if (instance.profileId === "legacy_no_pork") preferenceFlags.add("no_pork");
+    else if (instance.profileId === "legacy_no_beef") preferenceFlags.add("no_beef");
+  }
+  const flagBacked = legacyProfileIdsFor(LEGACY_PREFERENCE_FLAGS.filter((flag) => preferenceFlags.has(flag)));
+  const rules = instances.filter((instance) => !flagBacked.has(instance.profileId)
+    && instance.profileId !== "legacy_no_pork" && instance.profileId !== "legacy_no_beef");
+  return {
+    preferenceFlags: LEGACY_PREFERENCE_FLAGS.filter((flag) => preferenceFlags.has(flag)),
+    profile: {
+      avoid_allergens: profile.avoid_allergens, avoid_food_ref_ids: profile.avoid_food_ref_ids,
+      banned_categories: profile.banned_categories, conditions: profile.conditions,
+      ...(profile.custom_rules === undefined ? {} : { custom_rules: profile.custom_rules }),
+      profileIds: instances.map((instance) => instance.profileId),
+      profileRules: activeHardRulesFor(rules, asOf),
+    },
+  };
+}
+
+/**
+ * The one eligibility verdict for a starter: the fail-closed verdict Today, Coach and the plan
+ * checks use (`suggestionItemsVerdict` → `evaluatePolicy`), judged on the starter's own bundled
+ * row. Anything that verdict does not call "allowed" (blocked, unverified, unknown) is withheld.
+ * Curated starter data (`starterSuggestionEvidence`) can only add denying evidence here.
  */
 function starterRuleHit(
-  item: Starter, bannedCategories: ReadonlySet<string>, avoidAllergens: ReadonlySet<string>,
-  instances: readonly ProfileInstance[], asOf: Date, avoidedIds: ReadonlySet<string> = NO_IDS,
+  item: Starter, flags: readonly string[], profile: Profile, instances: readonly ProfileInstance[],
+  asOf: Date,
 ): StarterRuleHit | null {
-  if (dbFood(item.id) === undefined) return { rule: "the bundled food list", verdict: "unverified" };
-  if (avoidedIds.has(item.id)) return { rule: "Avoid list", verdict: "violates" };
-  const category = (item.categories ?? []).find((key) => bannedCategories.has(key));
-  if (category) return { rule: `no-${category} rule`, verdict: "violates" };
-  const allergen = [...(item.allergens ?? []), ...(item.mayContain ?? [])]
-    .find((key) => avoidAllergens.has(allergenConcern(key)));
-  if (allergen) return { rule: `${allergen.replace("-", " ")} allergy`, verdict: "violates" };
-  const name = dbFood(item.id)?.name;
-  for (const instance of instances) {
-    for (const rule of instance.rules) {
-      if (!isActiveHardRule(rule, asOf)) continue;
-      const outcome = starterFacetOutcome(item, rule.facet) ?? profileFacetOutcome(rule.facet, {
-        // The bundled name may name a facet, but it is not a label and clears nothing here: only
-        // the starter's own curated evidence (starterFacetOutcome) can (Phase 18 W2c).
-        foodName: name, wholeFoodName: null, ingredientsText: name, ingredientsTextIsLabel: false,
-      });
-      if (outcome !== "absent") {
-        return { rule: profileRuleName(instance.profileId),
-          verdict: outcome === "present" ? "violates" : "unverified" };
-      }
-    }
-  }
-  return null;
-}
-
-const NO_IDS: ReadonlySet<string> = new Set();
-
-/** The legacy-flag instances `starterChoices` judges with, so a preview and a later save read the same rules. */
-function flagInstances(flags: readonly string[], asOf: Date): ProfileInstance[] {
-  const known = flags.filter((flag): flag is LegacyPreferenceFlag =>
-    (LEGACY_PREFERENCE_FLAGS as readonly string[]).includes(flag));
-  return profileInstancesForLegacyFlags(known, asOf.toISOString());
-}
-
-function flagBans(flags: readonly string[], profile: Profile): { banned: Set<string>; allergens: Set<string> } {
-  const banned = new Set(profile.banned_categories.map((x) => x.toLowerCase()));
-  const allergens = new Set(profile.avoid_allergens.map(allergenConcern));
-  for (const flag of flags) {
-    const key = ({ no_shellfish: "shellfish", no_eggs: "egg", no_soy: "soy", no_peanuts: "peanut" } as Record<string, string>)[flag];
-    if (key) allergens.add(allergenConcern(key));
-  }
-  if (flags.includes("low_fodmap")) banned.add("beans");
-  if (flags.includes("no_pork") || flags.includes("halal") || flags.includes("kosher")) banned.add("pork");
-  if (flags.includes("no_beef")) banned.add("beef");
-  // No certification data exists for meat; halal/kosher suggestions use plant, eggs and fish only.
-  if (flags.includes("halal") || flags.includes("kosher")) { banned.add("beef"); banned.add("poultry"); }
-  return { banned, allergens };
+  const food = dbFood(item.id);
+  if (food === undefined) return { rule: "the bundled food list", verdict: "unverified" };
+  // A starter has no food-ref id to compare with `avoid_food_ref_ids`, so a profile that names any
+  // avoided food cannot be checked here: every starter is withheld (fail closed), never offered.
+  if (profile.avoid_food_ref_ids.length > 0) return { rule: "Avoid list", verdict: "unverified" };
+  const { profile: constraint, preferenceFlags } = starterPolicyInputs(flags, profile, instances, asOf);
+  const refId = `starter:${item.id}`;
+  const facts = starterSuggestionEvidence(item, {
+    allergenTags: [], allergenEvidence: {}, checkedAllergens: [], ingredientsText: null,
+    ingredientsTextIsLabel: false, foodName: food.name, foodBrand: null, packaged: false,
+    policyCategories: null, facets: {}, noCook: null, onEatsList: false, onAvoidList: false,
+    role: item.role,
+  });
+  const verdict = suggestionItemsVerdict(
+    [{ foodRefId: refId, catalogFoodRevisionId: null, verdict: "allowed" }],
+    { status: "ready", preferenceFlags, byIdentity: { [suggestionFoodIdentity({ foodRefId: refId, catalogFoodRevisionId: null })]: facts } },
+    constraint, false);
+  if (verdict.outcome === "allowed") return null;
+  return { rule: FOOD_RULES, verdict: verdict.outcome === "blocked" ? "violates" : "unverified" };
 }
 
 /**
  * Every starter with the rule that withholds it (null: it is offered). Diet style is judged
- * separately, so a starter of another diet carries `{ rule: "diet", verdict: "violates" }`.
- * `avoidedIds` are the starters an `avoid_food_ref_ids` entry resolves to (see
- * `avoidedStarterIds`); an id that names no starter excludes nothing.
+ * separately (it can only deny), so a starter of another diet carries `{ rule: "diet", verdict:
+ * "violates" }`.
  */
 export function starterRuleHits(flags: readonly string[], profile: Profile,
   instances: readonly ProfileInstance[] = [], asOf: Date = new Date(),
-  avoidedIds: ReadonlySet<string> = NO_IDS): Map<string, StarterRuleHit | null> {
+): Map<string, StarterRuleHit | null> {
   const style = dietStyle(flags);
-  const { banned, allergens } = flagBans(flags, profile);
-  const all = [...instances, ...flagInstances(flags, asOf)];
   return new Map(STARTERS.map((item) => [item.id, item.diets.includes(style)
-    ? starterRuleHit(item, banned, allergens, all, asOf, avoidedIds)
+    ? starterRuleHit(item, flags, profile, instances, asOf)
     : { rule: "diet", verdict: "violates" as const }]));
 }
 
 /**
  * Absence of a loaded profile must never mean that allergens are clear. A starter whose status
  * cannot be proved is withheld by itself; the list is never emptied wholesale because one facet
- * is uncurated. An `avoid_food_ref_ids` entry removes only the starter it resolves to.
+ * cannot be checked.
  */
 export function starterChoices(flags: readonly string[], profile: Profile,
-  instances: readonly ProfileInstance[] = [], asOf: Date = new Date(),
-  avoidedIds: ReadonlySet<string> = NO_IDS): Starter[] {
-  const hits = starterRuleHits(flags, profile, instances, asOf, avoidedIds);
+  instances: readonly ProfileInstance[] = [], asOf: Date = new Date()): Starter[] {
+  const hits = starterRuleHits(flags, profile, instances, asOf);
   return STARTERS.filter((item) => hits.get(item.id) === null);
 }
 
 /**
- * The same allergen/category/hard-rule check `starterChoices` applies, but against the account's
- * CURRENT profile directly (no diet-style filter, no flag-derived bans merged in) — for a
- * just-before-write recheck where only the stored profile+instances could have changed, not the
- * draft's own flags. Returns true when the item is now excluded and must not be written as "eats".
+ * The same eligibility verdict `starterChoices` applies, against the account's CURRENT stored
+ * profile only (no draft flags) — for a just-before-write recheck where only the stored
+ * profile+instances could have changed. True when the item is now excluded and must not be
+ * written as "eats".
  */
 export function starterExcludedByCurrentRules(
   item: Starter, profile: Profile, instances: readonly ProfileInstance[], asOf: Date = new Date(),
-  avoidedIds: ReadonlySet<string> = NO_IDS,
+  flags: readonly string[] = NO_FLAGS,
 ): boolean {
-  return starterExclusionReason(item, profile, instances, asOf, avoidedIds) !== null;
+  return starterExclusionReason(item, profile, instances, asOf, flags) !== null;
 }
 
 /** The rule that now withholds one starter from the CURRENT profile, or null when it is still allowed. */
 export function starterExclusionReason(
   item: Starter, profile: Profile, instances: readonly ProfileInstance[], asOf: Date = new Date(),
-  avoidedIds: ReadonlySet<string> = NO_IDS,
+  flags: readonly string[] = NO_FLAGS,
 ): StarterRuleHit | null {
-  const banned = new Set(profile.banned_categories.map((x) => x.toLowerCase()));
-  const allergens = new Set(profile.avoid_allergens.map(allergenConcern));
-  return starterRuleHit(item, banned, allergens, instances, asOf, avoidedIds);
-}
-
-/**
- * The starters an `avoid_food_ref_ids` entry names, read from this device's food-ref cache
- * (`readPrefRefCache`: starter foods are cached under `starter:<id>`). A ref id the cache cannot
- * place names no starter here; the server still applies it to every food it matches.
- */
-export function avoidedStarterIds(
-  profile: Pick<Profile, "avoid_food_ref_ids">,
-  refs: Readonly<Record<string, { userRefId?: string; catalogRefId?: string } | undefined>>,
-): Set<string> {
-  const avoid = new Set(profile.avoid_food_ref_ids);
-  const ids = new Set<string>();
-  if (avoid.size === 0) return ids;
-  for (const item of STARTERS) {
-    const ref = refs[`starter:${item.id}`];
-    if (ref && ((ref.userRefId && avoid.has(ref.userRefId)) || (ref.catalogRefId && avoid.has(ref.catalogRefId)))) {
-      ids.add(item.id);
-    }
-  }
-  return ids;
+  return starterRuleHit(item, flags, profile, instances, asOf);
 }
 
 export function starterDefaultIds(choices: readonly Starter[]): string[] {
@@ -247,8 +217,6 @@ export type InitialStarterOptions = {
    * default it never showed is saved as a liked food (2026-10-07 QA: 29 Eats nobody chose).
    */
   preselectDefaults?: boolean;
-  /** Starters an `avoid_food_ref_ids` entry resolves to (see `avoidedStarterIds`). */
-  avoidedIds?: ReadonlySet<string>;
 };
 
 export function initialStarterSelection(
@@ -256,7 +224,7 @@ export function initialStarterSelection(
   instances: readonly ProfileInstance[] = [], existingFoods: readonly Food[] = [],
   options: InitialStarterOptions = {},
 ): Record<string, StarterMark> {
-  const choices = starterChoices(flags, profile, instances, new Date(), options.avoidedIds);
+  const choices = starterChoices(flags, profile, instances);
   const preselect = options.preselectDefaults ?? true;
   const marks: Record<string, StarterMark> = preselect ? Object.fromEntries(
     starterDefaultIds(choices).map((id) => [id, "eats"])) : {};
@@ -344,9 +312,8 @@ const ROLE_WORDS: Record<FoodRole, string> = { protein: "proteins", carb: "carbs
 export function starterSelectionProblem(
   ids: readonly string[], flags: readonly string[], profile: Profile,
   instances: readonly ProfileInstance[] = [], asOf: Date = new Date(),
-  avoidedIds: ReadonlySet<string> = NO_IDS,
 ): StarterSelectionProblem | null {
-  const hits = starterRuleHits(flags, profile, instances, asOf, avoidedIds);
+  const hits = starterRuleHits(flags, profile, instances, asOf);
   const choices = STARTERS.filter((item) => hits.get(item.id) === null);
   if (starterSelectionValid(ids, choices)) return null;
   for (const id of ids) {

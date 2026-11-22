@@ -29,7 +29,7 @@ import {
 } from "@/components/Onboarding/v2/plan-answers";
 import type { PlanStateAnswers } from "@/components/Onboarding/v2/facts-bridge";
 import FallingFoodPile from "@/components/Onboarding/FallingFoodPile";
-import FoodsTopPickChips, { FoodsPickHint } from "@/components/Onboarding/FoodsTopPickChips";
+import FoodsTopPickChips from "@/components/Onboarding/FoodsTopPickChips";
 import {
   effectiveBand, emptyFacts, FactQuestion, firstUnconfirmedField, GoalPillRow, PlaybackSentence,
   type FactAnswer, type Goal, type OnboardingFactKey,
@@ -56,8 +56,7 @@ import {
 } from "@/components/Onboarding/v2/draft-store";
 import { dbFood } from "@/lib/food-db";
 import { foodShortName } from "@/components/Onboarding/food-display-names";
-import { starterSelectionValid } from "@/lib/foods/starter";
-import { starterProteinAvailability } from "@/lib/foods/starter-availability";
+import { starterReadiness } from "@/lib/foods/starter-availability";
 import { starterFillShortRoles, starterFood } from "@/lib/foods/starter";
 import { starterFillOrder } from "@/lib/foods/starter-variety";
 import { onboardingPlanPreview, type PlanPreviewMeal } from "@/lib/onboarding/plan-preview";
@@ -65,7 +64,7 @@ import { RATE_NOT_ELIGIBLE_ERROR, saveOnboardingPlan } from "@/lib/onboarding/sa
 import { energyProfileFrom, isProfileComplete } from "@/lib/profile/energy";
 import { paceChoices, LB_PER_KG, type PaceChoices } from "@/lib/profile/pace";
 import { validateRate } from "@/lib/profile/rate-goal";
-import type { TargetEligibility } from "@/lib/profile/rate-eligibility";
+import { safetyConditionEntries, type TargetEligibility } from "@/lib/profile/rate-eligibility";
 import { ONBOARDING_COUNTRY_CHIP } from "@/lib/profile/onboarding-state";
 import { todayIso } from "@/lib/settings/date";
 import { mealCountFor, resolveSlotTimes } from "@/lib/plan";
@@ -125,7 +124,7 @@ const FOODS_SHORT_NOTICE: PlanNotice = {
   actionLabel: "Adjust food rules", action: "rules",
 };
 const PLAN_FOODS_SHORT_NOTICE: PlanNotice = {
-  text: "Your plan needs at least two foods you'd eat in each group before it can be saved.",
+  text: "Pick the foods your rules allow in each group (two each, or every food a group has) before the plan can be saved.",
   actionLabel: "Choose more foods", action: "foods",
 };
 const PROFILE_SHORT_NOTICE: PlanNotice = {
@@ -655,17 +654,15 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
   // safety-filtered starter list this shell now shows them.
   // The love round starts with nothing marked: only foods the person taps (or Sprout fills in on
   // request) are saved (live QA 2026-10-07: 29 unseen defaults were saved as Eats).
+  // The safety round's condition entries are saved with the plan; the Foods step judges the
+  // account as if they were stored, exactly as the save does.
+  const pendingConditions = useMemo(() => safetyConditionEntries(safetyAnswers), [safetyAnswers]);
   const starter = useStarterStep(onboardingState,
-    foodAccess.status === "legacy" || foodAccess.status === "pilot", { preselectDefaults: false });
+    foodAccess.status === "legacy" || foodAccess.status === "pilot",
+    { preselectDefaults: false, pendingConditions });
 
   const selectedStarterIds = Object.entries(starter.marks)
     .filter(([, mark]) => mark === "eats").map(([id]) => id);
-  const starterSelectionReady = !!starter.choices
-    && starterSelectionValid(selectedStarterIds, starter.choices);
-  // GPT-6 Sol round-1 BLOCK: the legacy form also requires `starterProteinAvailability(...).ready`
-  // — enough distinct proteins selected to cover every planned meal without repeating one, not
-  // just the flat "≥2 per role" `starterSelectionValid` checks — before it will let a legacy
-  // account save. This shell's own gate was missing that second check.
   const incompleteForPlan = !onboardingState || missingProfileFields(onboardingState, baseEligibility).length > 0;
   // GPT-6 Sol round-2 WARN: an unexpected `buildCompletedSettings` error used to fall back to
   // `plannedCount = 0`, which makes `starterProteinAvailability(..., 0).ready` trivially true
@@ -680,8 +677,12 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
       return [true, 0] as const;
     }
   })();
-  const proteinAvailability = starter.choices
-    ? starterProteinAvailability(starter.marks, starter.choices, plannedCount) : null;
+  // The ONE readiness answer (lib/foods/starter-availability.ts): the hint, Done, Pick for me, the
+  // reward preview and the save all read it. A legacy account also needs one protein per planned
+  // meal, capped at the proteins its rules leave; a pilot account has no such need.
+  const planned = foodAccess.status === "legacy" ? plannedCount : 0;
+  const readiness = starter.choices ? starterReadiness(starter.marks, starter.choices, planned) : null;
+  const starterFree = readiness?.starterFree === true;
   // The account as it stands (its other Eats and saved days), so a returning account's preview
   // is Today's plan too (final Sol review BLOCK). Until it is read the reward card stays in its
   // preparing state and "Use this plan" waits: no starter-only preview is ever shown.
@@ -693,9 +694,7 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
       // "Use this plan" with `starter.choices` still `null` (never loaded, or a failed reread)
       // was possible. Pilot now needs the same "a safety-filtered list exists and the current
       // marks are valid against it" floor legacy already had.
-      (foodAccess.status === "pilot" && starter.choices !== null && starterSelectionReady)
-      || (foodAccess.status === "legacy" && starterSelectionReady
-        && proteinAvailability?.ready === true)
+      (foodAccess.status === "pilot" || foodAccess.status === "legacy") && readiness?.ready === true
     );
 
   /** A pure preview of tomorrow's targets — never writes anything. `null` while a required fact
@@ -953,6 +952,7 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
     }
     const choices = starter.choices;
     const need = foodAccess.status === "legacy" ? { protein: Math.max(2, plannedCount) } : {};
+    // Nothing eligible: there is nothing to fill, and finishing without foods is the right path.
     const added = starterFillShortRoles(choices, starter.marks, need, tappedOff, starterFillOrder);
     for (const id of added) starter.mark(id, "eats");
     const filled: Record<string, StarterMark> = { ...starter.marks };
@@ -964,10 +964,7 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
   /** The selection rule "Use this plan" saves under: two foods per group, and for a legacy plan
    *  enough distinct proteins for its meals. */
   function selectionUsable(marks: Readonly<Record<string, StarterMark>>, choices: readonly Starter[]): boolean {
-    const ids = Object.entries(marks).filter(([, mark]) => mark === "eats").map(([id]) => id);
-    return starterSelectionValid(ids, choices)
-      && (foodAccess.status === "pilot"
-        || (foodAccess.status === "legacy" && starterProteinAvailability(marks, choices, plannedCount).ready));
+    return starterReadiness(marks, choices, planned).ready;
   }
 
   /** The account's real skip path (`lib/profile/onboarding-client.ts`, the same functions and the
@@ -1050,22 +1047,27 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
       },
     });
     if (!result.ok) {
+      // `starter_rules` (W062): a fresh read of the food rules withholds a picked food or leaves a
+      // group short. The guard stays held through the re-read and the move back to Foods, so a
+      // second tap cannot start a save on the stale list; then the person sees which food and rule.
+      if (result.code === "starter_rules") {
+        setSaveFailed(false);
+        try {
+          await starter.reread();
+          advance("foods");
+          setLeaveError(result.error);
+        } finally {
+          leaving.current = false;
+          setSavingState(null);
+        }
+        return;
+      }
       leaving.current = false;
       setSavingState(null);
       // `422 adult_only`: no plan is built; the friendly stop, not an error line.
       if (result.code === "adult_only") { setLeaveError(null); advance("minor"); return; }
       // `409 rate_not_eligible`: the account's stored answers hold the pace; the plan card says so
       // and the next tap saves at maintenance (the server holds it whatever the phone sends).
-      // `starter_rules` (W062): a fresh read of the food rules withholds a picked food or leaves a
-      // group short. Re-read the choices (drops the withheld picks), go back to Foods and say which
-      // food and rule — never leave the person on a "Try again" that repeats the same refusal.
-      if (result.code === "starter_rules") {
-        setSaveFailed(false);
-        await starter.reread();
-        advance("foods");
-        setLeaveError(result.error);
-        return;
-      }
       setSaveFailed(true);
       if (result.code === "rate_not_eligible") { setServerHeld(true); setLeaveError(RATE_NOT_ELIGIBLE_ERROR); return; }
       setLeaveError(result.error);
@@ -1094,8 +1096,7 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
   });
 
   /** The foods beat is done once the selection is one the plan can use. */
-  const foodsReady = starterSelectionReady
-    && (foodAccess.status === "pilot" || proteinAvailability?.ready === true);
+  const foodsReady = readiness?.ready === true;
   const lovedCount = selectedStarterIds.length;
   // "Use this plan" appears once the reward card shows Today's plan (the account read answered).
   const dockMode: OnboardingDockMode | null = beat === "reward" && previewAccount === null ? null
@@ -1119,12 +1120,7 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
         setLeaveError("Couldn’t verify your food rules. Try again.");
         return;
       }
-      const freshSelected = Object.entries(starter.marks)
-        .filter(([, mark]) => mark === "eats").map(([id]) => id);
-      const stillReady = starterSelectionValid(freshSelected, freshChoices)
-        && (foodAccess.status === "pilot"
-          || starterProteinAvailability(starter.marks, freshChoices, plannedCount).ready);
-      if (!stillReady) {
+      if (!selectionUsable(starter.marks, freshChoices)) {
         setLeaveError("A rule just changed what's safe to eat — choose again below.");
         return;
       }
@@ -1140,19 +1136,23 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
   }
 
   const foodsContent = (() => {
-    if (foodAccess.status === "pilot") {
-      return <FoodsTopPickChips choices={starter.choices ?? []} marks={starter.marks} onMark={markFood} />;
-    }
-    if (foodAccess.status === "legacy") {
-      if (starter.choices) {
-        return <div className="flex flex-col gap-3">
-          <FoodsPickHint choices={starter.choices} marks={starter.marks} />
-          <FallingFoodPile choices={starter.choices} marks={starter.marks} onMark={markFood}
-            shownIds={shownFoodIds}
-            onShown={(id) => setShownFoodIds((current) => current.includes(id) ? current : [...current, id])} />
+    if (foodAccess.status === "pilot" || foodAccess.status === "legacy") {
+      if (!starter.choices) {
+        // Loading, a read failure and a pending rule review are not "nothing to suggest": the
+        // person never finishes on an empty list the rules never produced.
+        if (!starter.error) return <Placeholder label="Checking your food rules…" />;
+        return <div className="flex flex-col items-center gap-3" data-testid="foods-rules-unavailable">
+          <Placeholder label={starter.error} />
+          {!starter.error.startsWith("Review your food rules")
+            && <Button variant="tertiary" size="md" onClick={starter.retry}>Try again</Button>}
         </div>;
       }
-      return <Placeholder label={starter.error ?? "Checking your food rules…"} />;
+      if (foodAccess.status === "pilot") {
+        return <FoodsTopPickChips choices={starter.choices} marks={starter.marks} onMark={markFood} />;
+      }
+      return <FallingFoodPile choices={starter.choices} marks={starter.marks} onMark={markFood}
+        plannedMeals={planned} shownIds={shownFoodIds}
+        onShown={(id) => setShownFoodIds((current) => current.includes(id) ? current : [...current, id])} />;
     }
     return <Placeholder label={foodAccess.status === "review"
       ? "Review your food rules in Foods › Avoids before choosing suggestions."
@@ -1222,7 +1222,7 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
       unreadNote={`${APP_NAME} didn’t catch a cuisine there. Try Mexican, Italian or Thai, or pick from the list.`}
       onDone={(ids) => answerPlan("cuisines", { cuisines: ids as CuisineKey[] })} />;
     if (beat === "foods") return slots.foodGame ?? foodsContent;
-    return slots.plateReward ?? <RewardPlateCard targets={targets} lovedFoods={lovedFoods} meals={previewMeals}
+    return slots.plateReward ?? <RewardPlateCard targets={targets} lovedFoods={lovedFoods} meals={previewMeals} starterFree={starterFree}
       notes={planNotes} onChangeNote={changeFromPlan}
       showNumbers={showNumbers} onToggleNumbers={() => setShowNumbers((value) => !value)} />;
   })();
@@ -1321,7 +1321,7 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
         /* Sol review round 2: "Use this plan" only once a real plan can be saved; otherwise the
          * honest "Not now" (distinct from the standing "Skip for now" link). */
         confirmLabel={beat === "reward" ? (saveFailed && !saving ? "Try again" : "Use this plan")
-          : `Done · ${lovedCount} loved`}
+          : starterFree ? "Done" : `Done · ${lovedCount} loved`}
         confirmStatus={saving || confirmingFoods ? "pending" : undefined}
         onConfirm={handleDockConfirm}
         escapeLabel="Pick for me" onEscape={beat === "foods" ? pickForMe : () => advance("reward")} />

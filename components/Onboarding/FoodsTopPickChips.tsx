@@ -10,7 +10,8 @@
  * removes the matching chip before this list ever renders, not after.
  */
 import { dbFood } from "@/lib/food-db";
-import { starterRoleRequirement, type Starter, type StarterMark } from "@/lib/foods/starter";
+import type { Starter, StarterMark } from "@/lib/foods/starter";
+import { FoodsPickHint } from "@/components/Onboarding/FoodsPickHint";
 import { starterVarietyOrder } from "@/lib/foods/starter-variety";
 import type { FoodRole } from "@/lib/foods";
 import Button from "@/components/ui/Button";
@@ -33,50 +34,7 @@ export function topPickChoices(choices: readonly Starter[]): Starter[] {
   return picks;
 }
 
-const ROLE_LABEL: Record<FoodRole, { one: string; many: string }> = {
-  protein: { one: "protein", many: "proteins" },
-  carb: { one: "carb", many: "carbs" },
-  fat: { one: "fat", many: "fats" },
-};
-
-/**
- * The counter and hint above the foods: how many each group still needs ("Pick 2 proteins"), and,
- * when the person's food rules leave a group fewer than two foods, a plain line saying why the
- * number is lower (or the group is skipped). Without it "Done" only appeared, silently, after two
- * picks per group (W062 WARN 2).
- */
-export function FoodsPickHint({ choices, marks }: {
-  choices: readonly Starter[];
-  marks: Record<string, StarterMark>;
-}) {
-  const rows = ROLES.map((role) => {
-    const need = starterRoleRequirement(role, choices);
-    const have = choices.filter((item) => item.role === role && marks[item.id] === "eats").length;
-    const available = choices.filter((item) => item.role === role).length;
-    return { role, need, have, available, left: Math.max(0, need - have) };
-  });
-  const open = rows.filter((row) => row.left > 0);
-  const limited = rows.filter((row) => row.available < 2);
-  const say = (row: (typeof rows)[number]) =>
-    `${row.left}${row.have > 0 ? " more" : ""} ${row.left === 1 ? ROLE_LABEL[row.role].one : ROLE_LABEL[row.role].many}`;
-  return <div className="flex flex-col gap-1" data-testid="foods-pick-hint">
-    <p role="status" className="m-0 text-caption text-graphite">
-      {choices.length === 0
-        ? "Your food rules leave nothing to suggest right now, so you can finish and add foods later."
-        : open.length > 0 ? `Pick ${open.map(say).join(", ")} to finish.` : "That's enough. Tap Done when you're ready."}
-    </p>
-    <p className="m-0 text-caption text-graphite" aria-label="Picks so far">
-      {rows.filter((row) => row.available > 0)
-        .map((row) => `${ROLE_LABEL[row.role].many[0].toUpperCase()}${ROLE_LABEL[row.role].many.slice(1)} ${row.have}/${row.need}`)
-        .join(" · ")}
-    </p>
-    {choices.length > 0 && limited.map((row) => <p key={row.role} className="m-0 text-caption text-graphite">
-      {row.available === 0
-        ? `Your food rules leave no ${ROLE_LABEL[row.role].many}, so we'll skip them.`
-        : `Your food rules leave only ${row.available} ${ROLE_LABEL[row.role].one}, so that's all you need.`}
-    </p>)}
-  </div>;
-}
+export { FoodsPickHint };
 
 export default function FoodsTopPickChips({ choices, marks, onMark }: {
   choices: readonly Starter[];

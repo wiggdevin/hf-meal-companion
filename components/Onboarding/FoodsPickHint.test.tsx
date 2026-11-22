@@ -38,6 +38,6 @@ describe("FoodsPickHint", () => {
 
   it("lets a person with no allowed foods finish", () => {
     render(<FoodsPickHint choices={[]} marks={{}} />);
-    expect(screen.getByRole("status").textContent).toMatch(/you can finish and add foods later/);
+    expect(screen.getByRole("status").textContent).toMatch(/nothing to pick.*Tap Done to finish and add foods later/);
   });
 });

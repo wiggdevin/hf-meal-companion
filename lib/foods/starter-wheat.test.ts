@@ -30,6 +30,6 @@ describe("starters treat wheat and gluten as one concern", () => {
 
   it("leaves a wheat-free starter alone", () => {
     expect(starterChoices([], { ...rules, avoid_allergens: ["wheat"] })
-      .some((item) => item.id === "corn-tortilla")).toBe(true);
+      .some((item) => item.id === "white-rice-cooked")).toBe(true);
   });
 });

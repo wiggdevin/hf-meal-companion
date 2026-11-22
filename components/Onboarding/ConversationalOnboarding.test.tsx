@@ -492,7 +492,7 @@ describe("ConversationalOnboarding", () => {
     await reachReward();
     fireEvent.click(screen.getByRole("button", { name: "Use this plan" }));
     const notice = await screen.findByTestId("plan-notice");
-    expect(notice.textContent).toMatch(/two foods you'd eat in each group/);
+    expect(notice.textContent).toMatch(/Pick the foods your rules allow in each group/);
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(persistSkippedOnboarding).not.toHaveBeenCalled();
     expect(saveOnboardingPlan).not.toHaveBeenCalled();
@@ -501,6 +501,84 @@ describe("ConversationalOnboarding", () => {
     screen.getByRole("button", { name: "Skip for now" }); // the only skip, unchanged
     fireEvent.click(within(notice).getByRole("button", { name: "Choose more foods" }));
     await screen.findByRole("button", { name: "Pick for me" });
+  });
+
+  /** Walks to the Foods beat and stops there (no pick). */
+  async function reachFoods(): Promise<void> {
+    fireEvent.click(screen.getByRole("button", { name: "Lose weight" }));
+    await fillRemainingRequiredFacts();
+    fireEvent.click(screen.getByRole("button", { name: "That’s me" }));
+    await passPlanBeats();
+  }
+
+  it("a pilot account whose food rules are still loading waits; it never reads as 'nothing to suggest'", async () => {
+    foodAccess.status = "pilot";
+    starterFixture.choices = null;
+    render(<ConversationalOnboarding />);
+    await reachFoods();
+    await screen.findByText("Checking your food rules…");
+    expect(screen.queryByRole("button", { name: /^Done/ })).toBeNull();
+    expect(screen.queryByText(/nothing to pick/i)).toBeNull();
+  });
+
+  it("a pilot account whose food rules failed to load shows the error and a retry, and cannot finish", async () => {
+    foodAccess.status = "pilot";
+    starterFixture.choices = null;
+    starterFixture.error = "Couldn’t verify your food rules. Try again.";
+    render(<ConversationalOnboarding />);
+    await reachFoods();
+    await screen.findByTestId("foods-rules-unavailable");
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(starterSpies.retry).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: /^Done/ })).toBeNull();
+    expect(saveOnboardingPlan).not.toHaveBeenCalled();
+  });
+
+  it("an account whose rules leave no starter finishes without picking: one counter says so, the reward shows the"
+    + " starter-free state and the save runs", async () => {
+    foodAccess.status = "pilot";
+    starterFixture.choices = [];
+    render(<ConversationalOnboarding />);
+    await reachFoods();
+    const hint = await screen.findByText(/Nothing fits your food rules.*finish and add foods later/);
+    expect(hint.getAttribute("role")).toBe("status");
+    expect(hint.getAttribute("aria-live")).toBe("polite");
+    expect(screen.getAllByTestId("foods-pick-hint")).toHaveLength(1);
+    fireEvent.click(await screen.findByRole("button", { name: "Done" }));
+    await screen.findByTestId("reward-plate-starter-free");
+    fireEvent.click(await screen.findByRole("button", { name: "Use this plan" }));
+    await vi.waitFor(() => expect(saveOnboardingPlan).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(replace).toHaveBeenCalledWith("/"));
+  });
+
+  it("a starter_rules refusal returns to Foods with the named reason, holds the save guard through the reread,"
+    + " and never reaches Today", async () => {
+    pickableFoods();
+    starterFixture.marks = { p1: "eats", p2: "eats", c1: "eats", c2: "eats", f1: "eats", f2: "eats" };
+    render(<ConversationalOnboarding />);
+    fireEvent.click(screen.getByRole("button", { name: "Lose weight" }));
+    await fillRemainingRequiredFacts();
+    fireEvent.click(screen.getByRole("button", { name: "That’s me" }));
+    await passPlanBeats();
+    fireEvent.click(await screen.findByRole("button", { name: "Done · 6 loved" }));
+    await screen.findByTestId("reward-plate-ready");
+    let finishReread: (choices: typeof starterFixture.choices) => void = () => {};
+    starterSpies.reread.mockImplementationOnce(() => new Promise((resolve) => { finishReread = resolve; }));
+    saveOnboardingPlan.mockImplementationOnce(async () => ({ ok: false as const, code: "starter_rules" as const,
+      error: "Peanut butter doesn't fit your food rules. Go back to Foods, take it off, and pick again." }) as never);
+    const use = await screen.findByRole("button", { name: "Use this plan" });
+    fireEvent.click(use);
+    await vi.waitFor(() => expect(starterSpies.reread).toHaveBeenCalled());
+    // The reread is still in flight: a second tap must not start a second save on the stale list.
+    const again = screen.queryByRole("button", { name: "Use this plan" });
+    if (again) fireEvent.click(again);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(saveOnboardingPlan).toHaveBeenCalledTimes(1);
+    finishReread(starterFixture.choices);
+    await screen.findByText(/Peanut butter doesn't fit your food rules/);
+    await screen.findByRole("button", { name: "Done · 6 loved" }); // back on Foods
+    expect(replace).not.toHaveBeenCalled();
+    expect(saveOnboardingPlan).toHaveBeenCalledTimes(1);
   });
 
   it("'Use this plan' really writes once every required fact and a ready pilot food selection"

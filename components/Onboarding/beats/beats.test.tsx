@@ -4,7 +4,7 @@
  * inferred activity chip, the tap-only safety round, the pace chips in lb a week after the clamp,
  * "Your day" pre-filled with the US chip on, and the under-18 stop.
  */
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import WeekBeat from "./WeekBeat";
 import SafetyRound from "./SafetyRound";
@@ -13,19 +13,14 @@ import YourDayBeat from "./YourDayBeat";
 import MinorStop from "./MinorStop";
 import { paceChoices, type PaceChoices } from "@/lib/profile/pace";
 
-const instancesClient = vi.hoisted(() => ({
-  fetchProfileInstances: vi.fn(async () => ({ instances: [], catalog: [], legacyProfileIds: [] })),
-  confirmProfileInstance: vi.fn(async () => ({})),
-  removeProfileInstance: vi.fn(async () => {}),
+const editor = vi.hoisted(() => ({
+  report: null as null | ((state: { pending: boolean; error: string | null }) => void),
 }));
-vi.mock("@/lib/profile/instances-client", () => instancesClient);
-vi.mock("@/lib/device/account", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/device/account")>()),
-  currentAccountOrNull: () => ({ userId: "11111111-1111-4111-8111-111111111111" }),
-}));
-
 vi.mock("@/components/Onboarding/DietaryProfilePicker", () => ({
-  default: () => <div data-testid="rule-editor" />,
+  default: ({ onWriteState }: { onWriteState?: (state: { pending: boolean; error: string | null }) => void }) => {
+    editor.report = onWriteState ?? null;
+    return <div data-testid="rule-editor" />;
+  },
 }));
 
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
@@ -74,36 +69,19 @@ describe("SafetyRound", () => {
       rulesEdited: false });
   });
 
-  it("asks which allergies with common allergen chips; Continue waits for a chip or None (W062 WARN 1)", async () => {
+  it("blocks Continue and 'None' while the rule editor has a write in flight, and shows its failure", () => {
     const onDone = vi.fn();
     render(<SafetyRound initial={null} onDone={onDone} />);
     fireEvent.click(screen.getByRole("button", { name: "Food allergy" }));
-    const chips = screen.getByTestId("allergen-chips");
-    for (const name of ["Peanut", "Tree nuts", "Milk", "Egg", "Wheat", "Soy", "Fish", "Shellfish", "Sesame"]) {
-      within(chips).getByRole("button", { name: new RegExp(`^${name}`) });
-    }
-    const next = screen.getByRole("button", { name: "Continue" });
-    expect(next.hasAttribute("disabled")).toBe(true);
-    fireEvent.click(within(chips).getByRole("button", { name: /^Peanut/ }));
-    // A chip writes a real confirmed allergy; Continue opens once the write settles.
-    await waitFor(() => expect(instancesClient.confirmProfileInstance)
-      .toHaveBeenCalledWith(expect.anything(), "allergy_peanut", expect.any(Array)));
-    await waitFor(() => expect(next.hasAttribute("disabled")).toBe(false));
-    fireEvent.click(next);
-    expect(onDone).toHaveBeenCalledWith(expect.objectContaining({ picks: ["allergy"], rulesEdited: true }));
-  });
-
-  it("'None of these' also lets an allergy pick continue, and a failed save reverts the chip", async () => {
-    render(<SafetyRound initial={null} onDone={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Food allergy" }));
-    const chips = screen.getByTestId("allergen-chips");
-    fireEvent.click(within(chips).getByRole("button", { name: /^None/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Add food rules" }));
+    act(() => editor.report?.({ pending: true, error: null }));
+    expect(screen.getByRole("button", { name: "Saving your rule…" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("button", { name: "No, none of these" }).hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Saving your rule…" }));
+    expect(onDone).not.toHaveBeenCalled();
+    act(() => editor.report?.({ pending: false, error: "Couldn’t save this rule. Check your connection and try again." }));
+    expect(screen.getByText(/Couldn’t save this rule/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(false);
-    fireEvent.click(within(chips).getByRole("button", { name: /^None/ }));
-    instancesClient.confirmProfileInstance.mockRejectedValueOnce(new Error("offline"));
-    fireEvent.click(within(chips).getByRole("button", { name: /^Soy/ }));
-    await screen.findByRole("alert");
-    expect(screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(true);
   });
 
   it("offers pregnancy to every adult and needs one of its follow-ups before Continue", () => {

@@ -1,15 +1,16 @@
 "use client";
 
-import { accountHandle, assertCurrent, currentAccountOrNull, type AccountHandle } from "@/lib/device/account";
-import { readPrefRefCache, setFoodMembership } from "@/lib/foods/prefs-client";
+import { accountHandle, assertCurrent, type AccountHandle } from "@/lib/device/account";
+import { setFoodMembership } from "@/lib/foods/prefs-client";
 import { loadStore, upsertFood } from "@/lib/store";
 import type { Food } from "@/lib/foods";
 import {
-  avoidedStarterIds, STARTERS, starterExcludedByCurrentRules, starterFood, starterSelectionValid,
+  STARTERS, starterExcludedByCurrentRules, starterFood, starterSelectionValid,
   type Starter, type StarterMark,
 } from "@/lib/foods/starter";
 import { loadConstraints, type Profile } from "@/lib/constraints-client";
 import { fetchProfileInstances } from "@/lib/profile/instances-client";
+import { loadRuleReview } from "@/lib/rule-review-client";
 import type { ProfileInstance } from "@/lib/policy/profiles/types";
 
 type FreshRules = { profile: Profile; instances: readonly ProfileInstance[] };
@@ -37,10 +38,11 @@ export type StarterWriter = {
 
 async function readFreshRules(h: AccountHandle): Promise<FreshRules | null> {
   try {
-    const [constraints, profiles] = await Promise.all([
-      loadConstraints({ account: h }), fetchProfileInstances(h),
+    const [constraints, review, profiles] = await Promise.all([
+      loadConstraints({ account: h }), loadRuleReview({ account: h }), fetchProfileInstances(h),
     ]);
-    if (!constraints) return null;
+    // A pending rule review means the rules are not settled: never write against them.
+    if (!constraints || !review || review.required) return null;
     return { profile: constraints.profile, instances: profiles.instances };
   } catch {
     return null;
@@ -78,13 +80,6 @@ const STARTER_WRITE_CONCURRENCY = 4;
  *  the same fresh rules this file's own recheck uses, before ever calling `persistStarterSelection`. */
 export const STARTER_RULE_CHANGED_ERROR =
   "A rule just changed what's safe to eat — go back to Foods and choose again.";
-/** The starters one `avoid_food_ref_ids` list names on this device (a ref the cache cannot place excludes none). */
-export function resolveAvoidedStarterIds(profile: Pick<Profile, "avoid_food_ref_ids">): Set<string> {
-  if (profile.avoid_food_ref_ids.length === 0) return new Set();
-  const account = currentAccountOrNull();
-  return account ? avoidedStarterIds(profile, readPrefRefCache(account.userId)) : new Set();
-}
-
 export const STARTER_RULES_UNAVAILABLE_ERROR =
   "Couldn’t verify your food rules. Go back to Foods and retry.";
 
@@ -94,6 +89,8 @@ export async function persistStarterSelection(
   allowed: readonly Starter[],
   deps: StarterWriter = writer,
   kind: "reviewed" | "suggested" = "reviewed",
+  /** The draft diet flags (onboarding has not saved them yet); the stored rules never hold them. */
+  flags: readonly string[] = [],
 ): Promise<number> {
   const selected = Object.entries(marks).filter(([, mark]) => mark === "eats").map(([id]) => id);
   if (!starterSelectionValid(selected, allowed)) throw new Error("Pick two foods in each group (or every food a group has) to finish.");
@@ -122,12 +119,12 @@ export async function persistStarterSelection(
     fresh = await deps.freshRules(h);
     if (!fresh) throw new Error(STARTER_RULES_UNAVAILABLE_ERROR);
   }
-  // An `avoid_food_ref_ids` entry removes only the starter it resolves to, the same as in
-  // `starterChoices`; the per-item allergen/category/hard-rule predicate covers the rest.
-  const freshAvoided = fresh === null ? undefined : resolveAvoidedStarterIds(fresh.profile);
+  // The same shared evaluator verdict `starterChoices` applies; anything it does not prove
+  // allowed (an avoid-list entry included) is excluded.
+  const asOf = new Date();
   const freshExcluded = fresh === null ? null : new Set(
     STARTERS.filter((item) => starterExcludedByCurrentRules(item, fresh!.profile, fresh!.instances,
-      new Date(), freshAvoided)).map((item) => item.id));
+      asOf, flags)).map((item) => item.id));
   // Revalidate the two-per-role floor against what the fresh snapshot actually still allows,
   // BEFORE writing anything — a selection that passed the stale `allowed` list a moment ago can
   // fail it now, and that must surface as one clean error, never a partial write (Sol r1 WARN).

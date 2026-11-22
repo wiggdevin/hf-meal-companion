@@ -261,7 +261,13 @@ export function DietaryProfilePickerView({
 /** The account-aware container: fetches the catalog and this account's instances once bound, and
  *  writes every confirm/remove through lib/profile/instances-client.ts. `onRulesChanged` runs after
  *  each saved write, so a host that reads the stored holds (onboarding's preview) can read again. */
-export default function DietaryProfilePicker({ onRulesChanged }: { onRulesChanged?: () => void } = {}) {
+export default function DietaryProfilePicker({ onRulesChanged, onWriteState }: {
+  onRulesChanged?: () => void;
+  /** Reports whether a rule write is in flight and the last failure's message (null once a later
+   *  write starts), so a host that must not move on mid-write (onboarding's safety round) can wait
+   *  for it and show the error even after the editor closes. */
+  onWriteState?: (state: { pending: boolean; error: string | null }) => void;
+} = {}) {
   const [handle, setHandle] = useState<AccountHandle | null>(() => currentAccountOrNull());
   const [catalog, setCatalog] = useState<readonly ProfileSummary[]>([]);
   const [instances, setInstances] = useState<readonly ProfileInstance[]>([]);
@@ -273,6 +279,11 @@ export default function DietaryProfilePicker({ onRulesChanged }: { onRulesChange
   const [catalogError, setCatalogError] = useState(false);
   const [catalogAttempt, setCatalogAttempt] = useState(0);
   const [rowError, setRowError] = useState<{ profileId: string; message: string } | null>(null);
+  const [customPending, setCustomPending] = useState(false);
+  const [customError, setCustomError] = useState<string | null>(null);
+  const pending = busyId !== null || customPending;
+  const failure = rowError?.message ?? customError;
+  useEffect(() => { onWriteState?.({ pending, error: failure }); }, [onWriteState, pending, failure]);
 
   // Onboarding mounts only once the account is bound in practice, but a subscription (rather than
   // a synchronous read) is what lib/device/account.ts's own callers do (AuthGate.tsx,
@@ -298,6 +309,15 @@ export default function DietaryProfilePicker({ onRulesChanged }: { onRulesChange
 
   // Reads the live revision each time so a rules change elsewhere is a conflict, not an overwrite.
   async function handleAddCustomRule(rule: NewCustomRule): Promise<boolean> {
+    setCustomPending(true);
+    setCustomError(null);
+    const saved = await addCustomRule(rule);
+    setCustomPending(false);
+    if (!saved) setCustomError(SAVE_ERROR);
+    return saved;
+  }
+
+  async function addCustomRule(rule: NewCustomRule): Promise<boolean> {
     if (handle === null) return false;
     try {
       const loaded = await loadConstraints({ account: handle });

@@ -42,8 +42,7 @@ import CuisineStep, { CUISINE_STEP_TITLE, useCuisineStep } from "./CuisineStep";
 import ActionFeedbackToast, { useActionFeedback } from "@/components/ui/ActionFeedback";
 import { useStarterStep } from "./useStarterStep";
 import { useOnboardingFoodAccess } from "./useOnboardingFoodAccess";
-import { starterSelectionValid } from "@/lib/foods/starter";
-import { starterProteinAvailability } from "@/lib/foods/starter-availability";
+import { starterReadiness } from "@/lib/foods/starter-availability";
 import { mealCountFor } from "@/lib/plan";
 import { persistStarterSelection } from "@/lib/foods/starter-client";
 import CloseButton from "@/components/ui/CloseButton";
@@ -453,7 +452,8 @@ export default function OnboardingFlow({
       // the stale list could still let an already-excluded food write through as "eats".
       const freshChoices = await starter.reread();
       if (!freshChoices) throw new Blocked("Couldn’t verify your food rules. Go back to Foods and retry.");
-      await persistStarterSelection(starter.marks, freshChoices);
+      // Nothing eligible: nothing to write. The draft flags are not stored yet, so they ride along.
+      if (freshChoices.length > 0) await persistStarterSelection(starter.marks, freshChoices, undefined, "reviewed", currentState.flags);
       setFoodsSaved(true);
     }
     // Everything above only QUEUED the stamp; leaving on a queued write is what sends a finished
@@ -541,12 +541,11 @@ export default function OnboardingFlow({
         ? <Notice tone="attention" title="Couldn’t check your saved health answers, so this plan keeps your calories about where you burn."
             action={{ label: "Retry", onClick: () => { void stored.refresh(); } }} />
         : <p role="status" className="m-0 text-caption text-graphite">Checking your saved health answers…</p>;
-  const selectedStarterIds = Object.entries(starter.marks)
-    .filter(([, mark]) => mark === "eats").map(([id]) => id);
-  const starterSelectionReady = !!starter.choices
-    && starterSelectionValid(selectedStarterIds, starter.choices);
-  const proteinAvailability = starter.choices
-    ? starterProteinAvailability(starter.marks, starter.choices, plannedCount) : null;
+  // The one readiness answer the chat flow uses: groups capped at what the rules leave, so hard
+  // food rules never strand the form.
+  const readiness = starter.choices ? starterReadiness(starter.marks, starter.choices, plannedCount) : null;
+  const starterSelectionReady = readiness?.ready === true;
+  const proteinAvailability = readiness?.proteins ?? null;
   const planReady = optionalFoods || (foodAccess.status === "legacy"
     && starterSelectionReady && proteinAvailability?.ready === true);
   const deviceShown = showDevice && activeDeviceCapability?.enabled === true;

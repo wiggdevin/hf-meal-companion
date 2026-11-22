@@ -88,18 +88,21 @@ function foodsAfterSave(existing: Record<string, Food>, picks: readonly Food[]):
   return foods;
 }
 
-/** The picks plus the existing Eats the server verified, carrying that read's evidence and stamp
- *  when it was judged under the rules the preview plans with. */
+/**
+ * The picks plus the existing Eats the server verified, but only when that read was judged under
+ * the rules the preview plans with: a live (not revoked) set stamped with the same rules key as
+ * the draft settings, so it carries its evidence and stamp. A set from other rules (a diet the
+ * person just chose, a revoked epoch), a plain set, or no read at all leaves the picks alone:
+ * an existing food that fails the current effective rules never reaches the preview.
+ */
 function previewVerified(foods: Record<string, Food>, picks: readonly Food[],
   verified: ReadonlySet<string> | null, settings: Settings): ReadonlySet<string> {
-  const ids = [...picks.filter((food) => food.status === "eats").map((food) => food.id),
-    ...[...(verified ?? [])].filter((id) => foods[id]?.status === "eats")];
-  if (verified instanceof StampedEligibleSet && !verified.revoked
-    && verified.rulesKey === foodRulesKey(settings)) {
-    return new StampedEligibleSet(ids, verified.marks, verified.rulesKey, verified.epoch,
-      mealEvidenceOf(verified), verified.verifiedAt, verified.accountId, verified.sentences);
-  }
-  return new Set(ids);
+  const pickIds = picks.filter((food) => food.status === "eats").map((food) => food.id);
+  if (!(verified instanceof StampedEligibleSet) || verified.revoked
+    || verified.rulesKey !== foodRulesKey(settings)) return new Set(pickIds);
+  const ids = [...pickIds, ...[...verified].filter((id) => foods[id]?.status === "eats")];
+  return new StampedEligibleSet(ids, verified.marks, verified.rulesKey, verified.epoch,
+    mealEvidenceOf(verified), verified.verifiedAt, verified.accountId, verified.sentences);
 }
 
 export function onboardingPlanPreview(

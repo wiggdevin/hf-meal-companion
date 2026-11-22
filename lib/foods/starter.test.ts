@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { starterChoices, initialStarterSelection, starterFood, mentionedFoodChoices, starterSelectionValid,
   starterSelectionProblem, starterProblemMessage, starterRoleRequirement, starterShortRoles,
-  avoidedStarterIds, STARTERS } from "./starter";
+  STARTERS } from "./starter";
 import { legacyInstanceFromCatalog } from "@/lib/policy/profiles/legacy-flags";
 import type { ProfileInstance, RuleId } from "@/lib/policy/profiles/types";
 
@@ -28,9 +28,8 @@ describe("account-safe starter foods", () => {
     expect(starterChoices(["no_soy"], emptyRules).some((item) => item.id === "tofu-firm")).toBe(false);
     expect(starterChoices([], { ...emptyRules, avoid_allergens: ["soy"] })
       .some((item) => item.id === "tofu-firm")).toBe(false);
-    // A ref id that names no starter excludes nothing; it never empties the list (W062 BLOCK 2).
-    expect(starterChoices([], { ...emptyRules, avoid_food_ref_ids: ["unmapped-ref"] }))
-      .toEqual(starterChoices([], emptyRules));
+    // A starter has no food-ref id to compare with, so an Avoid list cannot be checked: fail closed.
+    expect(starterChoices([], { ...emptyRules, avoid_food_ref_ids: ["unmapped-ref"] })).toEqual([]);
     expect(starterChoices([], { ...emptyRules, avoid_allergens: ["tree nuts", "milk"] })
       .some((item) => item.id === "almonds" || item.id === "whey-protein-powder")).toBe(false);
   });
@@ -71,22 +70,19 @@ describe("account-safe starter foods", () => {
     expect(starterShortRoles(starterChoices([], emptyRules, [peanut]))).toEqual([]);
   });
 
-  it("halal plus no beef keeps a non-empty list and a valid default selection", () => {
+  it("stored halal withholds uncertified chicken and beef and leaves a starter-free list that can still save", () => {
     const halal = legacyInstanceFromCatalog("halal", "2026-09-01")!;
     const noBeef = profileInstancesForLegacyFlags(["no_beef"], "2026-09-01");
+    // No draft flag: the stored profile alone holds halal, and nothing in the bundled list is certified.
+    const stored = starterChoices([], emptyRules, [halal]).map((item) => item.id);
+    expect(stored).not.toContain("chicken-breast-roasted");
+    expect(stored).not.toContain("ground-beef-90-10-cooked");
     const choices = starterChoices(["halal", "no_beef"], emptyRules, [halal, ...noBeef]);
-    const ids = choices.map((item) => item.id);
-    expect(ids.length).toBeGreaterThan(15);
-    expect(ids).not.toContain("pork-tenderloin-roasted");
-    expect(ids).not.toContain("ground-beef-90-10-cooked");
-    // Halal also drops all land meat (no certification data), so fish, eggs and plants carry it.
-    expect(ids).not.toContain("chicken-breast-roasted");
-    expect(ids).toContain("salmon-wild-sockeye-cooked");
-    const picked = initialStarterSelection(["halal", "no_beef"], emptyRules, "", [], [],
-      {}) as Record<string, string>;
-    const eats = Object.keys(picked).filter((id) => picked[id] === "eats");
-    expect(starterSelectionValid(eats, choices)).toBe(true);
-    expect(starterSelectionProblem(eats, ["halal", "no_beef"], emptyRules, [halal, ...noBeef])).toBeNull();
+    expect(choices.map((item) => item.id)).not.toContain("pork-tenderloin-roasted");
+    // Withheld means withheld, not "assume fine": the person finishes with no starters at all.
+    expect(starterRoleRequirement("protein", choices)).toBe(0);
+    expect(starterSelectionValid([], choices)).toBe(true);
+    expect(starterSelectionProblem([], ["halal", "no_beef"], emptyRules, [halal, ...noBeef])).toBeNull();
   });
 
   it("excludes a starter whose rule facet is uncurated by itself, not the others", () => {
@@ -103,16 +99,6 @@ describe("account-safe starter foods", () => {
       profileId: "legacy_no_beef", facet: "contains_ingredient:beef" }] };
     const ids = starterChoices([], emptyRules, [beef]).map((item) => item.id);
     expect(ids).not.toContain("ground-beef-90-10-cooked");
-    expect(ids.length).toBe(STARTERS.length - 1);
-  });
-
-  it("an avoid ref id resolved through the device cache removes only that starter", () => {
-    const refs = { "starter:egg-white": { userRefId: "ref-egg" }, "starter:tofu-firm": { catalogRefId: "ref-tofu" } };
-    const avoided = avoidedStarterIds({ avoid_food_ref_ids: ["ref-egg", "nope"] }, refs);
-    expect([...avoided]).toEqual(["egg-white"]);
-    const ids = starterChoices([], { ...emptyRules, avoid_food_ref_ids: ["ref-egg"] }, [], new Date(), avoided)
-      .map((item) => item.id);
-    expect(ids).not.toContain("egg-white");
     expect(ids.length).toBe(STARTERS.length - 1);
   });
 

@@ -111,30 +111,27 @@ describe("starter membership persistence", () => {
     unbindAccount();
   });
 
-  it("an avoid_food_ref_ids entry removes only the starter it resolves to, never the whole list", async () => {
+  it("an avoid_food_ref_ids entry cannot be matched to a starter, so nothing is written as eats (fail closed)", async () => {
     bindAccount("11111111-1111-4111-8111-111111111111");
     const userId = "11111111-1111-4111-8111-111111111111";
-    // This device placed one starter's ref: that ref is on the profile's avoid list.
+    // Even with this device's ref cache warm, the cache is not an authority: it is never read.
     localStorage.setItem(FOOD_PREF_REFS_KEY, JSON.stringify({ [userId]: {
       "starter:turkey-breast-roasted": { userRefId: "ref-turkey", syncedAt: "2026-11-01T00:00:00.000Z" },
     } }));
     const mark = vi.fn(async (_food: ReturnType<typeof starterFood>) => {});
     const freshRules = vi.fn(async () => ({
-      profile: { ...rules, avoid_food_ref_ids: ["ref-turkey", "unplaced-ref"] }, instances: [],
+      profile: { ...rules, avoid_food_ref_ids: ["ref-turkey"] }, instances: [],
     }));
     const deps = { existing: () => ({}), mark, save: vi.fn(), freshRules };
-    // Turkey is dropped; the other chosen proteins still meet the floor, so the write goes on.
     const picks = { ...base, "salmon-wild-sockeye-cooked": "eats" } as const;
-    await persistStarterSelection(picks, choices, deps);
-    const written = mark.mock.calls.map(([food]) => food.id);
-    expect(written).not.toContain("starter:turkey-breast-roasted");
-    expect(written).toContain("starter:chicken-breast-roasted");
-    // With a ref that resolves to nothing, no starter is withheld.
-    mark.mockClear();
-    await persistStarterSelection(picks, choices, { ...deps, freshRules: async () => ({
-      profile: { ...rules, avoid_food_ref_ids: ["unplaced-ref"] }, instances: [] }) });
-    expect(mark.mock.calls.map(([food]) => food.id)).toContain("starter:turkey-breast-roasted");
+    await persistStarterSelection(picks, choices, deps).catch(() => undefined);
+    const eats = () => mark.mock.calls.filter(([food]) => food.status === "eats").map(([food]) => food.id);
+    expect(eats()).toEqual([]);
+    // A cold cache gives the same answer: an avoid ref never lets a starter through.
     localStorage.removeItem(FOOD_PREF_REFS_KEY);
+    mark.mockClear();
+    await persistStarterSelection(picks, choices, deps).catch(() => undefined);
+    expect(eats()).toEqual([]);
     unbindAccount();
   });
 
