@@ -5,6 +5,7 @@ import BarcodeScanSheet from "@/components/BarcodeScanSheet";
 import CatalogSearch from "@/components/CatalogSearch";
 import Sheet from "@/components/Sheet";
 import Button from "@/components/ui/Button";
+import { captureInstant, type CaptureInstant } from "@/components/coach/attachments/context";
 import { barcodeAttachment } from "@/components/coach/attachments/photo-barcode";
 import type { AttachmentSendOptions } from "@/components/coach/attachments/useAttachmentTurn";
 import type { CoachAttachment } from "@/lib/coach/attachments";
@@ -22,7 +23,7 @@ const META = "text-tiny font-normal text-muted";
 export const SCAN_REFUSED_COPY = "The coach is still answering. Try again in a moment.";
 
 export default function ScanAttachmentSheet({
-  open, onClose, onAttachment, onSearchManually, now = () => new Date(), initialChoice = null,
+  open, onClose, onAttachment, onSearchManually, now = () => new Date(), initialChoice = null, captured,
 }: {
   open: boolean;
   /** A barcode read from a photo that matched several products: start on "Which one?". */
@@ -32,6 +33,8 @@ export default function ScanAttachmentSheet({
     opts?: AttachmentSendOptions) => void | Promise<boolean>;
   onSearchManually?: (description: string) => void;
   now?: () => Date;
+  /** The photo's frozen instant, when this sheet asks "Which one?" about a code read from it. */
+  captured?: CaptureInstant;
 }) {
   const [choice, setChoice] = useState<BarcodeResponse | null>(initialChoice);
   const [searching, setSearching] = useState(false);
@@ -69,7 +72,7 @@ export default function ScanAttachmentSheet({
       onClose();
     };
     const sent = await onAttachment(
-      barcodeAttachment(response, match, now()), `Scanned ${match.description}`,
+      barcodeAttachment(response, match, captured ?? captureInstant(now())), `Scanned ${match.description}`,
       { onDispatched: close },
     );
     if (sent === false && !closed) {

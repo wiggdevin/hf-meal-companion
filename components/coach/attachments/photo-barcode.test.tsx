@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { barcodeInPhoto } from "@/components/coach/attachments/photo-barcode";
 import { DockIntentReceiver, deliverDockIntent } from "@/components/coach/attachments/dock-handoff";
 import type { BarcodeMatch, BarcodeResponse } from "@/lib/barcode/client";
+import { signAndUpload } from "@/lib/capture-client";
 
 vi.mock("@/lib/capture-client", async (original) => ({
   ...await original<typeof import("@/lib/capture-client")>(),
@@ -11,7 +12,7 @@ vi.mock("@/lib/capture-client", async (original) => ({
 }));
 vi.mock("@/lib/media/resize", () => ({ resizeImage: vi.fn(async (file: Blob) => file) }));
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 const match = { foodRefId: "f1", catalogFoodId: 1, revisionId: 42, description: "Rice crackers" } as BarcodeMatch;
 const resolved: BarcodeResponse = { status: "resolved", gtin14: "04006381333931", cached: false, match };
@@ -34,7 +35,16 @@ describe("barcodeInPhoto", () => {
   it("asks which product when the code matches several", async () => {
     const found = await barcodeInPhoto(photo, { read: async () => "4006381333931",
       resolve: async () => ({ kind: "resolved", response: ambiguous }), account });
-    expect(found).toEqual({ kind: "choose", response: ambiguous });
+    expect(found).toEqual({ kind: "choose", response: ambiguous, captured: expect.objectContaining({ at: expect.any(Date) }) });
+  });
+
+  it("freezes the capture instant before the decode and the lookup, and reads the clock once", async () => {
+    const times = [new Date("2026-10-04T23:59:00Z"), new Date("2026-10-05T00:03:00Z")];
+    const now = vi.fn(() => times.shift() ?? new Date("2026-10-06T00:00:00Z"));
+    const found = await barcodeInPhoto(photo, { read: async () => "4006381333931", account, now,
+      resolve: async () => ({ kind: "resolved", response: resolved }) });
+    expect(now).toHaveBeenCalledTimes(1);
+    expect(found).toMatchObject({ attachment: { scannedAt: "2026-10-04T23:59:00.000Z" } });
   });
 
   it("leaves the photo to the AI when there is no code, an unknown one, or no answer", async () => {
@@ -78,7 +88,8 @@ describe("the chat's photo receiver", () => {
   });
 
   it("asks which product before sending anything", async () => {
-    const onAttachment = await deliver(async () => ({ kind: "choose", response: ambiguous as Extract<BarcodeResponse, { status: "ambiguous" }> }));
+    const onAttachment = await deliver(async (_file, deps) => ({ kind: "choose",
+      response: ambiguous as Extract<BarcodeResponse, { status: "ambiguous" }>, captured: deps!.captured! }));
     expect(onAttachment).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog", { name: "Which one?" })).toBeTruthy();
   });
@@ -88,5 +99,33 @@ describe("the chat's photo receiver", () => {
     const onAttachment = await deliver(readBarcode, false);
     expect(readBarcode).not.toHaveBeenCalled();
     expect(onAttachment).toHaveBeenCalledWith(expect.objectContaining({ kind: "capture" }), "Sent a photo");
+  });
+
+  it("keeps the instant the dock handed the photo over through a slow read, the upload and a retry", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-04T12:00:00Z"));
+    vi.mocked(signAndUpload).mockResolvedValueOnce({ kind: "failed", outcome: { message: "Upload failed." } } as never);
+    const onAttachment = await deliver(async () => {
+      vi.setSystemTime(new Date("2026-10-04T12:20:00Z"));
+      return { kind: "photo" };
+    });
+    await waitFor(() => screen.getByRole("button", { name: "Try again" }));
+    expect(onAttachment).not.toHaveBeenCalled();
+    vi.setSystemTime(new Date("2026-10-05T09:00:00Z"));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Try again" })); });
+    await waitFor(() => expect(onAttachment).toHaveBeenCalledTimes(1));
+    expect(onAttachment).toHaveBeenCalledWith(expect.objectContaining({ pickedAt: "2026-10-04T12:00:00.000Z" }), "Sent a photo");
+  });
+
+  it("files a \"Which one?\" pick at the photo's instant, not the pick's", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-04T12:00:00Z"));
+    const onAttachment = await deliver(async (_file, deps) => ({ kind: "choose",
+      response: ambiguous as Extract<BarcodeResponse, { status: "ambiguous" }>, captured: deps!.captured! }));
+    vi.setSystemTime(new Date("2026-10-05T09:00:00Z"));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Rice crackers, salted/ })); });
+    await waitFor(() => expect(onAttachment).toHaveBeenCalled());
+    expect(onAttachment).toHaveBeenCalledWith(expect.objectContaining({ kind: "barcode",
+      scannedAt: "2026-10-04T12:00:00.000Z" }), expect.anything(), expect.anything());
   });
 });

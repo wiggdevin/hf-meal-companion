@@ -10,7 +10,7 @@
  * A legacy card (saved before F-108, with no capture time) takes the time its message was saved,
  * then now when it is still that day, and midday on its date only for an older day with neither.
  */
-import { dateInZone, instantAt } from "@/lib/coach/apply-shared";
+import { dateInZone, instantAt } from "@/lib/zoned-time";
 
 /** How far ahead of the server clock a phone's capture time may be and still count (clock skew). */
 export const CAPTURE_SKEW_MS = 5 * 60_000;

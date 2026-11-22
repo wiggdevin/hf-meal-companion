@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CaptureStatusSheet, useCaptureUpload, type CaptureMethod } from "@/components/coach/attachments/useCaptureUpload";
+import { captureInstant, type CaptureInstant } from "@/components/coach/attachments/context";
 import { barcodeInPhoto, type PhotoBarcode } from "@/components/coach/attachments/photo-barcode";
 import ScanAttachmentSheet from "@/components/coach/attachments/ScanAttachmentSheet";
 import type { CoachAttachment } from "@/lib/coach/attachments";
@@ -64,31 +65,39 @@ export function DockIntentReceiver({ ready, onAttachment, scanEnabled = false, r
   ready: boolean;
   onAttachment: (attachment: CoachAttachment, optimisticText: string) => void | Promise<boolean>;
   scanEnabled?: boolean;
-  readBarcode?: (file: Blob) => Promise<PhotoBarcode>;
+  readBarcode?: (file: Blob, deps?: { captured?: CaptureInstant }) => Promise<PhotoBarcode>;
 }) {
   const capture = useCaptureUpload(onAttachment);
-  const [choice, setChoice] = useState<Extract<PhotoBarcode, { kind: "choose" }>["response"] | null>(null);
-  async function receive(intent: DockIntent): Promise<void> {
+  const [choice, setChoice] = useState<Extract<PhotoBarcode, { kind: "choose" }> | null>(null);
+  async function receive(intent: DockIntent, captured: CaptureInstant): Promise<void> {
     if (scanEnabled && intent.kind === "photo") {
       capture.reading();
-      const found = await readBarcode(intent.file);
+      const found = await readBarcode(intent.file, { captured });
       if (found.kind === "gone") { capture.dismiss(); return; }
       if (found.kind === "product") { capture.dismiss(); void onAttachment(found.attachment, found.text); return; }
-      if (found.kind === "choose") { capture.dismiss(); setChoice(found.response); return; }
+      if (found.kind === "choose") { capture.dismiss(); setChoice(found); return; }
     }
-    await capture.upload(intent.file, intent.kind);
+    await capture.upload(intent.file, intent.kind, captured);
   }
   // Grok audit 2026-10-02, finding 4: the deleted CameraAttachmentButton reopened its own file
   // input on retry; its input now lives on the dock's camera/upload tiles instead (an iOS picker
   // only opens inside the user's own tap, so this receiver cannot reopen it from here), so retry
   // just re-runs the same upload for the file the dock already handed over.
-  const lastIntent = useRef<DockIntent | null>(null);
-  useDockIntents((intent) => { lastIntent.current = intent; void receive(intent); }, ready);
+  // The instant is frozen when the dock hands the file over, and the retry reuses it (F-108).
+  const lastIntent = useRef<{ intent: DockIntent; captured: CaptureInstant } | null>(null);
+  useDockIntents((intent) => {
+    const captured = captureInstant();
+    lastIntent.current = { intent, captured };
+    void receive(intent, captured);
+  }, ready);
   return <>
     <CaptureStatusSheet status={capture.status} onDismiss={capture.dismiss}
-      onRetry={() => { const intent = lastIntent.current; if (intent) void capture.upload(intent.file, intent.kind); }} />
-    {choice && <ScanAttachmentSheet key={choice.gtin14} open initialChoice={choice}
-      onClose={() => setChoice(null)} onAttachment={onAttachment} />}
+      onRetry={() => {
+        const last = lastIntent.current;
+        if (last) void capture.upload(last.intent.file, last.intent.kind, last.captured);
+      }} />
+    {choice && <ScanAttachmentSheet key={choice.response.gtin14} open initialChoice={choice.response}
+      captured={choice.captured} onClose={() => setChoice(null)} onAttachment={onAttachment} />}
   </>;
 }
 
