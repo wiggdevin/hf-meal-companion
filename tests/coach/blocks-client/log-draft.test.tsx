@@ -141,6 +141,19 @@ describe("log_draft block", () => {
       .toHaveBeenCalledWith(barcodeBlock.localDate, firstRequest.entry_id));
   });
 
+  it("logs a dock capture at the moment it was captured, not at noon (F-108)", async () => {
+    const commit = vi.mocked(commitLogEntry);
+    commit.mockResolvedValue({ status: "queued" });
+    // 19:40 in Denver on 19 Sep is 01:40 UTC on 20 Sep.
+    const captured = { ...barcodeBlock, capturedAt: "2026-09-20T01:40:00.000Z" };
+    render(<LogDraftBlock block={captured} ctx={context()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Log it" }));
+    await waitFor(() => expect(commit).toHaveBeenCalledOnce());
+    const request = commit.mock.calls[0][0];
+    expect(request.eaten_at).toBe("2026-09-20T01:40:00.000Z");
+    expect(request.local_date).toBe("2026-09-19");
+  });
+
   it("stays pending when status persistence fails and retries without logging twice", async () => {
     const commitBarcode = vi.fn().mockResolvedValue({
       entryIds: ["entry-1"], summary: "Plain rice crackers",
