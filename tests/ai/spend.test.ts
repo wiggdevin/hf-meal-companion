@@ -219,19 +219,29 @@ describe("the OpenRouter allowance", () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.stubEnv("AI_OPENROUTER_ATTEMPT_CEILING_USD", "0.4");
     expect(openRouterAttemptCeilingUsd()).toBe(0.4);
-    for (const bad of ["0", "-1", "lots", "0x1", "Infinity", "NaN", "5.01", "1000"]) {
+    for (const bad of ["0", "-1", "lots", "0x1", "Infinity", "NaN"]) {
       vi.stubEnv("AI_OPENROUTER_ATTEMPT_CEILING_USD", bad);
       expect(openRouterAttemptCeilingUsd()).toBe(DEFAULT_OPENROUTER_ATTEMPT_CEILING_USD);
     }
     expect(log).toHaveBeenCalled();
   });
 
-  it("accepts the boundary 5 and rejects just above it", () => {
-    vi.spyOn(console, "error").mockImplementation(() => undefined);
+  it("accepts the boundary 5 and clamps anything above it to 5, never shrinking the hold", () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.stubEnv("AI_OPENROUTER_ATTEMPT_CEILING_USD", "5");
     expect(openRouterAttemptCeilingUsd()).toBe(5);
-    vi.stubEnv("AI_OPENROUTER_ATTEMPT_CEILING_USD", "5.000001");
-    expect(openRouterAttemptCeilingUsd()).toBe(DEFAULT_OPENROUTER_ATTEMPT_CEILING_USD);
+    expect(log).not.toHaveBeenCalled();
+    for (const big of ["5.000001", "5.01", "1000"]) {
+      vi.stubEnv("AI_OPENROUTER_ATTEMPT_CEILING_USD", big);
+      expect(openRouterAttemptCeilingUsd()).toBe(5);
+    }
+    expect(log).toHaveBeenCalled();
+  });
+
+  it("rejects an interactive share just above 1 before rounding", () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubEnv("AI_INTERACTIVE_SHARE", "1.0000001");
+    expect(interactiveShare()).toBe(0.7);
   });
 
   it("logs an attempt that cost more than the allowance and still records it in full", () => {

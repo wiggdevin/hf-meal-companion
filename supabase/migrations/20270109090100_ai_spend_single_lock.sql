@@ -327,12 +327,14 @@ begin
 end $$;
 
 
--- Nothing but the spend functions called the one-argument form.
-drop function public._ai_spend_reconcile(uuid);
+-- The one-argument form is kept (not dropped) so a spend RPC still running the old body during the
+-- cutover can finish; nothing new calls it. It is closed to every API role below.
+revoke all on function public._ai_spend_reconcile(uuid) from public, anon, authenticated, service_role;
 
 -- The spend functions and delete_account stay service_role only: revoke first, then grant.
-revoke all on function public._ai_spend_lock() from public, anon, authenticated;
-revoke all on function public._ai_spend_reconcile(uuid, timestamptz) from public, anon, authenticated;
+-- Internal helpers: only the locked entry points (security definer) may call them.
+revoke all on function public._ai_spend_lock() from public, anon, authenticated, service_role;
+revoke all on function public._ai_spend_reconcile(uuid, timestamptz) from public, anon, authenticated, service_role;
 revoke all on function public.ai_spend_reserve_split(uuid, numeric, numeric, numeric, integer,
   boolean, numeric, numeric) from public, anon, authenticated;
 revoke all on function public.ai_spend_reserve(uuid, numeric, numeric, numeric, integer)

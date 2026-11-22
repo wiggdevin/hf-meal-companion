@@ -80,8 +80,13 @@ function usdFromEnv(name: string, fallback: number): number {
 export function openRouterAttemptCeilingUsd(): number {
   const value = usdFromEnv("AI_OPENROUTER_ATTEMPT_CEILING_USD", DEFAULT_OPENROUTER_ATTEMPT_CEILING_USD);
   if (value > 0 && value <= MAX_OPENROUTER_ATTEMPT_CEILING_USD) return value;
-  console.error("AI_OPENROUTER_ATTEMPT_CEILING_USD must be above 0 and at most "
-    + `${MAX_OPENROUTER_ATTEMPT_CEILING_USD}; using the default`, { value });
+  if (value > MAX_OPENROUTER_ATTEMPT_CEILING_USD) {
+    // Clamp, never shrink: a larger configured allowance keeps the largest hold we allow.
+    console.error("AI_OPENROUTER_ATTEMPT_CEILING_USD is above the maximum; clamping",
+      { value, max: MAX_OPENROUTER_ATTEMPT_CEILING_USD });
+    return MAX_OPENROUTER_ATTEMPT_CEILING_USD;
+  }
+  console.error("AI_OPENROUTER_ATTEMPT_CEILING_USD must be above 0; using the default", { value });
   return DEFAULT_OPENROUTER_ATTEMPT_CEILING_USD;
 }
 
@@ -115,8 +120,8 @@ export function interactiveShare(): number {
   const raw = process.env.AI_INTERACTIVE_SHARE;
   if (raw === undefined || raw.trim().length === 0) return DEFAULT_INTERACTIVE_SHARE;
   const parsed = strictDecimal(raw);
-  const value = parsed === null ? null : round6(parsed);
-  if (value !== null && value > 0 && value <= 1) return value;
+  const value = parsed === null || !(parsed > 0 && parsed <= 1) ? null : round6(parsed);
+  if (value !== null && value > 0) return value;
   console.error("AI_INTERACTIVE_SHARE must be a plain decimal above 0 and at most 1; using the default",
     { value: raw });
   return DEFAULT_INTERACTIVE_SHARE;

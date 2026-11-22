@@ -155,7 +155,9 @@ describe.skipIf(!HAS_DB || !HAS_BRANCH)("20270109090100 ai_spend_single_lock (da
       for (const role of ["anon", "authenticated"]) {
         expect(runSql(`select has_function_privilege('${role}', 'public.${sig}', 'execute')`), `${role} ${sig}`).toBe("f");
       }
-      expect(runSql(`select has_function_privilege('service_role', 'public.${sig}', 'execute')`)).toBe("t");
+      // Internal helpers are callable only from inside the security-definer RPCs.
+      const internal = sig.startsWith("_ai_spend_");
+      expect(runSql(`select has_function_privilege('service_role', 'public.${sig}', 'execute')`), `service_role ${sig}`).toBe(internal ? "f" : "t");
       expect(runSql(`select count(*) from pg_proc p, aclexplode(p.proacl) x
         where p.oid = 'public.${sig}'::regprocedure and x.grantee = 0`), `public ${sig}`).toBe("0");
     }
