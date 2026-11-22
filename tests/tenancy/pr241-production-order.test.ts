@@ -184,6 +184,11 @@ describe.skipIf(!(HAS_DB && HAS_BRANCH))("PR #241 applied in production order, a
         + "'delete')"),
       // Review r1 BLOCK: approving a proposal built on a trend weight writes 'trend', which the
       // widened check must accept (as the owner, no JWT: the service-role path).
+      // The checked writer needs a profile: a short owner, so the protein minimum stays under 135 g.
+      `insert into user_settings (user_id, first_opened_at, time_zone, height_cm, birth_year, sex, weight_kg, `
+        + `activity_level, goal, training_weekdays) values ('${owner}', now(), 'America/Denver', 150, 1980, `
+        + `'female', 70, 'moderate', 'maintain', '{1,3,5}') on conflict (user_id) do update set `
+        + `height_cm = 150, birth_year = 1980, sex = 'female', weight_kg = 70, goal = 'maintain';`,
       "create temp table prod_order_ids on commit drop as select gen_random_uuid() as estimate, "
         + "gen_random_uuid() as proposal;",
       `insert into expenditure_estimates (id, user_id, local_date, status, tdee_kcal, confidence, `
@@ -191,7 +196,7 @@ describe.skipIf(!(HAS_DB && HAS_BRANCH))("PR #241 applied in production order, a
         + `'estimating', 2250, 1, 'exp-1.0.0', 80.4 from prod_order_ids;`,
       `insert into target_proposals (id, user_id, week_start, status, proposed, `
         + `based_on_estimate_id) select proposal, '${owner}', '2041-03-04', 'pending', `
-        + `'{"kcalTrain":2250,"kcalRest":1800,"proteinG":135,"fatG":85,"carbG":210}'::jsonb, `
+        + `'{"kcalTrain":2250,"kcalRest":1800,"proteinG":135,"fatG":85,"carbG":236}'::jsonb, `
         + `estimate from prod_order_ids;`,
       tag("approval", `select r->>'status' || '/' || coalesce(r->'profile'->>'input_weight_source', `
         + `'none') from (select approve_target_proposal('${owner}', proposal) as r `

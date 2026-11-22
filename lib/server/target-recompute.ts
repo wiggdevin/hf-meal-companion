@@ -14,7 +14,7 @@
  * - Nothing is written when the active revision already matches, so a retry is a no-op.
  * - Adaptive and proposal revisions (another `formula_name`) are authoritative and left alone, and
  *   an account that has not finished onboarding is skipped: onboarding writes its own revision.
- * - The write is conditional (`write_target_revision_if_active`): it lands only while the
+ * - The write is conditional (`write_target_revision_if_active_checked`): it lands only while the
  *   revision this run planned from is still active, so a weigh-in, pin, proposal or another
  *   recompute that committed meanwhile is never buried; on conflict the run re-plans.
  * - It re-derives from profile fields only. Weight and pins stay what the active revision says:
@@ -51,6 +51,7 @@ import { targetRevisionFromProfile } from "@/lib/targets/revision";
 import { resolveAccountDay } from "@/lib/server/account-day";
 import { fetchAllRows } from "@/lib/server/paged-read";
 import { readTargetEligibility } from "@/lib/server/target-eligibility";
+import { TargetBelowFloorError } from "@/lib/server/target-write-errors";
 import {
   isMinorOn, paceAllowed, standardProtein, type TargetEligibility,
 } from "@/lib/profile/rate-eligibility";
@@ -72,7 +73,7 @@ type SettingsRow = UserSettingsProfileRow & {
 
 export type RecomputeSkip =
   | "no_settings" | "not_onboarded" | "incomplete_profile" | "authoritative_formula"
-  | "future_revision" | "pins_differ" | "adult_only";
+  | "future_revision" | "pins_differ" | "adult_only" | "below_floor";
 
 type Derived = ReturnType<typeof deriveTargetRevision>;
 
@@ -221,11 +222,11 @@ export function revisionMatches(active: TargetProfile, expected: Derived): boole
     && (active.input_activity_level ?? null) === expected.inputs.activity
     && (active.input_goal ?? null) === expected.inputs.goal
     && Number(active.goal_rate_bp_week ?? 0) === Number(expected.inputs.goalRateBpWeek ?? 0)
-    && Number(active.kcal_min) === Number(expected.floors.kcalMin)
+    // The minima are the checked writer's (migration 20270109100000): it computes them from the
+    // account's own weight, height and goal, which can differ from the weight this plan derives
+    // at, so their numbers are not compared (they would never settle). A row that did not come
+    // from that writer says so in its source and is rewritten once.
     && (active.kcal_min_source ?? null) === expected.floors.kcalMinSource
-    && Number(active.protein_g_min) === Number(expected.floors.proteinGMin)
-    && Number(active.fat_g_min) === Number(expected.floors.fatGMin)
-    && Number(active.carb_g_min) === Number(expected.floors.carbGMin)
     // A revision without the frozen seed, or one frozen by older rules, is rewritten once so
     // the expenditure engine has the start this derivation would give it (step E1).
     && num(active.initial_tdee_kcal) === expected.seed.initialTdeeKcal
@@ -248,7 +249,9 @@ type DayHints = Pick<RecomputeOptions, "clientDay" | "requestZone">;
 /** A 0-pace derivation, or, when the profile cannot derive, the revision itself copied at a 0
  *  pace (`copy`): its macros stay, and no later step or proposal builds on its pace. */
 type Supersede =
-  | { input: DeriveTargetRevisionInput; expected: Derived }
+  // `fallback`: the pace-cleared copy of the revision, written when the checked writer refuses the
+  // derivation as below a floor (an old pin under today's minimum): ending the pace is never refused.
+  | { input: DeriveTargetRevisionInput; expected: Derived; fallback: TargetRevision | null }
   | { copy: TargetRevision };
 
 /** The highest protein a revision sets on either day; a legacy row falls back to `protein_g`. */
@@ -294,7 +297,10 @@ async function supersedeWrites(
     const expected = deriveTargetRevision(input);
     const proteinAbove = standardProtein(dated)
       && proteinOf(profile) > Math.max(expected.training.protein, expected.rest.protein);
-    if (hasPace(profile) || proteinAbove) writes.push({ input, expected });
+    if (hasPace(profile) || proteinAbove) {
+      writes.push({ input, expected,
+        fallback: hasPace(profile) ? paceClearedCopy(profile, date) : null });
+    }
   }
   return writes;
 }
@@ -370,7 +376,7 @@ async function plan(
 
 /**
  * Bring the account's active derived revision in line with its current `user_settings` row.
- * Writes through `writeDerivedTargets` (the `write_target_revision` RPC), never raw SQL.
+ * Writes through `writeDerivedTargets` (the `write_target_revision_checked` RPC), never raw SQL.
  */
 export async function recomputeDerivedTarget(
   client: SupabaseClient, userId: string, options: RecomputeOptions = {},
@@ -412,20 +418,35 @@ export async function recomputeDerivedTarget(
         return { status: "would_write", active: next.active,
           expected: "copy" in first ? first.copy : first.expected };
       }
-      // Unconditional writes (`write_target_revision`): the conditional RPC refuses any date with
+      // Unconditional writes (`write_target_revision_checked`): the conditional RPC refuses any date with
       // a later revision, and a 0 pace is the safe side of any race. The next round verifies.
       let last: TargetRevision | null = null;
       for (const write of next.writes) {
-        last = "copy" in write ? await writeRevisionCopy(userId, write.copy)
-          : await writeDerivedTargets(client, userId, write.input);
+        if ("copy" in write) { last = await writeRevisionCopy(userId, write.copy); continue; }
+        try {
+          last = await writeDerivedTargets(client, userId, write.input);
+        } catch (e) {
+          if (!(e instanceof TargetBelowFloorError) || !write.fallback) throw e;
+          last = await writeRevisionCopy(userId, write.fallback);
+        }
       }
       if (last) written = { revision: last, rounds: round, byHold: true };
       continue;
     }
     if (next.kind !== "derive") throw new Error("unreachable");
     if (options.dryRun) return { status: "would_write", active: next.active, expected: next.expected };
-    const revision = await writeDerivedTargetsIfActive(client, userId, next.input,
-      next.active?.id ?? null, next.rev);
+    let revision: TargetRevision | null;
+    try {
+      revision = await writeDerivedTargetsIfActive(client, userId, next.input,
+        next.active?.id ?? null, next.rev);
+    } catch (e) {
+      // The checked writer refuses a derivation under a floor (an old pin under today's minimum,
+      // or a weigh-in that raised it). The active revision stays; a later settings change retries.
+      if (e instanceof TargetBelowFloorError) {
+        return { status: "skipped", reason: "below_floor", active: next.active };
+      }
+      throw e;
+    }
     // null: another revision became active after this plan read it. Re-plan from the new state.
     if (revision) written = { revision, rounds: round, byHold: false };
     // The next round re-reads settings and the active revision; a match ends the run, and a newer

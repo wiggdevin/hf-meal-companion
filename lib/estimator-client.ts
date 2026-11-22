@@ -14,6 +14,7 @@ import {
 import { readAccountItem, removeAccountItem, writeAccountItem } from "@/lib/device/account-storage";
 import { enqueue } from "@/lib/sync/outbox";
 import { targetDayFor } from "@/lib/targets/revision";
+import { targetRefusal } from "@/lib/targets/refusal";
 import type { Entity, SyncOp } from "@/lib/sync/types";
 import type {
   DecideResponse, ExpenditureResponse, ProposalSummary, TargetsRequest, TargetsResponse,
@@ -91,6 +92,32 @@ export function fetchProposals(h: AccountHandle, fetchFn: typeof fetch = fetch) 
     fetchFn);
 }
 
+/** A proposal the server refused to apply (below a floor, macros that do not add up, no profile). */
+export class ProposalRefusedError extends Error {
+  constructor(readonly status: number, readonly code: string, message: string) {
+    super(message);
+    this.name = "ProposalRefusedError";
+  }
+}
+
+const REFUSAL_CODES: readonly string[] =
+  ["below_floor", "kcal_mismatch", "invalid_macros", "profile_required"];
+
+/** `decide failed: N`, except a refusal the server explained: that keeps its own sentence. */
+async function decideRefusal(h: AccountHandle, res: Response): Promise<Error> {
+  try {
+    const body = await accountJson<unknown>(h, res);
+    const { error, message } = (body ?? {}) as { error?: unknown; message?: unknown };
+    if (typeof error === "string" && REFUSAL_CODES.includes(error)
+        && typeof message === "string" && message.length > 0) {
+      return new ProposalRefusedError(res.status, error, message);
+    }
+  } catch (e) {
+    rethrowAccountChanged(e);
+  }
+  return new Error(`decide failed: ${res.status}`);
+}
+
 export async function decideProposalOnline(
   proposalId: string, decision: "approve" | "reject", fetchFn: typeof fetch = fetch,
 ): Promise<DecideResponse> {
@@ -102,7 +129,7 @@ export async function decideProposalOnline(
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ decision, expectedStatus: "pending" }),
   }, { fetchImpl: fetchFn });
-  if (!res.ok) throw new Error(`decide failed: ${res.status}`);
+  if (!res.ok) throw await decideRefusal(h, res);
   removeAccountItem(h, PROPOSALS_CACHE_NAME);
   return accountJson<DecideResponse>(h, res);
 }
@@ -142,7 +169,11 @@ export async function postTargets(
   const res = await accountFetch(h, "/api/targets", {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(req),
   }, { fetchImpl: fetchFn });
-  if (!res.ok) throw new Error(`save targets failed: ${res.status}`);
+  if (!res.ok) {
+    // A 4xx says why (below_floor carries the server's own sentence); anything else stays generic.
+    if (res.status >= 400 && res.status < 500) throw await targetRefusal(h, res);
+    throw new Error(`save targets failed: ${res.status}`);
+  }
   return accountJson<TargetsResponse>(h, res);
 }
 

@@ -539,6 +539,9 @@ describe.skipIf(!HAS_BRANCH)("account RPCs, called by A with B's ids (spec 3.3)"
     ["write_target_revision_if_active",
       { p_user_id: owner, p_row: {}, p_expected_id: null, p_expected_settings_rev: null }],
     ["write_target_revision_pair", { p_user_id: owner, p_predecessor: {}, p_row: {} }],
+    ["write_target_revision_checked", { p_user_id: owner, p_row: {} }],
+    ["write_target_revision_if_active_checked",
+      { p_user_id: owner, p_row: {}, p_expected_id: null, p_expected_settings_rev: null }],
     ["approve_target_proposal", { p_user_id: owner, p_proposal_id: proposalId }],
   ] as const;
 

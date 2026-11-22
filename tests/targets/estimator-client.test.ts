@@ -100,6 +100,27 @@ describe("fetchTargets", () => {
   });
 });
 
+describe("decideProposalOnline refusals", () => {
+  const answer = (status: number, body: unknown) =>
+    vi.fn<typeof fetch>(async () => Response.json(body, { status }));
+
+  it("keeps the server's sentence for a refusal it explained, and `decide failed` for the rest", async () => {
+    vi.stubGlobal("navigator", { onLine: true });
+    const sentence = "That is below your minimum of 1900 kcal a day. Choose 1900 or more.";
+    await expect(decideProposalOnline("pr1", "approve",
+      answer(422, { error: "below_floor", message: sentence })))
+      .rejects.toMatchObject({ name: "ProposalRefusedError", status: 422, message: sentence });
+    await expect(decideProposalOnline("pr1", "approve",
+      answer(409, { error: "profile_required", message: "Finish your profile first." })))
+      .rejects.toMatchObject({ name: "ProposalRefusedError", code: "profile_required" });
+    await expect(decideProposalOnline("pr1", "approve",
+      answer(409, { error: "conflict", message: "This proposal was already decided." })))
+      .rejects.toThrow("decide failed: 409");
+    await expect(decideProposalOnline("pr1", "approve", answer(500, { error: "internal" })))
+      .rejects.toThrow("decide failed: 500");
+  });
+});
+
 describe("decideProposalOnline", () => {
   it("refuses offline rather than queueing an approval", async () => {
     vi.stubGlobal("navigator", { onLine: false });

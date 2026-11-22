@@ -40,7 +40,7 @@ export type OnboardingDraft = {
   callsUsed?: number;
   /** GPT-6 Sol BLOCK (onb2-p0): the "Use this plan" save's one target request id, kept across a
    *  failed attempt and a reload, so a retry after a lost target answer is the same request and
-   *  the server writes one revision (`write_target_revision` dedupes on `request_id`). `key` is
+   *  the server writes one revision (`write_target_revision_checked` dedupes on `request_id`). `key` is
    *  what the request says: a changed answer is a new request and gets a new id. */
   targetRequest?: { id: string; key: string };
   savedAt: string;

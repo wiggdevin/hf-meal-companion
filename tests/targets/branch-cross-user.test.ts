@@ -2,6 +2,8 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { defaultSettings } from "@/lib/store";
 import { adminClient, createTestUsers, HAS_BRANCH, resetUser } from "@/tests/helpers/supabase";
+import { seedFloorProfile } from "@/tests/helpers/floor-profile";
+import { TargetBelowFloorError } from "@/lib/server/target-write-errors";
 import { authorTargets, FloorViolationError, writeDerivedTargets } from "@/lib/server/targets";
 
 const run = HAS_BRANCH ? describe : describe.skip;
@@ -21,6 +23,8 @@ run("cross-user denial and percent authority on a real branch", () => {
     // else — the ramp stage that used to supply 115 g of protein and 50 g of fat is deleted, and a
     // row-less account is refused with `targets_need_profile` (lib/server/targets.ts:195). Seed the
     // first revision through the same derived path onboarding uses, then assert against its floors.
+    await seedFloorProfile(admin, users.a.userId, { birth_year: 1996, height_cm: 165, weight_kg: 60,
+      sex: "female", goal: "recomp" });
     await writeDerivedTargets(users.a.client, users.a.userId, {
       settings: { ...defaultSettings(), sex: "female", birthYear: 1996, heightCm: 165,
         weightKg: 60, activityLevel: "moderate", goal: "recomp" },
@@ -64,18 +68,34 @@ run("cross-user denial and percent authority on a real branch", () => {
       .rejects.toBeInstanceOf(FloorViolationError);
   });
 
-  it("recomputes the floors even when the client sent post-floor numbers", async () => {
-    await authorTargets(users.a.client, users.a.userId, { mode: "grams",
-      effectiveFrom: "2026-09-16", kcalTrain: 2200, kcalRest: 1750,
-      grams: { proteinG: 90, fatG: 30, carbG: 400 } });
-    const { data } = await admin.from("target_profiles").select("protein_g, fat_g")
-      .eq("user_id", users.a.userId).eq("effective_from", "2026-09-16").single();
-    // Rewritten, not dropped: the literals 115 and >=50 were the deleted ramp's stage-1 floors.
-    // The floors still recompute, from the account's own revision, so the sent 90 g and 30 g must
-    // come back raised to that revision's floors.
+  it("refuses numbers below the account's own floors and writes nothing (W060)", async () => {
+    // The writer recomputes the floors from the account's profile. A grams set below them is
+    // refused with the minimum, not silently raised (it used to be raised).
+    const write = (proteinG: number, fatG: number, effectiveFrom: string) =>
+      authorTargets(users.a.client, users.a.userId, { mode: "grams", effectiveFrom,
+        kcalTrain: 2200, kcalRest: 1750,
+        // The typed carbohydrate matches the calories, so only the floor can refuse it.
+        grams: { proteinG, fatG, carbG: Math.round((2200 - 4 * proteinG - 9 * fatG) / 4) } });
+    const fat = await write(floors.proteinGMin + 20, 30, "2026-09-16").catch((e: unknown) => e);
+    expect(fat).toBeInstanceOf(TargetBelowFloorError);
+    expect(fat).toMatchObject({ status: 422, floor: "fat", minimum: floors.fatGMin });
+    const protein = await write(90, floors.fatGMin + 10, "2026-09-16").catch((e: unknown) => e);
+    expect(protein).toBeInstanceOf(TargetBelowFloorError);
+    expect(protein).toMatchObject({ status: 422, floor: "protein", minimum: floors.proteinGMin });
     expect(floors.proteinGMin).toBeGreaterThan(90);
-    expect(floors.fatGMin).toBeGreaterThan(30);
-    expect(Number(data?.protein_g)).toBe(floors.proteinGMin);
-    expect(Number(data?.fat_g)).toBe(floors.fatGMin);
+    const { data } = await admin.from("target_profiles").select("id")
+      .eq("user_id", users.a.userId).eq("effective_from", "2026-09-16");
+    expect(data).toEqual([]);
+  });
+
+  it("refuses typed grams whose calories do not add up, instead of rewriting the carbs (spec 1.4)", async () => {
+    // 150 P + 200 C + 80 F make 2,120 kcal; the user typed 2,000.
+    const error = await authorTargets(users.a.client, users.a.userId, { mode: "grams",
+      effectiveFrom: "2026-09-17", kcalTrain: 2000, kcalRest: 1800,
+      grams: { proteinG: 150, fatG: 80, carbG: 200 } }).catch((e: unknown) => e);
+    expect(error).toMatchObject({ status: 422, code: "kcal_mismatch" });
+    const { data } = await admin.from("target_profiles").select("id")
+      .eq("user_id", users.a.userId).eq("effective_from", "2026-09-17");
+    expect(data).toEqual([]);
   });
 });

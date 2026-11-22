@@ -9,11 +9,20 @@
 // (@testing-library/react is not installed, per tests/expenditure/card-copy.test.ts).
 import { describe, expect, it } from "vitest";
 import { decideErrorMessage } from "@/components/ProposalCard";
+import { ProposalRefusedError } from "@/lib/estimator-client";
 
 describe("decideErrorMessage", () => {
   it("names a stale/superseded proposal on a 409 conflict", () => {
     expect(decideErrorMessage(new Error("decide failed: 409")))
       .toBe("This proposal changed — reload to see the latest.");
+  });
+
+  it("shows the server's own sentence for a refused approval (floor, macros, profile)", () => {
+    const sentence = "That is below your minimum of 1900 kcal a day. Choose 1900 or more.";
+    expect(decideErrorMessage(new ProposalRefusedError(422, "below_floor", sentence))).toBe(sentence);
+    // A 409 profile_required is not a stale proposal.
+    expect(decideErrorMessage(new ProposalRefusedError(409, "profile_required",
+      "Finish your profile first."))).toBe("Finish your profile first.");
   });
 
   it("gives a generic retry message for any other failure", () => {

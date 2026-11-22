@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createTestUsers, HAS_BRANCH, resetUser } from "../helpers/supabase";
 import { recomputeDerivedTarget } from "@/lib/server/target-recompute";
+import { SAFETY_CONDITION_TEXT } from "@/lib/profile/rate-eligibility";
 
 const run = HAS_BRANCH ? describe : describe.skip;
 
@@ -111,5 +112,34 @@ run("write_target_revision_if_active", () => {
       p_row: { ...row("2026-10-03", 2000), formula_name: "adaptive-tdee-v1" } });
     await expect(recomputeDerivedTarget(client, userId, { today: "2026-10-03" }))
       .resolves.toMatchObject({ status: "skipped", reason: "authoritative_formula" });
+  });
+
+  // A hold must end the pace even when the checked writer cannot judge the revision it replaces:
+  // a profile that cannot derive (SF002), or an old pin under today's floor (SF001).
+  describe.each([
+    ["a cleared height", { height_cm: null }, {}],
+    ["a pin under today's floor", {}, { pin_protein_g: 100, kcal_min: 1200,
+      training_macros: { kcal: 1500, protein: 100, carbs: 150, fat: 56 },
+      rest_macros: { kcal: 1500, protein: 100, carbs: 150, fat: 56 } }],
+  ])("a new pace hold with %s", (_name, settingsOver, rowOver) => {
+    it("still ends the pace", async () => {
+      await resetUser(userId);
+      await admin.from("user_settings").upsert({
+        user_id: userId, first_opened_at: "2026-09-20T17:00:00Z", onboarded_at: "2026-09-22T11:12:00Z",
+        time_zone: "America/Denver", height_cm: 170.2, birth_year: 1968, sex: "female",
+        body_fat_pct: 32, weight_kg: 72.575, activity_level: "moderate", goal: "recomp",
+        training_weekdays: [1, 3, 4, 5], ...settingsOver,
+      });
+      const paced = await admin.rpc("write_target_revision", { p_user_id: userId,
+        p_row: { ...row("2026-09-22", 2104), goal_rate_bp_week: -50, ...rowOver } });
+      expect(paced.error).toBeNull();
+      const held = await admin.from("constraint_profiles").upsert({
+        user_id: userId, conditions: [SAFETY_CONDITION_TEXT.pregnant] });
+      expect(held.error).toBeNull();
+      const outcome = await recomputeDerivedTarget(client, userId, { today: "2026-10-03" });
+      // The pace ended; a derivation that a pin under the floor refuses leaves the copy in force.
+      expect(["written", "skipped"]).toContain(outcome.status);
+      expect(outcome.active).toMatchObject({ goal_rate_bp_week: 0 });
+    });
   });
 });

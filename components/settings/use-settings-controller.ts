@@ -16,6 +16,7 @@ import { loadStore, saveStore, saveStoreFor } from "@/lib/store";
 import { SYNCED_EVENT } from "@/lib/sync/client";
 import { fetchTargetState } from "@/lib/targets/client";
 import type { MacroFloors } from "@/lib/targets/percent";
+import { refusalMessage } from "@/lib/targets/refusal";
 import type { Settings, SlotId, Store } from "@/lib/types";
 
 type ProfileAction = Parameters<typeof applyUpdateProfile>[0];
@@ -275,7 +276,8 @@ export function useSettingsController() {
         pinsInFlight.current -= 1;
         if (pinsInFlight.current === 0) setPending({});
         if (e instanceof AccountChanged) return;
-        setSaveError("Couldn't save your targets — try again when you have a connection.");
+        setSaveError(refusalMessage(e,
+          "Couldn't save your targets — try again when you have a connection."));
       },
     );
   }
@@ -295,7 +297,8 @@ export function useSettingsController() {
       },
       (e: unknown) => {
         if (e instanceof AccountChanged) return;
-        setSaveError("Couldn't reset your targets — try again when you have a connection.");
+        setSaveError(refusalMessage(e,
+          "Couldn't reset your targets — try again when you have a connection."));
       },
     );
   }
@@ -322,9 +325,10 @@ export function useSettingsController() {
         setTargetSaving(false);
         targetsRef.current = updated; setTargets(updated); setTargetSheetOpen(false);
       },
-      () => {
+      (e: unknown) => {
         setTargetSaving(false);
-        setSaveError("Couldn't save your targets — try again when you have a connection.");
+        setSaveError(refusalMessage(e,
+          "Couldn't save your targets — try again when you have a connection."));
       },
     );
   }

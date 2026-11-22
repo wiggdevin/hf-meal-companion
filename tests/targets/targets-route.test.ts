@@ -18,7 +18,7 @@ vi.mock("@/lib/server/targets", async () => {
     restoreTargetRevision: (...a: unknown[]) => restoreTargetRevision(...a) };
 });
 const { GET, POST } = await import("@/app/api/targets/route");
-const { FloorViolationError } = await import("@/lib/server/targets");
+const { FloorViolationError, TargetBelowFloorError } = await import("@/lib/server/targets");
 const { AdultOnlyError } = await import("@/lib/profile/rate-eligibility");
 
 const post = (body: unknown) => new Request("https://x.test/api/targets", {
@@ -83,6 +83,23 @@ describe("POST /api/targets", () => {
     expect(res.status).toBe(422);
     await expect(res.json()).resolves.toMatchObject({
       error: "protein_below_floor", minProteinPct: 30.86, minFatPct: 25.72 });
+  });
+
+  it("answers 422 below_floor with the floor, the day and the minimum (W060)", async () => {
+    authorTargets.mockRejectedValue(new TargetBelowFloorError("protein", "rest", 131));
+    const res = await POST(post(BODY));
+    expect(res.status).toBe(422);
+    await expect(res.json()).resolves.toEqual({ error: "below_floor",
+      message: "That is less than your minimum of 131 g of protein a day. Choose 131 g or more.",
+      floor: "protein", dayType: "rest", minimum: 131 });
+  });
+
+  it("answers 409 profile_required when the account has no profile yet (W060)", async () => {
+    const { HttpError } = await import("@/lib/server/auth");
+    authorTargets.mockRejectedValue(new HttpError(409, "profile_required", "Finish your profile first."));
+    const res = await POST(post(BODY));
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ error: "profile_required" });
   });
 
   it("answers 422 adult_only and writes nothing for an account under 18 (G2)", async () => {

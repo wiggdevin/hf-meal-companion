@@ -2,6 +2,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { adminClient, createTestUsers, HAS_BRANCH, resetUser } from "@/tests/helpers/supabase";
 import { decideProposal, ProposalConflictError } from "@/lib/server/proposals";
+import { seedFloorProfile } from "@/tests/helpers/floor-profile";
 import { activeTargets, today } from "@/lib/server/targets";
 
 const run = HAS_BRANCH ? describe : describe.skip;
@@ -11,7 +12,7 @@ run("approve_target_proposal on a real branch", () => {
   let users: Awaited<ReturnType<typeof createTestUsers>>;
   let proposalId = "";
 
-  const PROPOSED = { kcalTrain: 2250, kcalRest: 1800, proteinG: 135, fatG: 85, carbG: 210,
+  const PROPOSED = { kcalTrain: 2250, kcalRest: 1800, proteinG: 135, fatG: 85, carbG: 236,
     deltaKcalTrain: 50, deltaKcalRest: 50, raisedToFloor: false };
 
   beforeAll(async () => {
@@ -19,6 +20,7 @@ run("approve_target_proposal on a real branch", () => {
     users = await createTestUsers();
     await resetUser(users.a.userId);
     await resetUser(users.b.userId);
+    await seedFloorProfile(admin, users.a.userId, { goal: "maintain" });
     await admin.from("target_profiles").insert({ user_id: users.a.userId,
       effective_from: "2026-09-01", kcal_train: 2200, kcal_rest: 1750, authored_by: "user",
       mode: "grams", protein_g: 135, fat_g: 85, carb_g: 200, protein_g_min: 135 });

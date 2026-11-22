@@ -1,5 +1,6 @@
 "use client";
 
+import { refusalMessage } from "@/lib/targets/refusal";
 import { accountHandle, currentAccountOrNull, type AccountHandle } from "@/lib/device/account";
 import { readAccountItem, removeAccountItem, writeAccountItem } from "@/lib/device/account-storage";
 import { useEffect, useReducer, useRef, useState, type KeyboardEvent } from "react";
@@ -396,7 +397,8 @@ export default function OnboardingFlow({
   async function save(): Promise<void> {
     setConfirmSkipAt(null);
     const outcome = await feedback.run(savePlan, { kind: "commit", key: "save",
-      failureMessage: (cause) => cause instanceof Blocked ? cause.message : "Couldn’t save your plan. Try again." });
+      failureMessage: (cause) => cause instanceof Blocked ? cause.message
+        : refusalMessage(cause, "Couldn’t save your plan. Try again.") });
     if (!outcome.ok) return;
     if (draftHandle.current) removeAccountItem(draftHandle.current, DRAFT_NAME);
     if (offerDevice && activeDeviceCapability?.enabled) setShowDevice(true);

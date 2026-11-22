@@ -9,6 +9,8 @@ import type { ActionSpec } from "@/lib/coach/actions/spec";
 const SEX = ["female", "male"] as const;
 const ACTIVITY = ["sedentary", "light", "moderate", "active", "very_active"] as const;
 const GOAL = ["lose_fat", "recomp", "maintain", "gain_muscle"] as const;
+const WEIGHT_UNIT = ["lb", "kg"] as const;
+const HEIGHT_UNIT = ["ft_in", "cm"] as const;
 
 const fields = () => ({
   heightCm: z.number().min(50).max(260).optional(),
@@ -20,6 +22,9 @@ const fields = () => ({
   goal: z.enum(GOAL).optional(),
   goalRateBpWeek: z.number().int().optional(),
   trainingWeekdays: z.array(z.number().int().min(0).max(6)).optional(),
+  /** Display units only: they change no number and no target (W060, spec phase-12 section 2). */
+  weightUnit: z.enum(WEIGHT_UNIT).optional(),
+  heightUnit: z.enum(HEIGHT_UNIT).optional(),
 });
 
 const input = z.object({ kind: z.literal("update_profile"), ...fields() })
@@ -40,9 +45,26 @@ type Types = {
     bodyFatSource?: BodyFatSource | null; bodyFatMeasuredOn?: string | null;
     activityLevel?: "sedentary" | "light" | "moderate" | "active" | "very_active";
     goal?: "lose_fat" | "recomp" | "maintain" | "gain_muscle";
-    trainingWeekdays?: number[] };
+    trainingWeekdays?: number[];
+    weightUnit?: "lb" | "kg"; heightUnit?: "ft_in" | "cm" };
   token: SettingsToken<"update_profile">;
 };
+
+const UNIT_NAME = { lb: "lb", kg: "kg", ft_in: "ft and in", cm: "cm" } as const;
+
+/** True when the only fields named are display units. */
+export function unitsOnly(action: Record<string, unknown>): boolean {
+  const named = Object.keys(action).filter((key) => !["kind", "actionId", "flagged"].includes(key));
+  return named.length > 0 && named.every((key) => key === "weightUnit" || key === "heightUnit");
+}
+
+function unitTitle(action: { weightUnit?: "lb" | "kg"; heightUnit?: "ft_in" | "cm" }): string {
+  const parts = [
+    ...(action.weightUnit ? [`Weight unit: ${UNIT_NAME[action.weightUnit]}`] : []),
+    ...(action.heightUnit ? [`Height unit: ${UNIT_NAME[action.heightUnit]}`] : []),
+  ];
+  return parts.join(" · ");
+}
 
 export const updateProfile: ActionSpec<Types> = {
   kind: "update_profile",
@@ -52,7 +74,7 @@ export const updateProfile: ActionSpec<Types> = {
     numbers: ["heightCm", "weightKg", "birthYear", "bodyFatPct"],
     numbersRest: { field: "trainingWeekdays", max: 7 },
     numbersDoc: " with zero placeholders",
-    strings: ["sex", "activityLevel", "goal"],
+    strings: ["sex", "activityLevel", "goal", "weightUnit", "heightUnit"],
     stringsDoc: " with empty placeholders",
     fields: {
       heightCm: z.number().min(0).max(260),
@@ -62,21 +84,29 @@ export const updateProfile: ActionSpec<Types> = {
       bodyFatPct: z.number().min(0).max(70),
       activityLevel: describedEnum(ACTIVITY),
       goal: describedEnum(GOAL),
+      weightUnit: describedEnum(WEIGHT_UNIT),
+      heightUnit: describedEnum(HEIGHT_UNIT),
       trainingWeekdays: z.array(z.number().int().min(0).max(6)),
     },
   },
   replay: z.object({ ...groundedBaseSchema, kind: z.literal("update_profile"), ...fields() }),
   ground: async (value) => passThrough(value),
-  history: (action) => ` ${Object.keys(action)
-    .filter((key) => !["kind", "actionId", "flagged"].includes(key)).join(", ")}`,
+  // A unit shows its value so a follow-up turn ("and height too") sees what was switched.
+  history: (action) => ` ${Object.entries(action)
+    .filter(([key]) => !["kind", "actionId", "flagged"].includes(key))
+    .map(([key, value]) => key === "weightUnit" || key === "heightUnit" ? `${key} → ${value}` : key)
+    .join(", ")}`,
   prompt: { rank: 80, lines: [
     "  update_profile uses numericArgs [heightCm, weightKg, birthYear, bodyFatPct,",
-    "    ...trainingWeekdays] and stringArgs [sex, activityLevel, goal]. Use 0 and empty-string",
-    "    placeholders for unnamed earlier positions; update only the fields you named.",
+    "    ...trainingWeekdays] and stringArgs [sex, activityLevel, goal, weightUnit, heightUnit].",
+    "    Use 0 and empty-string placeholders for unnamed earlier positions; update only the fields",
+    "    you named. weightUnit (lb or kg) and heightUnit (ft_in or cm) only change how numbers are",
+    "    shown: \"show my weight in kg\" sets weightUnit and nothing else, and heightCm and weightKg",
+    "    always stay in cm and kg.",
   ] },
   example: { rank: 50, lines: (ctx) => [
     '  User: "I\'m 34 now"',
     `  Final: { "kind": "final", "text": "Updated your birth year.", "actions": [{ "kind": "update_profile", "numericArgs": [0, 0, ${Number(ctx.today.slice(0, 4)) - 34}] }] }`,
   ] },
-  card: { title: () => "Profile updated" },
+  card: { title: (action) => unitsOnly(action) ? unitTitle(action) : "Profile updated" },
 };

@@ -28,7 +28,8 @@ import { targetDayFor, targetRevisionOn } from "@/lib/targets/revision";
 import { getDay, loadStore, saveStoreFor, updateDay } from "@/lib/store";
 import { SYNCED_EVENT } from "@/lib/sync/client";
 import {
-  persistDerivedTargetRevisionSet, settingsWithTargetRevision, TargetRevisionQueuedError,
+  persistDerivedTargetRevisionSet, settingsWithTargetRevision, isFinalRefusal,
+  TargetRevisionQueuedError,
   type TargetPredecessor, type TargetRevisionSet,
 } from "@/lib/targets/client";
 import type { DayType, Settings } from "@/lib/types";
@@ -216,7 +217,7 @@ type MorningWeightOptions = WeighInOptions & {
 export type MorningWeightResult =
   | { ok: false; reason: string }
   | { ok: true; previousTargetRevisionId: string | null }
-  | { ok: true; partial: "targets"; message: typeof TARGETS_PARTIAL_MESSAGE;
+  | { ok: true; partial: "targets"; message: string;
       previousTargetRevisionId: string | null; targetRequestId?: string };
 
 export function saveMorningWeight(
@@ -313,10 +314,15 @@ export async function saveMorningWeight(
   } catch (error) {
     if (error instanceof AccountChanged || !isCurrent(h)) return gone();
     const targetRequestId = error instanceof TargetRevisionQueuedError ? error.requestId : undefined;
+    // A floor refusal is final and is not queued: the weight stays, the targets do not move, and
+    // the server's own sentence says why (a new weight can put the old targets under a minimum).
+    const message = isFinalRefusal(error)
+      ? `Weight saved. Your targets were not changed: ${error.message}`
+      : TARGETS_PARTIAL_MESSAGE;
     const partial = { ok: true as const, partial: "targets" as const,
-      message: TARGETS_PARTIAL_MESSAGE, previousTargetRevisionId,
+      message, previousTargetRevisionId: isFinalRefusal(error) ? null : previousTargetRevisionId,
       ...(targetRequestId ? { targetRequestId } : {}) };
-    return opts.detailed ? partial : TARGETS_PARTIAL_MESSAGE;
+    return opts.detailed ? partial : message;
   }
 }
 

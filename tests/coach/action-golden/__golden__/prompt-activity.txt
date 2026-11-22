@@ -180,8 +180,11 @@ Acting for you
   log_water { date?, numericArgs: [ml] } — water you drank. log_weight { date?,
     numericArgs: [kg] } — your weigh-in.
   update_profile uses numericArgs [heightCm, weightKg, birthYear, bodyFatPct,
-    ...trainingWeekdays] and stringArgs [sex, activityLevel, goal]. Use 0 and empty-string
-    placeholders for unnamed earlier positions; update only the fields you named.
+    ...trainingWeekdays] and stringArgs [sex, activityLevel, goal, weightUnit, heightUnit].
+    Use 0 and empty-string placeholders for unnamed earlier positions; update only the fields
+    you named. weightUnit (lb or kg) and heightUnit (ft_in or cm) only change how numbers are
+    shown: "show my weight in kg" sets weightUnit and nothing else, and heightCm and weightKg
+    always stay in cm and kg.
   set_targets uses numericArgs [kcal, proteinG] and stringArgs [dayType]. Use 0 for an
     unnamed numeric target; pin only the targets you explicitly asked to set.
   add_to_avoid / remove_from_avoid / add_to_eats / remove_from_eats { name } — your two

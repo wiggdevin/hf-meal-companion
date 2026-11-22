@@ -1,11 +1,12 @@
 // tests/proposals/rls-decide.test.ts  — [needs branch]
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { adminClient, createTestUsers, HAS_BRANCH, resetUser } from "@/tests/helpers/supabase";
+import { seedFloorProfile } from "@/tests/helpers/floor-profile";
 import { decideProposal } from "@/lib/server/proposals";
 
 const run = HAS_BRANCH ? describe : describe.skip;
 
-const PROPOSED = { kcalTrain: 2250, kcalRest: 1800, proteinG: 135, fatG: 85, carbG: 210,
+const PROPOSED = { kcalTrain: 2250, kcalRest: 1800, proteinG: 135, fatG: 85, carbG: 236,
   deltaKcalTrain: 50, deltaKcalRest: 50, raisedToFloor: false };
 
 run("target_proposals RLS — a client UPDATE is only a reject", () => {
@@ -32,6 +33,7 @@ run("target_proposals RLS — a client UPDATE is only a reject", () => {
 
   beforeEach(async () => {
     await resetUser(users.a.userId);
+    await seedFloorProfile(admin, users.a.userId, { goal: "maintain" });
   });
 
   it("rejects a direct client UPDATE that sets status = 'approved'", async () => {
