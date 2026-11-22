@@ -12,6 +12,34 @@ decision): one checked target writer in the database, and units from chat. Every
 including the combined weigh-in RPC, the Undo RPCs, the direct profile RPC, the Health-driven
 warning and the contract migration — is in "Later" with its lessons.
 
+## Implementation status (W060, branch `feat/w060-checked-target-writer`)
+
+Built, in a draft PR; the migration is **not applied to production** (the release owner applies it).
+Owner confirmation of the minima (protein 1.8 / 2.0 g/kg, `macroMinimumKcal`) is **pending**.
+
+- **Migration** `supabase/migrations/20270109100000_w060_checked_target_writer.sql` (down file in
+  `supabase/migrations/down/`). It adds `account_body_mass_kg`, `account_floor`,
+  `write_target_revision_checked` and `write_target_revision_if_active_checked`, and patches
+  `approve_target_proposal` to call the checked writer. The file name differs from section 1.6
+  (`20261108090000_phase12_target_floor`) because that slot is long past. Phase 10's
+  `complete_onboarding` is not in this repo, so its call is untested here.
+- **Callers** (section 1.4): `lib/server/target-writes.ts`, `targets.ts`, `proposals.ts`, and
+  `app/api/targets/route.ts` call only the checked writers. App code no longer calls
+  `write_target_revision`. `422 below_floor` carries `{ floor, dayType, minimum, message }`.
+- **Deviation: `floor_profile`.** The onboarding form posts the target before its profile op is
+  queued, so the checked writer reads weight, height, sex, birth year and goal from the stored
+  profile first and falls back to a `floor_profile` in `p_row` only for a field with no stored value.
+  A stored value always wins.
+- **Pins and the derive engine.** The derive engine does not raise a pin to the protein or calorie
+  floor, so a pin under a floor is refused (`below_floor`), not raised. Grams-mode carbohydrate under
+  100 g is no longer raised.
+- **Client** (section 1.5): `TargetFloorError` (`lib/targets/refusal.ts`) is thrown for a
+  `below_floor` answer. It is never queued, and the drain removes a queued save the server now
+  refuses. Settings, the weigh-in, Undo and onboarding show the server's sentence;
+  `TargetModeSheet` grams mode moves each day's calories with the grams.
+- **Deviation: units from chat.** Units go through `update_profile` (`weightUnit`, `heightUnit`),
+  not a new `update_setting` tool. There is no daily rate limit and no old-client gating.
+
 ## Next audit
 
 The Phase 12 implementation plan must be audited by GPT-6 Sol before any Phase 12 code is written.
