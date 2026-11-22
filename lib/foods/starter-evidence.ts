@@ -2,6 +2,8 @@ import type { FacetOutcome } from "@/lib/policy/facet-rules";
 import type { SuggestionFoodEvidence } from "@/lib/coach/suggest-evidence-types";
 import { RUBRIC_VERSION, type Facet } from "@/lib/foods/facet-vocabulary";
 import type { Starter } from "@/lib/foods/starter";
+import { allergenKey } from "@/lib/policy/allergens";
+import { ingredientTerms } from "@/lib/policy/profiles/hard-rules";
 
 /** Add facts proved by an exact bundled-starter row; conflicting cache facts can only deny. */
 export function starterSuggestionEvidence(
@@ -44,22 +46,106 @@ export function starterSuggestionEvidence(
 }
 
 
+const hasAllergen = (item: Starter, key: string): boolean =>
+  item.allergens?.includes(key) === true || item.mayContain?.includes(key) === true;
+const hasCategory = (item: Starter, key: string): boolean => item.categories?.includes(key) === true;
+const animalFlesh = (item: Starter): boolean => item.diets.length === 1 && item.diets[0] === "omnivore";
+const GRAINS = new Set(["white-rice-cooked", "brown-rice-cooked", "quinoa-cooked", "oatmeal-cooked",
+  "white-bread", "whole-wheat-bread", "corn-tortilla"]);
+const ROOTS = new Set(["potato-baked-with-skin", "sweet-potato-baked"]);
+const TYRAMINE = new Set(["tempeh", "greek-yogurt-plain-nonfat"]);
+const SWEETENED = new Set(["whey-protein-powder"]);
+const ADDED_SUGAR = new Set(["white-bread", "whole-wheat-bread", "whey-protein-powder"]);
+const never = (): boolean => false;
+
+/**
+ * Curated, per-facet judgement for the reviewed starters (W062). Every facet the rule picker can
+ * set as a hard rule is listed here or, deliberately, left out: a facet that is not here is
+ * `unknown`, which only withholds that one starter (never the whole list). `never` marks a facet
+ * that no bundled starter carries: each is a plain, single-ingredient whole food, cooked, with no
+ * alcohol, blood, gelatin, honey, insect, shellfish or sesame in it. Canned light tuna is on the
+ * FDA "best choices" list, so it is not high_mercury_fish.
+ */
+const CURATED_FACETS: Readonly<Record<string, (item: Starter) => boolean>> = {
+  contains_dairy: (i) => hasAllergen(i, "dairy"),
+  contains_egg: (i) => hasAllergen(i, "egg"),
+  contains_soy: (i) => hasAllergen(i, "soy"),
+  contains_peanut: (i) => hasAllergen(i, "peanut"),
+  contains_tree_nut: (i) => hasAllergen(i, "tree-nut"),
+  contains_gluten: (i) => hasAllergen(i, "gluten") || hasAllergen(i, "wheat"),
+  contains_wheat: (i) => hasAllergen(i, "wheat"),
+  contains_sesame: (i) => hasAllergen(i, "sesame"),
+  contains_finfish: (i) => hasCategory(i, "fish"),
+  shellfish: (i) => hasAllergen(i, "shellfish"),
+  crustacean_shellfish: (i) => hasAllergen(i, "shellfish"),
+  mollusc: (i) => hasAllergen(i, "shellfish"),
+  contains_grain: (i) => GRAINS.has(i.id),
+  root_vegetable: (i) => ROOTS.has(i.id),
+  tyramine_rich: (i) => TYRAMINE.has(i.id),
+  non_nutritive_sweetener: (i) => SWEETENED.has(i.id),
+  aspartame: (i) => SWEETENED.has(i.id),
+  beans: (i) => hasCategory(i, "beans"),
+  poultry: (i) => hasCategory(i, "poultry"),
+  red_meat: (i) => hasCategory(i, "beef") || hasCategory(i, "pork"),
+  land_animal_flesh: (i) => hasCategory(i, "poultry") || hasCategory(i, "beef") || hasCategory(i, "pork"),
+  mammalian_derived: (i) => hasCategory(i, "beef") || hasCategory(i, "pork") || hasAllergen(i, "dairy"),
+  high_iodine: (i) => hasCategory(i, "fish") || hasAllergen(i, "dairy") || hasAllergen(i, "egg"),
+  alcohol: never, blood_product: never, gelatin: never, honey: never, insect_derived: never,
+  fish_without_fins_scales: never, mixes_meat_and_dairy: never, raw_or_undercooked_animal: never,
+  unpasteurized: never, high_listeria_risk: never, high_mercury_fish: never, grapefruit_family: never,
+  star_fruit: never, fava_bean: never, coffee_or_tea: never,
+};
+
+/** Allergens that no bundled starter carries, so a named one is `absent` on every starter. */
+const ALLERGENS_NO_STARTER_HAS = new Set(["sesame", "shellfish", "crustacean", "sulfites", "mustard",
+  "celery", "lupin", "mollusc"]);
+
+function allergenNamed(item: Starter, rawName: string): boolean | null {
+  const key = allergenKey(rawName);
+  if (key === "gluten" || key === "wheat") return hasAllergen(item, "gluten") || hasAllergen(item, "wheat");
+  if (["dairy", "egg", "soy", "peanut", "tree-nut", "apple"].includes(key)) return hasAllergen(item, key);
+  if (key === "fish") return hasCategory(item, "fish") || hasAllergen(item, "fish");
+  if (ALLERGENS_NO_STARTER_HAS.has(key)) return false;
+  return null;
+}
+
+/** One free-text ingredient term of a `contains_ingredient:` rule: true, false, or null (unknown). */
+function ingredientTermNamed(item: Starter, term: string): boolean | null {
+  const t = term.toLowerCase().trim();
+  if (/^(pork|ham|bacon)$/.test(t)) return hasCategory(item, "pork");
+  if (/^(beef|veal)$/.test(t)) return hasCategory(item, "beef");
+  if (/^(legumes?|beans?|lentils?|chickpeas?|peas?|peanuts?)$/.test(t)) {
+    return hasCategory(item, "beans") || hasAllergen(item, "soy") || hasAllergen(item, "peanut");
+  }
+  if (/^(dairy|milk|cheese|butter|cream|yogurt)$/.test(t)) return hasAllergen(item, "dairy");
+  if (/^(wine|beer|spirits|liqueur|cooking wine|alcohol|vinegar)$/.test(t)) return false;
+  if (/^(sugar|syrup|sugars|syrups)$/.test(t)) return ADDED_SUGAR.has(item.id);
+  return null;
+}
+
+function ingredientRule(item: Starter, description: string): FacetOutcome | null {
+  const verdicts = ingredientTerms(description).map((term) => ingredientTermNamed(item, term));
+  if (verdicts.length === 0) return null;
+  if (verdicts.includes(true)) return "present";
+  return verdicts.every((verdict) => verdict === false) ? "absent" : null;
+}
+
 /** Evidence applies only to the reviewed STARTERS catalog, never arbitrary names or labels.
  * Diet tags describe the complete starter, so they also clear matching saved profile rules.
- * Unreviewed facets (especially medical ones) still require the normal policy evidence. */
+ * `null` means the starter's own evidence does not cover that facet: the caller then falls back
+ * to the generic policy evidence, which rarely clears a food, so that starter alone is withheld. */
 export function starterFacetOutcome(item: Starter, facet: string): FacetOutcome | null {
-  const categories = item.categories ?? [];
-  if (facet === "meat") return item.diets.length === 1 && item.diets[0] === "omnivore"
-    ? "present" : "absent";
-  if (facet === "fish_seafood") return categories.includes("fish") ? "present" : "absent";
+  if (facet === "meat") return animalFlesh(item) ? "present" : "absent";
+  if (facet === "fish_seafood") return hasCategory(item, "fish") ? "present" : "absent";
   if (facet === "animal_product") return item.diets.includes("vegan") ? "absent" : "present";
-  if (facet === "gelatin" && item.diets.includes("vegetarian")) return "absent";
-  if ((facet === "honey" || facet === "insect_derived") && item.diets.includes("vegan")) return "absent";
-  if (facet === "pork" || facet === "contains_ingredient:pork") {
-    return categories.includes("pork") ? "present" : "absent";
+  if (facet === "pork") return hasCategory(item, "pork") ? "present" : "absent";
+  if (facet === "beef") return hasCategory(item, "beef") ? "present" : "absent";
+  const curated = CURATED_FACETS[facet];
+  if (curated) return curated(item) ? "present" : "absent";
+  if (facet.startsWith("contains_allergen:")) {
+    const named = allergenNamed(item, facet.slice("contains_allergen:".length));
+    return named === null ? null : named ? "present" : "absent";
   }
-  if (facet === "beef" || facet === "contains_ingredient:beef") {
-    return categories.includes("beef") ? "present" : "absent";
-  }
+  if (facet.startsWith("contains_ingredient:")) return ingredientRule(item, facet.slice("contains_ingredient:".length));
   return null;
 }

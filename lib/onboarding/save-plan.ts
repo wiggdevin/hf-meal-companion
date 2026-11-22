@@ -39,12 +39,13 @@ import { loadConstraints, type Profile } from "@/lib/constraints-client";
 import { fetchProfileInstances } from "@/lib/profile/instances-client";
 import type { ProfileInstance } from "@/lib/policy/profiles/types";
 import {
-  starterChoices, starterSelectionValid, type Starter, type StarterMark,
+  starterChoices, starterProblemMessage, starterSelectionProblem, starterSelectionValid,
+  type Starter, type StarterMark,
 } from "@/lib/foods/starter";
 import { starterProteinAvailability } from "@/lib/foods/starter-availability";
 import {
-  defaultStarterWriter, persistStarterSelection, STARTER_RULE_CHANGED_ERROR, starterMarksStand,
-  STARTER_RULES_UNAVAILABLE_ERROR, type StarterWriter,
+  defaultStarterWriter, persistStarterSelection, resolveAvoidedStarterIds, STARTER_RULE_CHANGED_ERROR,
+  starterMarksStand, STARTER_RULES_UNAVAILABLE_ERROR, type StarterWriter,
 } from "@/lib/foods/starter-client";
 import {
   CONSTRAINT_SAVE_WARNING, mirroredOnboardedAt, ONBOARDING_SYNC_WARNING,
@@ -89,7 +90,9 @@ export type SaveOnboardingPlanResult =
    *  `rate_not_eligible` (the account's stored answers hold the pace). */
   | { ok: false; error: string; code?: SavePlanRefusal };
 
-export type SavePlanRefusal = "adult_only" | "rate_not_eligible";
+/** `starter_rules`: a fresh read of the account's food rules withholds a picked food or leaves a
+ *  group short; the shell re-reads the choices and sends the person back to Foods (W062). */
+export type SavePlanRefusal = "adult_only" | "rate_not_eligible" | "starter_rules";
 
 /** Some chosen foods are still queued on this phone, not on the server. */
 export const FOODS_NOT_DELIVERED_ERROR =
@@ -187,15 +190,22 @@ export async function saveOnboardingPlan(
       }
       if (!fresh) return { ok: false, error: STARTER_RULES_UNAVAILABLE_ERROR };
       assertCurrent(h);
-      const freshChoices = starterChoices(input.onboardingState.flags, fresh.profile, fresh.instances);
+      const avoided = resolveAvoidedStarterIds(fresh.profile);
+      const asOf = new Date();
+      const freshChoices = starterChoices(input.onboardingState.flags, fresh.profile, fresh.instances,
+        asOf, avoided);
       const freshSelectedIds = Object.entries(marks)
         .filter(([, mark]) => mark === "eats").map(([id]) => id);
       if (!starterSelectionValid(freshSelectedIds, freshChoices)) {
-        return { ok: false, error: STARTER_RULE_CHANGED_ERROR };
+        // Say which food a rule withholds (or which group is short), so the person can fix it.
+        const problem = starterSelectionProblem(freshSelectedIds, input.onboardingState.flags,
+          fresh.profile, fresh.instances, asOf, avoided);
+        return { ok: false, code: "starter_rules",
+          error: problem ? starterProblemMessage(problem) : STARTER_RULE_CHANGED_ERROR };
       }
       if (status === "legacy"
         && !starterProteinAvailability(marks, freshChoices, plannedCount).ready) {
-        return { ok: false, error: STARTER_RULE_CHANGED_ERROR };
+        return { ok: false, code: "starter_rules", error: STARTER_RULE_CHANGED_ERROR };
       }
       // Hand this exact read to `persistStarterSelection`'s own pre-write recheck (ONB2-RULE-REREAD-
       // WRITE) instead of letting it fetch a second time — the read above already covers the same

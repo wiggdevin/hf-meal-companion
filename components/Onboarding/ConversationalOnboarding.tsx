@@ -29,7 +29,7 @@ import {
 } from "@/components/Onboarding/v2/plan-answers";
 import type { PlanStateAnswers } from "@/components/Onboarding/v2/facts-bridge";
 import FallingFoodPile from "@/components/Onboarding/FallingFoodPile";
-import FoodsTopPickChips from "@/components/Onboarding/FoodsTopPickChips";
+import FoodsTopPickChips, { FoodsPickHint } from "@/components/Onboarding/FoodsTopPickChips";
 import {
   effectiveBand, emptyFacts, FactQuestion, firstUnconfirmedField, GoalPillRow, PlaybackSentence,
   type FactAnswer, type Goal, type OnboardingFactKey,
@@ -965,7 +965,7 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
    *  enough distinct proteins for its meals. */
   function selectionUsable(marks: Readonly<Record<string, StarterMark>>, choices: readonly Starter[]): boolean {
     const ids = Object.entries(marks).filter(([, mark]) => mark === "eats").map(([id]) => id);
-    return choices.length > 0 && starterSelectionValid(ids, choices)
+    return starterSelectionValid(ids, choices)
       && (foodAccess.status === "pilot"
         || (foodAccess.status === "legacy" && starterProteinAvailability(marks, choices, plannedCount).ready));
   }
@@ -1056,6 +1056,16 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
       if (result.code === "adult_only") { setLeaveError(null); advance("minor"); return; }
       // `409 rate_not_eligible`: the account's stored answers hold the pace; the plan card says so
       // and the next tap saves at maintenance (the server holds it whatever the phone sends).
+      // `starter_rules` (W062): a fresh read of the food rules withholds a picked food or leaves a
+      // group short. Re-read the choices (drops the withheld picks), go back to Foods and say which
+      // food and rule — never leave the person on a "Try again" that repeats the same refusal.
+      if (result.code === "starter_rules") {
+        setSaveFailed(false);
+        await starter.reread();
+        advance("foods");
+        setLeaveError(result.error);
+        return;
+      }
       setSaveFailed(true);
       if (result.code === "rate_not_eligible") { setServerHeld(true); setLeaveError(RATE_NOT_ELIGIBLE_ERROR); return; }
       setLeaveError(result.error);
@@ -1065,8 +1075,8 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
     await clearOnboardingDraft();
     await telemetry.finish();
     router.replace("/");
-  }, [router, settings, onboardingState, safetyAnswers, foodAccess.status, starter.marks, plannedCount,
-    storedState, serverHeld, telemetry]);
+  }, [router, settings, onboardingState, safetyAnswers, foodAccess.status, plannedCount,
+    storedState, serverHeld, telemetry, starter]);
 
   const skipNow = onSkip ?? (() => void leaveOnboarding());
   /** "Skip for now": once anything is answered (past the opener), one more tap confirms it, so a
@@ -1135,9 +1145,12 @@ export default function ConversationalOnboarding({ slots = {}, onSkip, onComplet
     }
     if (foodAccess.status === "legacy") {
       if (starter.choices) {
-        return <FallingFoodPile choices={starter.choices} marks={starter.marks} onMark={markFood}
-          shownIds={shownFoodIds}
-          onShown={(id) => setShownFoodIds((current) => current.includes(id) ? current : [...current, id])} />;
+        return <div className="flex flex-col gap-3">
+          <FoodsPickHint choices={starter.choices} marks={starter.marks} />
+          <FallingFoodPile choices={starter.choices} marks={starter.marks} onMark={markFood}
+            shownIds={shownFoodIds}
+            onShown={(id) => setShownFoodIds((current) => current.includes(id) ? current : [...current, id])} />
+        </div>;
       }
       return <Placeholder label={starter.error ?? "Checking your food rules…"} />;
     }

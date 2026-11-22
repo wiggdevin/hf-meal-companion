@@ -1,11 +1,11 @@
 "use client";
 
-import { accountHandle, assertCurrent, type AccountHandle } from "@/lib/device/account";
-import { setFoodMembership } from "@/lib/foods/prefs-client";
+import { accountHandle, assertCurrent, currentAccountOrNull, type AccountHandle } from "@/lib/device/account";
+import { readPrefRefCache, setFoodMembership } from "@/lib/foods/prefs-client";
 import { loadStore, upsertFood } from "@/lib/store";
 import type { Food } from "@/lib/foods";
 import {
-  STARTERS, starterExcludedByCurrentRules, starterFood, starterSelectionValid,
+  avoidedStarterIds, STARTERS, starterExcludedByCurrentRules, starterFood, starterSelectionValid,
   type Starter, type StarterMark,
 } from "@/lib/foods/starter";
 import { loadConstraints, type Profile } from "@/lib/constraints-client";
@@ -78,6 +78,13 @@ const STARTER_WRITE_CONCURRENCY = 4;
  *  the same fresh rules this file's own recheck uses, before ever calling `persistStarterSelection`. */
 export const STARTER_RULE_CHANGED_ERROR =
   "A rule just changed what's safe to eat — go back to Foods and choose again.";
+/** The starters one `avoid_food_ref_ids` list names on this device (a ref the cache cannot place excludes none). */
+export function resolveAvoidedStarterIds(profile: Pick<Profile, "avoid_food_ref_ids">): Set<string> {
+  if (profile.avoid_food_ref_ids.length === 0) return new Set();
+  const account = currentAccountOrNull();
+  return account ? avoidedStarterIds(profile, readPrefRefCache(account.userId)) : new Set();
+}
+
 export const STARTER_RULES_UNAVAILABLE_ERROR =
   "Couldn’t verify your food rules. Go back to Foods and retry.";
 
@@ -89,7 +96,7 @@ export async function persistStarterSelection(
   kind: "reviewed" | "suggested" = "reviewed",
 ): Promise<number> {
   const selected = Object.entries(marks).filter(([, mark]) => mark === "eats").map(([id]) => id);
-  if (!starterSelectionValid(selected, allowed)) throw new Error("Choose at least two foods in each group.");
+  if (!starterSelectionValid(selected, allowed)) throw new Error("Pick two foods in each group (or every food a group has) to finish.");
   const allowedIds = new Set(allowed.map((item) => item.id));
   const knownIds = new Set(STARTERS.map((item) => item.id));
   const h = accountHandle();
@@ -115,14 +122,12 @@ export async function persistStarterSelection(
     fresh = await deps.freshRules(h);
     if (!fresh) throw new Error(STARTER_RULES_UNAVAILABLE_ERROR);
   }
-  // `starterChoices` excludes every starter outright once `avoid_food_ref_ids` is non-empty (this
-  // local catalog has no food-ref IDs, so an unresolved ID rule can't be waived by name) — the
-  // fresh check has to honor that same all-or-nothing rule, not just the per-item allergen/
-  // category/hard-rule predicate `starterExcludedByCurrentRules` covers (Sol r1 BLOCK).
-  const freshBlocksEverything = fresh !== null && fresh.profile.avoid_food_ref_ids.length > 0;
+  // An `avoid_food_ref_ids` entry removes only the starter it resolves to, the same as in
+  // `starterChoices`; the per-item allergen/category/hard-rule predicate covers the rest.
+  const freshAvoided = fresh === null ? undefined : resolveAvoidedStarterIds(fresh.profile);
   const freshExcluded = fresh === null ? null : new Set(
-    STARTERS.filter((item) => freshBlocksEverything
-      || starterExcludedByCurrentRules(item, fresh!.profile, fresh!.instances)).map((item) => item.id));
+    STARTERS.filter((item) => starterExcludedByCurrentRules(item, fresh!.profile, fresh!.instances,
+      new Date(), freshAvoided)).map((item) => item.id));
   // Revalidate the two-per-role floor against what the fresh snapshot actually still allows,
   // BEFORE writing anything — a selection that passed the stale `allowed` list a moment ago can
   // fail it now, and that must surface as one clean error, never a partial write (Sol r1 WARN).

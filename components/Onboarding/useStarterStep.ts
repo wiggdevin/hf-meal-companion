@@ -7,6 +7,7 @@ import { loadConstraints } from "@/lib/constraints-client";
 import { loadRuleReview } from "@/lib/rule-review-client";
 import { fetchProfileInstances } from "@/lib/profile/instances-client";
 import { initialStarterSelection, starterChoices, type Starter, type StarterMark } from "@/lib/foods/starter";
+import { resolveAvoidedStarterIds } from "@/lib/foods/starter-client";
 import type { OnboardingState } from "@/lib/profile/onboarding-state";
 
 /**
@@ -22,7 +23,8 @@ async function readStarterChoices(
   ]);
   if (!constraints || !review || review.required) return null;
   assertCurrent(h);
-  return starterChoices(flags, constraints.profile, profiles.instances);
+  return starterChoices(flags, constraints.profile, profiles.instances, new Date(),
+    resolveAvoidedStarterIds(constraints.profile));
 }
 
 /** `preselectDefaults: false` (onboarding v2's love round): start with nothing marked, so only foods
@@ -59,11 +61,13 @@ export function useStarterStep(state: OnboardingState | null, enabled = true,
         return;
       }
       assertCurrent(h);
-      const safe = starterChoices(activeFlags, constraints.profile, profiles.instances);
+      const avoidedIds = resolveAvoidedStarterIds(constraints.profile);
+      const safe = starterChoices(activeFlags, constraints.profile, profiles.instances, new Date(),
+        avoidedIds);
       setLoadedFor(key);
       setChoices(safe);
       setMarks(initialStarterSelection(activeFlags, constraints.profile, text, profiles.instances,
-        Object.values(loadStore().foods), { preselectDefaults }));
+        Object.values(loadStore().foods), { preselectDefaults, avoidedIds }));
       setError(null);
     }).catch(() => {
       if (live) { setChoices(null); setError("Couldn’t verify your food rules. Retry when you’re online."); }

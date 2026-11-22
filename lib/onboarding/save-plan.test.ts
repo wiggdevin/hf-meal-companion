@@ -16,6 +16,7 @@ import { defaultSettings } from "@/lib/store";
 import { saveOnboardingPlan, type SaveOnboardingPlanDeps } from "@/lib/onboarding/save-plan";
 import { CONSTRAINT_SAVE_WARNING } from "@/lib/profile/onboarding-client";
 import { STARTER_RULE_CHANGED_ERROR } from "@/lib/foods/starter-client";
+import { legacyInstanceFromCatalog, profileInstancesForLegacyFlags } from "@/lib/policy/profiles/legacy-flags";
 import { TargetSaveRefusedError } from "@/lib/targets/client";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -88,8 +89,55 @@ describe("saveOnboardingPlan", () => {
       starter: { status: "pilot", marks: sixFoods, plannedCount: 0 },
     }, deps);
 
-    expect(result).toEqual({ ok: false, error: STARTER_RULE_CHANGED_ERROR });
+    // The refusal names the picked food and the rule that withholds it, and carries a code the
+    // shell uses to send the person back to Foods (W062 BLOCK 1).
+    expect(result).toEqual({ ok: false, code: "starter_rules",
+      error: "Chicken breast, roasted doesn't fit your no-poultry rule. Go back to Foods, take it off, and pick again." });
+    expect(result.ok === false && result.error).not.toBe(STARTER_RULE_CHANGED_ERROR);
     expect(deps.writeStarter).not.toHaveBeenCalled();
+  });
+
+  it("a halal plus no-beef account saves its fish, egg and plant picks; a conflicting pick is named, and a retry after fixing it saves", async () => {
+    const halal = legacyInstanceFromCatalog("halal", "2026-09-01")!;
+    const noBeef = profileInstancesForLegacyFlags(["no_beef"], "2026-09-01");
+    const readRules = vi.fn(async () => ({ profile: rules, instances: [halal, ...noBeef] }));
+    const deps = baseDeps({ readRules });
+    const input = (marks: Record<string, "eats">) => ({
+      settings: defaultSettings(), onboardingState: createOnboardingState(defaultSettings()),
+      starter: { status: "pilot" as const, marks, plannedCount: 0 },
+    });
+    const good = { "salmon-wild-sockeye-cooked": "eats", "egg-white": "eats",
+      "white-rice-cooked": "eats", "brown-rice-cooked": "eats",
+      "olive-oil": "eats", "avocado-oil": "eats" } as const;
+    expect(await saveOnboardingPlan(input(good), deps)).toEqual({ ok: true });
+    expect(deps.writeStarter).toHaveBeenCalledTimes(1);
+    // A pick the floor needs but a rule withholds is refused by name, with nothing written.
+    (deps.writeStarter as ReturnType<typeof vi.fn>).mockClear();
+    const bad = await saveOnboardingPlan(input({ "ground-beef-90-10-cooked": "eats", "egg-white": "eats",
+      "white-rice-cooked": "eats", "brown-rice-cooked": "eats", "olive-oil": "eats", "avocado-oil": "eats" }), deps);
+    expect(bad).toMatchObject({ ok: false, code: "starter_rules" });
+    expect(bad.ok === false && bad.error).toMatch(/Ground beef.*no[ -]beef rule/);
+    expect(deps.writeStarter).not.toHaveBeenCalled();
+    // After the person takes the food off, the same call saves.
+    expect(await saveOnboardingPlan(input(good), deps)).toEqual({ ok: true });
+    expect(deps.writeStarter).toHaveBeenCalledTimes(1);
+  });
+
+  it("a peanut allergy account saves a selection with no peanut-containing starter", async () => {
+    const peanut = legacyInstanceFromCatalog("allergy_peanut", "2026-09-01")!;
+    const deps = baseDeps({ readRules: vi.fn(async () => ({ profile: rules, instances: [peanut] })) });
+    const result = await saveOnboardingPlan({
+      settings: defaultSettings(), onboardingState: createOnboardingState(defaultSettings()),
+      starter: { status: "pilot", marks: sixFoods, plannedCount: 0 },
+    }, deps);
+    expect(result).toEqual({ ok: true });
+    const refused = await saveOnboardingPlan({
+      settings: defaultSettings(), onboardingState: createOnboardingState(defaultSettings()),
+      starter: { status: "pilot", marks: { "chicken-breast-roasted": "eats", "turkey-breast-roasted": "eats",
+        "white-rice-cooked": "eats", "brown-rice-cooked": "eats", "olive-oil": "eats", "peanut-butter": "eats" }, plannedCount: 0 },
+    }, deps);
+    expect(refused).toMatchObject({ ok: false, code: "starter_rules" });
+    expect(refused.ok === false && refused.error).toMatch(/Peanut butter.*peanut allergy/);
   });
 
   it("fails closed when the one rules read itself fails, rather than writing an unverified selection", async () => {

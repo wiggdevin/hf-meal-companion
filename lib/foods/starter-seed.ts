@@ -7,7 +7,7 @@ import { loadStore } from "@/lib/store";
 import type { Profile } from "@/lib/constraints-client";
 import type { Store } from "@/lib/types";
 import type { ProfileInstance } from "@/lib/policy/profiles/types";
-import { persistStarterSelection } from "@/lib/foods/starter-client";
+import { persistStarterSelection, resolveAvoidedStarterIds } from "@/lib/foods/starter-client";
 import { initialStarterSelection, starterChoices, starterSelectionValid } from "@/lib/foods/starter";
 
 const MARKER = "starter-suggestions-seeded-v1";
@@ -59,10 +59,13 @@ export function seedZeroFoodAccount(profile: Profile, instances: readonly Profil
       if (hasFoods !== false) return false; // account history and network errors fail closed
     }
     const flags = store.settings.dietPrefs?.flags ?? [];
-    const choices = starterChoices(flags, profile, instances);
-    const marks = initialStarterSelection(flags, profile, store.settings.dietPrefs?.text ?? "", instances);
+    const avoidedIds = resolveAvoidedStarterIds(profile);
+    const choices = starterChoices(flags, profile, instances, new Date(), avoidedIds);
+    const marks = initialStarterSelection(flags, profile, store.settings.dietPrefs?.text ?? "", instances,
+      [], { avoidedIds });
     const eats = Object.entries(marks).filter(([, mark]) => mark === "eats").map(([id]) => id);
-    if (!starterSelectionValid(eats, choices)) return false;
+    // Auto-seeding stays strict: with nothing allowed there is nothing to seed.
+    if (choices.length === 0 || !starterSelectionValid(eats, choices)) return false;
     // A partial write keeps this marker so the same device can resume only missing suggestions.
     if (state !== "pending") deps.storage.setItem(marker, "pending");
     await deps.persist(marks, choices, undefined, "suggested");

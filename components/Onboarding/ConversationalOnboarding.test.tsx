@@ -415,29 +415,30 @@ describe("ConversationalOnboarding", () => {
     expect(starterSpies.mark).toHaveBeenCalledWith("chicken-breast-roasted", "eats");
   });
 
-  // GPT-6 Sol BLOCK (onb2-p0): with too few foods the rules allow, pick-for-me moved on anyway
-  // and "Use this plan" then took the skip path.
-  it("'Pick for me' with too few allowed foods stays on Foods, says so, and offers to"
-    + " adjust the rules", async () => {
+  // W062: a person whose food rules leave one food per group must still be able to finish. The
+  // floor drops to what a group has, and the hint says so in plain words.
+  it("'Pick for me' with one allowed food per group picks it, says why, and moves on", async () => {
     foodAccess.status = "pilot";
     starterFixture.choices = [
       { id: "chicken-breast-roasted", role: "protein", default: true },
       { id: "white-rice-cooked", role: "carb", default: true },
       { id: "olive-oil", role: "fat", default: true },
     ] as never;
+    starterSpies.mark.mockImplementation((id: string, value: string) => {
+      starterFixture.marks = { ...starterFixture.marks, [id]: value };
+    });
     render(<ConversationalOnboarding />);
     fireEvent.click(screen.getByRole("button", { name: "Lose weight" }));
     await fillRemainingRequiredFacts();
     fireEvent.click(screen.getByRole("button", { name: "That’s me" }));
     await passPlanBeats();
+    const hint = await screen.findByTestId("foods-pick-hint");
+    expect(hint.textContent).toMatch(/only 1 proteins?, so that's all you need/);
     fireEvent.click(await screen.findByRole("button", { name: "Pick for me" }));
-    const notice = await screen.findByTestId("plan-notice");
-    expect(notice.textContent).toMatch(/couldn't fill every group/);
-    expect(screen.queryByTestId("reward-plate-ready")).toBeNull();
-    screen.getByRole("button", { name: "Pick for me" }); // still on Foods
-    fireEvent.click(within(notice).getByRole("button", { name: "Adjust food rules" }));
-    await screen.findByTestId("safety-round");
+    expect(starterSpies.mark).toHaveBeenCalledWith("chicken-breast-roasted", "eats");
+    expect(screen.queryByTestId("plan-notice")).toBeNull();
     expect(persistSkippedOnboarding).not.toHaveBeenCalled();
+    starterSpies.mark.mockReset();
   });
 
   // GPT-6 Sol WARN (onb2-p0): pick-for-me re-selected a food the person had just tapped off.
@@ -618,6 +619,30 @@ describe("ConversationalOnboarding", () => {
     expect(ids[1]).toBe(ids[0]);
   });
 
+  // W062 BLOCK 1: a rules refusal names the food and rule, sends the person back to Foods, and the
+  // retry after they change picks saves (never a dead-end "Try again" that repeats the error).
+  it("a starter_rules refusal returns to Foods with the specific line, and a later Done saves", async () => {
+    pickableFoods();
+    starterFixture.marks = { p1: "eats", p2: "eats", c1: "eats", c2: "eats", f1: "eats", f2: "eats" };
+    const line = "Chicken breast, roasted doesn't fit your halal rule. Go back to Foods, take it off, and pick again.";
+    saveOnboardingPlan.mockResolvedValueOnce({ ok: false, code: "starter_rules", error: line } as never);
+    await saveOnboardingDraft({ beat: "opener",
+      settings: { sex: "female", birthYear: 1992, heightCm: 165, weightKg: 60 } });
+    render(<ConversationalOnboarding />);
+    fireEvent.click(screen.getByRole("button", { name: "Lose weight" }));
+    fireEvent.click(await screen.findByRole("button", { name: "That’s me" }));
+    await passPlanBeats();
+    fireEvent.click(await screen.findByRole("button", { name: "Done · 6 loved" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use this plan" }));
+    expect((await screen.findByRole("alert")).textContent).toBe(line);
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    expect(starterSpies.reread).toHaveBeenCalled();
+    // Back on Foods: the next Done and Use this plan go through.
+    fireEvent.click(await screen.findByRole("button", { name: "Done · 6 loved" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use this plan" }));
+    await vi.waitFor(() => expect(replace).toHaveBeenCalledWith("/"));
+  });
+
   it("ONB2-RULE-REREAD: Foods 'Done' re-reads account rules before advancing to the reward beat"
     + " (Sol r6 BLOCK on onb2-l4-r2)", async () => {
     foodAccess.status = "pilot";
@@ -649,9 +674,11 @@ describe("ConversationalOnboarding", () => {
       { id: "f1", role: "fat" }, { id: "f2", role: "fat" },
     ];
     starterFixture.marks = { p1: "eats", p2: "eats", c1: "eats", c2: "eats", f1: "eats", f2: "eats" };
-    // The fresh read drops p2 to below the floor (only one protein left).
+    // The fresh read drops p2 for another protein the person never picked, so the group is
+    // still short of its two (the floor only falls when a group HAS fewer than two foods).
     starterSpies.reread.mockImplementation(async () => [
-      { id: "p1", role: "protein" }, { id: "c1", role: "carb" }, { id: "c2", role: "carb" },
+      { id: "p1", role: "protein" }, { id: "p3", role: "protein" },
+      { id: "c1", role: "carb" }, { id: "c2", role: "carb" },
       { id: "f1", role: "fat" }, { id: "f2", role: "fat" },
     ]);
     await saveOnboardingDraft({ beat: "opener",
