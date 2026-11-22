@@ -4,7 +4,7 @@
  * inferred activity chip, the tap-only safety round, the pace chips in lb a week after the clamp,
  * "Your day" pre-filled with the US chip on, and the under-18 stop.
  */
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import WeekBeat from "./WeekBeat";
 import SafetyRound from "./SafetyRound";
@@ -13,8 +13,14 @@ import YourDayBeat from "./YourDayBeat";
 import MinorStop from "./MinorStop";
 import { paceChoices, type PaceChoices } from "@/lib/profile/pace";
 
+const editor = vi.hoisted(() => ({
+  report: null as null | ((state: { pending: boolean; error: string | null }) => void),
+}));
 vi.mock("@/components/Onboarding/DietaryProfilePicker", () => ({
-  default: () => <div data-testid="rule-editor" />,
+  default: ({ onWriteState }: { onWriteState?: (state: { pending: boolean; error: string | null }) => void }) => {
+    editor.report = onWriteState ?? null;
+    return <div data-testid="rule-editor" />;
+  },
 }));
 
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
@@ -61,6 +67,47 @@ describe("SafetyRound", () => {
     fireEvent.click(screen.getByRole("button", { name: "No, none of these" }));
     expect(onDone).toHaveBeenCalledWith({ picks: [], pregnancy: null, medicines: [], conditionText: "",
       rulesEdited: false });
+  });
+
+  it("blocks Continue and 'None' while the rule editor has a write in flight, and shows its failure", () => {
+    const onDone = vi.fn();
+    render(<SafetyRound initial={null} onDone={onDone} />);
+    fireEvent.click(screen.getByRole("button", { name: "Food allergy" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add food rules" }));
+    act(() => editor.report?.({ pending: true, error: null }));
+    expect(screen.getByRole("button", { name: "Saving your rule…" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("button", { name: "No, none of these" }).hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Saving your rule…" }));
+    expect(onDone).not.toHaveBeenCalled();
+    act(() => editor.report?.({ pending: false, error: "Couldn’t save this rule. Check your connection and try again." }));
+    expect(screen.getByText(/Couldn’t save this rule/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(false);
+  });
+
+  // W062 verify round (Sol WARN SafetyRound.tsx:118): "None" after the editor was used still tells
+  // the shell the rules were edited, so it reads the account's rules again before any food UI.
+  it("'No, none of these' after the rule editor was used still reports rulesEdited", () => {
+    const onDone = vi.fn();
+    render(<SafetyRound initial={null} onDone={onDone} />);
+    fireEvent.click(screen.getByRole("button", { name: "Food allergy" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add food rules" }));
+    fireEvent.click(screen.getByRole("button", { name: "Food allergy" }));
+    fireEvent.click(screen.getByRole("button", { name: "No, none of these" }));
+    expect(onDone).toHaveBeenCalledWith(expect.objectContaining({ picks: [], rulesEdited: true }));
+  });
+
+  it("locks the pick chips while a rule write is in flight, and frees them when it settles", () => {
+    render(<SafetyRound initial={null} onDone={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Food allergy" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add food rules" }));
+    act(() => editor.report?.({ pending: true, error: null }));
+    for (const chip of within(screen.getByRole("group", { name: "Applies to me" })).getAllByRole("button")) {
+      expect(chip.hasAttribute("disabled")).toBe(true);
+    }
+    act(() => editor.report?.({ pending: false, error: null }));
+    for (const chip of within(screen.getByRole("group", { name: "Applies to me" })).getAllByRole("button")) {
+      expect(chip.hasAttribute("disabled")).toBe(false);
+    }
   });
 
   it("offers pregnancy to every adult and needs one of its follow-ups before Continue", () => {

@@ -17,7 +17,7 @@
  * When the editor was opened, Continue hands back `rulesEdited: true` so the shell re-reads the
  * account's rules before any food UI (ONB2-RULE-REREAD).
  */
-import { useId, useState } from "react";
+import { useCallback, useId, useState } from "react";
 import Button from "@/components/ui/Button";
 import Reveal from "@/components/Onboarding/beats/Reveal";
 import ChoiceChips from "@/components/Onboarding/beats/ChoiceChips";
@@ -54,8 +54,11 @@ const CONDITION_MAX = 64;
 
 export type SafetyRoundResult = SafetyRoundAnswer & { rulesEdited: boolean };
 
-function RuleEditorToggle({ open, onToggle, label }: { open: boolean; onToggle: () => void; label: string }) {
-  return <Button variant="secondary" size="md" className="self-start" aria-expanded={open} onClick={onToggle}>
+function RuleEditorToggle({ open, onToggle, label, disabled = false }: {
+  open: boolean; onToggle: () => void; label: string; disabled?: boolean;
+}) {
+  return <Button variant="secondary" size="md" className="self-start" aria-expanded={open}
+    disabled={disabled} onClick={onToggle}>
     {label}
   </Button>;
 }
@@ -74,6 +77,11 @@ export default function SafetyRound({ initial, note, onDone, busy = false }: {
   const [conditionText, setConditionText] = useState(initial?.conditionText ?? "");
   const [editorOpen, setEditorOpen] = useState(false);
   const [edited, setEdited] = useState(false);
+  // A rule write in flight (or failed) in the editor: Continue and "None" wait, and the failure
+  // stays on screen even after the editor is closed.
+  const [rules, setRules] = useState<{ pending: boolean; error: string | null }>({ pending: false, error: null });
+  const onWriteState = useCallback((state: { pending: boolean; error: string | null }) => setRules(state), []);
+  const writing = rules.pending;
   const conditionId = useId();
 
   const has = (pick: SafetyPick) => picks.includes(pick);
@@ -92,7 +100,7 @@ export default function SafetyRound({ initial, note, onDone, busy = false }: {
     && (!has("medicine") || medicines.length > 0);
 
   function finish() {
-    if (!ready || busy) return;
+    if (!ready || busy || writing) return;
     onDone({
       picks, pregnancy: has("pregnancy") ? pregnancy : null,
       medicines: has("medicine") ? medicines : [],
@@ -106,12 +114,18 @@ export default function SafetyRound({ initial, note, onDone, busy = false }: {
     {note && <BeatNote live>{note}</BeatNote>}
     <BeatQuestion>Before we pick foods: does anything here apply to you?</BeatQuestion>
     {/* One primary at a time: once a chip is picked, Continue is the primary and this steps back. */}
-    <Button size="lg" block variant={picks.length > 0 ? "secondary" : "primary"} disabled={busy}
-      onClick={() => onDone({ picks: [], pregnancy: null, medicines: [], conditionText: "", rulesEdited: false })}>
+    <Button size="lg" block variant={picks.length > 0 ? "secondary" : "primary"} disabled={busy || writing}
+      onClick={() => {
+        // Rules added in the editor before the person changed their mind still count: the shell
+        // reads the account's rules again whenever the editor was used (W062 verify round).
+        if (writing) return;
+        onDone({ picks: [], pregnancy: null, medicines: [], conditionText: "", rulesEdited: edited });
+      }}>
       No, none of these
     </Button>
     <p className="m-0 pt-2 text-caption text-graphite">Or tap any that apply</p>
-    <ChoiceChips label="Applies to me" multiple block options={PICKS} value={picks} onChange={togglePick} />
+    <ChoiceChips label="Applies to me" multiple block options={PICKS} value={picks} onChange={togglePick}
+      disabled={writing} />
 
     <Reveal id="safety-allergy" open={has("allergy")}>
       <div className="-mx-1 flex flex-col gap-2 px-1 py-1">
@@ -155,15 +169,16 @@ export default function SafetyRound({ initial, note, onDone, busy = false }: {
     </Reveal>
 
     {showsEditor && <div className="flex flex-col gap-2">
-      <RuleEditorToggle open={editorOpen} onToggle={toggleEditor}
+      <RuleEditorToggle open={editorOpen} onToggle={toggleEditor} disabled={writing}
         label={editorOpen ? "Close the rule editor" : "Add food rules"} />
       {/* The picker is a light-surface form; inside `.matte` it needs `.matte-reset`. */}
       <Reveal id="safety-editor" open={editorOpen}>
-        <div className="matte-reset surface flex-col p-4"><DietaryProfilePicker /></div>
+        <div className="matte-reset surface flex-col p-4"><DietaryProfilePicker onWriteState={onWriteState} /></div>
       </Reveal>
     </div>}
 
-    {picks.length > 0 && <Button variant="primary" size="lg" block disabled={!ready || busy}
-      onClick={finish}>{busy ? "Checking your rules…" : "Continue"}</Button>}
+    {rules.error && <BeatNote live>{rules.error}</BeatNote>}
+    {picks.length > 0 && <Button variant="primary" size="lg" block disabled={!ready || busy || writing}
+      onClick={finish}>{busy ? "Checking your rules…" : writing ? "Saving your rule…" : "Continue"}</Button>}
   </div>;
 }

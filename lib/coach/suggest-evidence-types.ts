@@ -1,6 +1,6 @@
 import type { FoodFacetJudgments } from "@/lib/foods/facets";
 import type { StoredAllergenEvidence } from "@/lib/policy/allergens";
-import type { FacetOutcome } from "@/lib/policy/facet-rules";
+import type { FacetOutcome, PolicyPreferenceFlag } from "@/lib/policy/facet-rules";
 
 export type StoredMealRole = "protein" | "carb" | "fat";
 export type SuggestionFoodEvidence = {
@@ -28,4 +28,18 @@ export type SuggestionFoodEvidence = {
   onEatsList: boolean;
   onAvoidList: boolean;
   role: StoredMealRole | null;
+};
+
+/** What the suggestion verdict reads about the account (defined here, a types-only module, so the
+ *  shared verdict stays importable from client code without the coach's server-side graph). */
+export type SuggestionEvidence = {
+  status: "ready" | "unavailable";
+  preferenceFlags: PolicyPreferenceFlag[];
+  byIdentity: Record<string, SuggestionFoodEvidence>;
+};
+
+/** The three fields of a composed item the verdict reads (lib/coach/compose.ts `ComposedItem`). */
+export type VerdictItem = {
+  foodRefId: string; catalogFoodRevisionId: number | null;
+  verdict: "allowed" | "blocked" | "unverified";
 };

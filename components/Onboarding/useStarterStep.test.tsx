@@ -4,7 +4,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { bindAccount, unbindAccount } from "@/lib/device/account";
 import { createOnboardingState } from "@/lib/profile/onboarding-state";
 import { defaultSettings } from "@/lib/store";
+import { safetyConditionEntries } from "@/lib/profile/rate-eligibility";
 import { useStarterStep } from "./useStarterStep";
+
+const TUNA = "tuna-canned-in-water-light";
 
 const reads = vi.hoisted(() => ({ constraints: vi.fn(), review: vi.fn(), instances: vi.fn() }));
 vi.mock("@/lib/constraints-client", () => ({ loadConstraints: reads.constraints }));
@@ -79,5 +82,47 @@ describe("starter step state", () => {
     expect(result.current.choices?.some((item) => item.id === "tofu-firm")).toBe(false);
     // The confirm path must never see the newly-excluded food still marked "eats".
     expect(result.current.marks["tofu-firm"]).not.toBe("eats");
+  });
+
+  // W062 verify round (Neon WARN): the safety round's Continue re-reads the rules BEFORE the plan
+  // answers (and so this render's pending conditions) update. The reread takes this round's
+  // answers explicitly, so a just-picked pregnancy answer withholds tuna in that very read.
+  it("reread(pending) judges the account under the safety answers just given, not the render's older ones", async () => {
+    bindAccount("11111111-1111-4111-8111-111111111111");
+    const openProfile = { avoid_allergens: [], avoid_food_ref_ids: [], banned_categories: [],
+      conditions: [], notes: null };
+    reads.constraints.mockResolvedValue({ profile: openProfile, rev: 0 });
+    reads.review.mockResolvedValue({ required: false, candidateAllergens: [],
+      candidateCategories: [], rev: 0 });
+    reads.instances.mockResolvedValue({ instances: [], catalog: [], legacyProfileIds: [] });
+    const initial = createOnboardingState(defaultSettings(), 4);
+    const pregnant = safetyConditionEntries({ pregnancy: "pregnant" });
+    const { result, rerender } = renderHook(({ pendingConditions }: { pendingConditions: string[] }) =>
+      useStarterStep(initial, true, { pendingConditions }), { initialProps: { pendingConditions: [] as string[] } });
+    await waitFor(() => expect(result.current.choices?.some((item) => item.id === TUNA)).toBe(true));
+    let fresh: Awaited<ReturnType<typeof result.current.reread>>;
+    // Without the override the render's own (empty) answers apply: the old behaviour kept tuna.
+    await act(async () => { fresh = await result.current.reread(); });
+    expect(fresh!.some((item) => item.id === TUNA)).toBe(true);
+    await act(async () => { fresh = await result.current.reread(pregnant); });
+    expect(fresh!.some((item) => item.id === TUNA)).toBe(false);
+    // The shell then stores the same answers: the rendered list settles on the same verdict.
+    rerender({ pendingConditions: pregnant });
+    await waitFor(() => expect(result.current.choices?.some((item) => item.id === TUNA)).toBe(false));
+  });
+
+  it("lists foods under the draft flags' projected allergen exclusions before the flags are stored", async () => {
+    bindAccount("11111111-1111-4111-8111-111111111111");
+    const openProfile = { avoid_allergens: [], avoid_food_ref_ids: [], banned_categories: [],
+      conditions: [], notes: null };
+    reads.constraints.mockResolvedValue({ profile: openProfile, rev: 0 });
+    reads.review.mockResolvedValue({ required: false, candidateAllergens: [],
+      candidateCategories: [], rev: 0 });
+    reads.instances.mockResolvedValue({ instances: [], catalog: [], legacyProfileIds: [] });
+    const eggs = { ...createOnboardingState(defaultSettings(), 4), flags: ["no_eggs" as const] };
+    const { result } = renderHook(() => useStarterStep(eggs));
+    await waitFor(() => expect(result.current.choices?.length).toBeGreaterThan(0));
+    expect(result.current.choices?.some((item) => item.id === "white-bread")).toBe(false);
+    expect(result.current.choices?.some((item) => item.id === TUNA)).toBe(false);
   });
 });

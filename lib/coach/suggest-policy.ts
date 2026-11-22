@@ -2,8 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ComposedItem } from "@/lib/coach/compose";
 import type { SuggestionCandidate } from "@/lib/coach/suggest-candidates";
 import type { Facet } from "@/lib/foods/facet-vocabulary";
-import type { StoredMealRole, SuggestionFoodEvidence } from "@/lib/coach/suggest-evidence-types";
-import { facetRulesFor, type PolicyPreferenceFlag } from "@/lib/policy/facet-rules";
+import type { StoredMealRole, SuggestionEvidence, SuggestionFoodEvidence } from "@/lib/coach/suggest-evidence-types";
+import { facetRulesFor } from "@/lib/policy/facet-rules";
 import type { ConstraintProfile } from "@/lib/policy/constraints";
 import { suggestionFoodIdentity, suggestionItemsOutcome } from "@/lib/coach/suggest-verdict";
 import { fetchByKeyChunks } from "@/lib/server/paged-read";
@@ -16,11 +16,7 @@ export {
 } from "@/lib/coach/suggest-verdict";
 
 export type { StoredMealRole, SuggestionFoodEvidence } from "@/lib/coach/suggest-evidence-types";
-export type SuggestionEvidence = {
-  status: "ready" | "unavailable";
-  preferenceFlags: PolicyPreferenceFlag[];
-  byIdentity: Record<string, SuggestionFoodEvidence>;
-};
+export type { SuggestionEvidence } from "@/lib/coach/suggest-evidence-types";
 /** `facets`: the account's confirmed profile-rule facets (profileRuleFacets), read with the rest.
  *  `client`: the service-role client to read through (default `adminClient()`); an offline report
  *  passes a read-only one (scripts/diet-rule-jev-impact.ts). */

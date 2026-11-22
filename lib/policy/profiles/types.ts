@@ -90,6 +90,10 @@ export type ProfileInstance = {
    *  per product (§9 R6: lib/policy/profiles/drug-interactions.ts). Unset stays unverified. */
   drug?: string;
   notes?: string;
+  /** Set only on an instance synthesized from a legacy preference flag (never on a stored row):
+   *  the flag already reaches the evaluator as a preference flag, so a policy reader adds the
+   *  stored rows as profile rules and skips these. Unset (an older server) means "stored". */
+  derivedFromFlag?: true;
 };
 
 /** A rule item that may legally block: confirmed, and grounded in one of the permitted bases. */

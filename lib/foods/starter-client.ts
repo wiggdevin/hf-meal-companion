@@ -10,6 +10,7 @@ import {
 } from "@/lib/foods/starter";
 import { loadConstraints, type Profile } from "@/lib/constraints-client";
 import { fetchProfileInstances } from "@/lib/profile/instances-client";
+import { loadRuleReview } from "@/lib/rule-review-client";
 import type { ProfileInstance } from "@/lib/policy/profiles/types";
 
 type FreshRules = { profile: Profile; instances: readonly ProfileInstance[] };
@@ -37,10 +38,11 @@ export type StarterWriter = {
 
 async function readFreshRules(h: AccountHandle): Promise<FreshRules | null> {
   try {
-    const [constraints, profiles] = await Promise.all([
-      loadConstraints({ account: h }), fetchProfileInstances(h),
+    const [constraints, review, profiles] = await Promise.all([
+      loadConstraints({ account: h }), loadRuleReview({ account: h }), fetchProfileInstances(h),
     ]);
-    if (!constraints) return null;
+    // A pending rule review means the rules are not settled: never write against them.
+    if (!constraints || !review || review.required) return null;
     return { profile: constraints.profile, instances: profiles.instances };
   } catch {
     return null;
@@ -87,9 +89,11 @@ export async function persistStarterSelection(
   allowed: readonly Starter[],
   deps: StarterWriter = writer,
   kind: "reviewed" | "suggested" = "reviewed",
+  /** The draft diet flags (onboarding has not saved them yet); the stored rules never hold them. */
+  flags: readonly string[] = [],
 ): Promise<number> {
   const selected = Object.entries(marks).filter(([, mark]) => mark === "eats").map(([id]) => id);
-  if (!starterSelectionValid(selected, allowed)) throw new Error("Choose at least two foods in each group.");
+  if (!starterSelectionValid(selected, allowed)) throw new Error("Pick two foods in each group (or every food a group has) to finish.");
   const allowedIds = new Set(allowed.map((item) => item.id));
   const knownIds = new Set(STARTERS.map((item) => item.id));
   const h = accountHandle();
@@ -115,14 +119,12 @@ export async function persistStarterSelection(
     fresh = await deps.freshRules(h);
     if (!fresh) throw new Error(STARTER_RULES_UNAVAILABLE_ERROR);
   }
-  // `starterChoices` excludes every starter outright once `avoid_food_ref_ids` is non-empty (this
-  // local catalog has no food-ref IDs, so an unresolved ID rule can't be waived by name) — the
-  // fresh check has to honor that same all-or-nothing rule, not just the per-item allergen/
-  // category/hard-rule predicate `starterExcludedByCurrentRules` covers (Sol r1 BLOCK).
-  const freshBlocksEverything = fresh !== null && fresh.profile.avoid_food_ref_ids.length > 0;
+  // The same shared evaluator verdict `starterChoices` applies; anything it does not prove
+  // allowed (an avoid-list entry included) is excluded.
+  const asOf = new Date();
   const freshExcluded = fresh === null ? null : new Set(
-    STARTERS.filter((item) => freshBlocksEverything
-      || starterExcludedByCurrentRules(item, fresh!.profile, fresh!.instances)).map((item) => item.id));
+    STARTERS.filter((item) => starterExcludedByCurrentRules(item, fresh!.profile, fresh!.instances,
+      asOf, flags)).map((item) => item.id));
   // Revalidate the two-per-role floor against what the fresh snapshot actually still allows,
   // BEFORE writing anything — a selection that passed the stale `allowed` list a moment ago can
   // fail it now, and that must surface as one clean error, never a partial write (Sol r1 WARN).

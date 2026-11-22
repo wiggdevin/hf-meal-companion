@@ -18,6 +18,7 @@ import {
 } from "@/lib/onboarding/save-plan";
 import { CONSTRAINT_SAVE_WARNING } from "@/lib/profile/onboarding-client";
 import { STARTER_RULE_CHANGED_ERROR } from "@/lib/foods/starter-client";
+import { legacyInstanceFromCatalog, profileInstancesForLegacyFlags } from "@/lib/policy/profiles/legacy-flags";
 import { TargetFloorError, TargetSaveRefusedError } from "@/lib/targets/client";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -90,8 +91,93 @@ describe("saveOnboardingPlan", () => {
       starter: { status: "pilot", marks: sixFoods, plannedCount: 0 },
     }, deps);
 
-    expect(result).toEqual({ ok: false, error: STARTER_RULE_CHANGED_ERROR });
+    // The refusal names the picked food and the rule that withholds it, and carries a code the
+    // shell uses to send the person back to Foods (W062 BLOCK 1).
+    expect(result).toMatchObject({ ok: false, code: "starter_rules" });
+    expect(result.ok === false && result.error).toMatch(/^Chicken breast.*Go back to Foods/);
+    expect(result.ok === false && result.error).not.toBe(STARTER_RULE_CHANGED_ERROR);
     expect(deps.writeStarter).not.toHaveBeenCalled();
+    // Nothing is written at all: the refusal comes before the plan write, so `onboarded_at` is
+    // never stamped and no membership or settings op is queued.
+    expect(deps.persistPlan).not.toHaveBeenCalled();
+    expect(deps.deliverWrites).not.toHaveBeenCalled();
+    expect(deps.mirrorOnboardedAt).not.toHaveBeenCalled();
+  });
+
+  it("a stored halal account has no certified starter: an uncertified Eats pick is reported, never saved or silently dropped", async () => {
+    const halal = legacyInstanceFromCatalog("halal", "2026-09-01")!;
+    const noBeef = profileInstancesForLegacyFlags(["no_beef"], "2026-09-01");
+    const deps = baseDeps({ readRules: vi.fn(async () => ({ profile: rules, instances: [halal, ...noBeef] })) });
+    const input = (marks: Record<string, "eats">) => ({
+      settings: defaultSettings(), onboardingState: createOnboardingState(defaultSettings()),
+      starter: { status: "pilot" as const, marks, plannedCount: 0 },
+    });
+    // The person ticked chicken and beef before the rule landed: neither is written.
+    const stale = { "chicken-breast-roasted": "eats", "ground-beef-90-10-cooked": "eats",
+      "white-rice-cooked": "eats", "brown-rice-cooked": "eats", "olive-oil": "eats", "avocado-oil": "eats" } as const;
+    const refused = await saveOnboardingPlan(input(stale), deps);
+    expect(refused).toMatchObject({ ok: false, code: "starter_rules" });
+    expect(deps.writeStarter).not.toHaveBeenCalled();
+    expect(deps.marksStand).not.toHaveBeenCalled();
+    // Finishing starter-free (no Eats picks) still succeeds.
+    expect(await saveOnboardingPlan(input({}), deps)).toEqual({ ok: true });
+    expect(deps.writeStarter).not.toHaveBeenCalled();
+  });
+
+  it("a zero-starter save (nothing eligible, nothing picked) writes no memberships and still completes", async () => {
+    const halal = legacyInstanceFromCatalog("halal", "2026-09-01")!;
+    const deps = baseDeps({ readRules: vi.fn(async () => ({ profile: rules, instances: [halal] })) });
+    const result = await saveOnboardingPlan({
+      settings: defaultSettings(), onboardingState: createOnboardingState(defaultSettings()),
+      starter: { status: "pilot", marks: {}, plannedCount: 0 },
+    }, deps);
+    expect(result).toEqual({ ok: true });
+    expect(deps.writeStarter).not.toHaveBeenCalled();
+    expect(deps.persistPlan).toHaveBeenCalledTimes(1);
+    expect(deps.mirrorOnboardedAt).toHaveBeenCalledTimes(1);
+  });
+
+  it("a legacy 3-meal account with zero eligible proteins can still finish", async () => {
+    const halal = legacyInstanceFromCatalog("halal", "2026-09-01")!;
+    const deps = baseDeps({ readRules: vi.fn(async () => ({ profile: rules, instances: [halal] })) });
+    const result = await saveOnboardingPlan({
+      settings: defaultSettings(), onboardingState: createOnboardingState(defaultSettings()),
+      starter: { status: "legacy", marks: {}, plannedCount: 3 },
+    }, deps);
+    expect(result).toEqual({ ok: true });
+    expect(deps.writeStarter).not.toHaveBeenCalled();
+  });
+
+  it("a starter_rules refusal leaves onboarded_at unwritten and writes nothing", async () => {
+    const deps = baseDeps({ readRules: vi.fn(async () => ({
+      profile: { ...rules, avoid_allergens: ["peanuts"] }, instances: [] })) });
+    const result = await saveOnboardingPlan({
+      settings: defaultSettings(), onboardingState: createOnboardingState(defaultSettings()),
+      starter: { status: "pilot", marks: { "chicken-breast-roasted": "eats", "turkey-breast-roasted": "eats",
+        "white-rice-cooked": "eats", "brown-rice-cooked": "eats", "olive-oil": "eats", "peanut-butter": "eats" },
+        plannedCount: 0 },
+    }, deps);
+    expect(result).toMatchObject({ ok: false, code: "starter_rules" });
+    expect(deps.writeStarter).not.toHaveBeenCalled();
+    expect(deps.persistPlan).not.toHaveBeenCalled();
+    expect(deps.mirrorOnboardedAt).not.toHaveBeenCalled();
+  });
+
+  it("a peanut allergy account saves a selection with no peanut-containing starter", async () => {
+    const peanut = legacyInstanceFromCatalog("allergy_peanut", "2026-09-01")!;
+    const deps = baseDeps({ readRules: vi.fn(async () => ({ profile: rules, instances: [peanut] })) });
+    const result = await saveOnboardingPlan({
+      settings: defaultSettings(), onboardingState: createOnboardingState(defaultSettings()),
+      starter: { status: "pilot", marks: sixFoods, plannedCount: 0 },
+    }, deps);
+    expect(result).toEqual({ ok: true });
+    const refused = await saveOnboardingPlan({
+      settings: defaultSettings(), onboardingState: createOnboardingState(defaultSettings()),
+      starter: { status: "pilot", marks: { "chicken-breast-roasted": "eats", "turkey-breast-roasted": "eats",
+        "white-rice-cooked": "eats", "brown-rice-cooked": "eats", "olive-oil": "eats", "peanut-butter": "eats" }, plannedCount: 0 },
+    }, deps);
+    expect(refused).toMatchObject({ ok: false, code: "starter_rules" });
+    expect(refused.ok === false && refused.error).toMatch(/^Peanut butter.*Go back to Foods/);
   });
 
   it("fails closed when the one rules read itself fails, rather than writing an unverified selection", async () => {

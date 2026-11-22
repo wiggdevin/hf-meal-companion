@@ -2,22 +2,22 @@
  * The fail-closed suggestion verdict (split out of lib/coach/suggest-policy.ts for the file-size
  * cap; suggest-policy re-exports everything here, so callers are unchanged).
  */
-import type { ComposedItem } from "@/lib/coach/compose";
-import type { SuggestionFoodEvidence } from "@/lib/coach/suggest-evidence-types";
-import type { SuggestionEvidence } from "@/lib/coach/suggest-policy";
+import type {
+  SuggestionEvidence, SuggestionFoodEvidence, VerdictItem,
+} from "@/lib/coach/suggest-evidence-types";
 import { facetOutcome } from "@/lib/policy/facet-rules";
 import { evaluatePolicy, type ConstraintProfile, type PolicyEvidence } from "@/lib/policy/constraints";
 import { classifyWholeFood } from "@/lib/policy/whole-foods";
 import { reasonFragment } from "@/lib/policy/reason-words";
 import { unknownAllergenFragment } from "@/lib/policy/held-allergens";
 
-export function suggestionFoodIdentity(item: Pick<ComposedItem,
+export function suggestionFoodIdentity(item: Pick<VerdictItem,
   "foodRefId" | "catalogFoodRevisionId">): string {
   return `ref:${item.foodRefId}`;
 }
 
 export type CandidateOutcome = "allowed" | "blocked" | "unverified" | "requires_preparation";
-type PolicyCandidateItem = Pick<ComposedItem,
+type PolicyCandidateItem = Pick<VerdictItem,
   "foodRefId" | "catalogFoodRevisionId" | "verdict">;
 
 /** The same fail-closed verdict used by coach suggestions, available to account-owned plans. */

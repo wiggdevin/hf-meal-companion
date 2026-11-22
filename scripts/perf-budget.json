@@ -1,5 +1,5 @@
 {
-  "bundle": { "firstLoadKb": 980, "totalKb": 1420 },
+  "bundle": { "firstLoadKb": 980, "totalKb": 1440 },
   "pages": {
     "paths": ["/sign-in"],
     "runs": 3,

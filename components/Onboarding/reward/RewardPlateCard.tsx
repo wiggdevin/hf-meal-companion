@@ -56,7 +56,7 @@ function MealRow({ meal }: { meal: PlanPreviewMeal }) {
 }
 
 export default function RewardPlateCard({ targets, lovedFoods, meals = [], notes = [], onChangeNote,
-  showNumbers, onToggleNumbers }: {
+  showNumbers, onToggleNumbers, starterFree = false }: {
   /** `null` while the preview is still being derived (missing a required fact this card cannot
    *  fix) — renders the "preparing" state rather than a crash or a stale number. */
   targets: RewardPlateTargets | null;
@@ -69,6 +69,9 @@ export default function RewardPlateCard({ targets, lovedFoods, meals = [], notes
   onChangeNote?: (beat: NonNullable<PlanNote["change"]>) => void;
   showNumbers: boolean;
   onToggleNumbers: () => void;
+  /** The account's rules left no starter food to pick: the card confirms setup and says where to
+   *  add foods later, instead of an empty "built from these" list. */
+  starterFree?: boolean;
 }) {
   if (!targets) {
     // Same `.matte-reset` need as the ready state below — `.well`'s own light `--color-fog`
@@ -86,12 +89,20 @@ export default function RewardPlateCard({ targets, lovedFoods, meals = [], notes
   // warns about — caught live in this lane's own mobile QA run, not by a test.
   return <div className="matte-reset surface flex flex-col gap-4 rounded-[24px] p-5"
     data-testid="reward-plate-ready">
-    <div className="flex flex-col gap-1">
-      <h1 className="m-0 text-balance font-display text-heading text-charcoal">Foods you&rsquo;ll see in your plan</h1>
-      <p className="m-0 text-caption text-graphite">
-        Your meals are built from these. Change them any time in Foods.
-      </p>
-    </div>
+    {starterFree
+      ? <div className="flex flex-col gap-1" data-testid="reward-plate-starter-free">
+        <h1 className="m-0 text-balance font-display text-heading text-charcoal">You&rsquo;re all set</h1>
+        <p className="m-0 text-caption text-graphite">
+          Your targets and food rules are ready. No starter foods fit your rules, so your meals
+          fill in as you add foods you eat. Add them any time in Foods.
+        </p>
+      </div>
+      : <div className="flex flex-col gap-1">
+        <h1 className="m-0 text-balance font-display text-heading text-charcoal">Foods you&rsquo;ll see in your plan</h1>
+        <p className="m-0 text-caption text-graphite">
+          Your meals are built from these. Change them any time in Foods.
+        </p>
+      </div>}
     {meals.length > 0 && <section className="flex flex-col gap-2" aria-label="Your first meals today">
       <h2 className="m-0 text-caption font-medium text-graphite">Your first meals today</h2>
       <ul className="m-0 flex flex-col gap-2 p-0">{meals.map((meal) => <MealRow key={meal.label} meal={meal} />)}</ul>

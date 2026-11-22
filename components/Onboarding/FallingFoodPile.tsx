@@ -35,6 +35,7 @@ import { starterVarietyOrder } from "@/lib/foods/starter-variety";
 import type { FoodRole } from "@/lib/foods";
 import { FADES, SPRINGS } from "@/lib/design/motion";
 import Button from "@/components/ui/Button";
+import { FoodsPickHint } from "./FoodsPickHint";
 import { CHIP_FILL } from "./facts/chip-fill";
 import { foodShortName } from "./food-display-names";
 import { useFoodDiscArtReady } from "./food-disc-art";
@@ -43,8 +44,6 @@ import TileGrid from "./TileGrid";
 import styles from "./FallingFoodPile.module.css";
 
 const ROLES: readonly FoodRole[] = ["protein", "carb", "fat"];
-const ROLE_NAME: Record<FoodRole, string> = { protein: "Proteins", carb: "Carbs", fat: "Fats" };
-const PER_ROLE = 2;
 const QUEUE_CAP = 14;
 const LANES = 4;
 /** Below this stage width four lanes put neighbouring discs (104 px with padding) on top of each
@@ -141,20 +140,12 @@ function spawnNext(queue: readonly Starter[], rand: number, lanes: number) {
   };
 }
 
-function roleCounts(choices: readonly Starter[], marks: Record<string, StarterMark>) {
-  return ROLES.map((role) => ({
-    role, loved: choices.filter((item) => item.role === role && marks[item.id] === "eats").length,
-  }));
-}
-
-function Instruction({ choices, marks }: { choices: readonly Starter[]; marks: Record<string, StarterMark> }) {
+function Instruction({ choices, marks, plannedMeals }: {
+  choices: readonly Starter[]; marks: Record<string, StarterMark>; plannedMeals: number;
+}) {
   return <div className="flex w-full flex-col gap-1">
     <p className="m-0 font-display text-[28px] leading-[1.1] tracking-display-md text-charcoal">Tap the foods you love</p>
-    <p className="m-0 text-caption text-graphite" aria-live="polite">
-      {roleCounts(choices, marks).map(({ role, loved }, index) => <span key={role}>
-        {index > 0 && " · "}{ROLE_NAME[role]} {Math.min(loved, PER_ROLE)}/{PER_ROLE}
-      </span>)}
-    </p>
+    <FoodsPickHint choices={choices} marks={marks} plannedMeals={plannedMeals} />
   </div>;
 }
 
@@ -170,8 +161,10 @@ function FoodGrid({ items, marks, onMark }: {
     onToggle={(id, next) => onMark(id, next ? "eats" : "neutral")} />;
 }
 
-export default function FallingFoodPile({ choices, marks, onMark, shownIds, onShown }: {
+export default function FallingFoodPile({ choices, marks, onMark, shownIds, onShown, plannedMeals = 0 }: {
   choices: readonly Starter[];
+  /** A legacy account needs one protein per planned meal; the counter says so (0 for a pilot account). */
+  plannedMeals?: number;
   marks: Record<string, StarterMark>;
   onMark: (id: string, mark: StarterMark) => void;
   /** Foods already shown this session, held by the caller so a remount never replays them. */
@@ -278,7 +271,7 @@ export default function FallingFoodPile({ choices, marks, onMark, shownIds, onSh
 
   if (reduceMotion || finished || listMode) {
     return <div className="flex w-full flex-col gap-3" data-testid="falling-food-pile" data-state="grid">
-      <Instruction choices={choices} marks={marks} />
+      <Instruction choices={choices} marks={marks} plannedMeals={plannedMeals} />
       {finished && <p className="m-0 text-caption text-graphite">Here&rsquo;s the full list. Tap any you&rsquo;d eat.</p>}
       <FoodGrid items={gridItems} marks={marks} onMark={onMark} />
       <FoodTray loved={loved} />
@@ -286,7 +279,7 @@ export default function FallingFoodPile({ choices, marks, onMark, shownIds, onSh
   }
 
   return <div className="flex w-full flex-col gap-3" data-testid="falling-food-pile" data-state="falling">
-    <Instruction choices={choices} marks={marks} />
+    <Instruction choices={choices} marks={marks} plannedMeals={plannedMeals} />
     <Button variant="tertiary" size="md" block className="min-h-11" onClick={() => setListMode(true)}>
       Just pick from the list
     </Button>

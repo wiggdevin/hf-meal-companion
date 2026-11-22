@@ -560,6 +560,29 @@ export function constraintPatchForFlags(
   return Object.keys(patch).length > 0 ? patch : null;
 }
 
+/**
+ * The profile as the account will hold it once `constraintPatchForFlags` has been written: the
+ * draft diet flags' allergen exclusions and banned categories, and the safety round's condition
+ * entries, appended to the stored lists. The Foods step's preview and the save's preflight both
+ * judge starters against THIS profile, so what the person sees and what the save checks is the
+ * same thing persistence writes (W062 verify round: no_eggs withholds white bread before the
+ * flag is stored; a pregnancy answer withholds tuna). Pure.
+ */
+export function projectedConstraintProfile(
+  flags: readonly PreferenceFlag[],
+  profile: Profile,
+  conditions: readonly string[] = [],
+): Profile {
+  const patch = constraintPatchForFlags(flags, profile, conditions);
+  if (!patch) return profile;
+  return {
+    ...profile,
+    ...(patch.avoidAllergens ? { avoid_allergens: patch.avoidAllergens } : {}),
+    ...(patch.bannedCategories ? { banned_categories: patch.bannedCategories } : {}),
+    ...(patch.conditions ? { conditions: patch.conditions } : {}),
+  };
+}
+
 export function weightLbFor(state: OnboardingState): number | null {
   const kg = parsedWeightKg(state);
   return kg === null ? null : kg * LB_PER_KG;

@@ -8,7 +8,7 @@ import type { Profile } from "@/lib/constraints-client";
 import type { Store } from "@/lib/types";
 import type { ProfileInstance } from "@/lib/policy/profiles/types";
 import { persistStarterSelection } from "@/lib/foods/starter-client";
-import { initialStarterSelection, starterChoices, starterSelectionValid } from "@/lib/foods/starter";
+import { initialStarterSelection, starterChoices, type Starter } from "@/lib/foods/starter";
 
 const MARKER = "starter-suggestions-seeded-v1";
 const pending = new Map<string, Promise<boolean>>();
@@ -23,6 +23,18 @@ export async function remoteHasFoods(h: AccountHandle): Promise<boolean | null> 
     .select("food_ref_id").eq("user_id", owner).limit(1));
   if (prefs.error) return null;
   return (foods.data?.length ?? 0) > 0 || (prefs.data?.length ?? 0) > 0;
+}
+
+const SEED_FLOOR = 2;
+
+/** Two allowed foods in every group and two seeded picks in each: no relaxed onboarding floor. */
+function strictSeedSelection(ids: readonly string[], choices: readonly Starter[]): boolean {
+  const selected = new Set(ids);
+  return (["protein", "carb", "fat"] as const).every((role) => {
+    const ofRole = choices.filter((item) => item.role === role);
+    return ofRole.length >= SEED_FLOOR
+      && ofRole.filter((item) => selected.has(item.id)).length >= SEED_FLOOR;
+  });
 }
 
 export type SeedDependencies = {
@@ -62,10 +74,12 @@ export function seedZeroFoodAccount(profile: Profile, instances: readonly Profil
     const choices = starterChoices(flags, profile, instances);
     const marks = initialStarterSelection(flags, profile, store.settings.dietPrefs?.text ?? "", instances);
     const eats = Object.entries(marks).filter(([, mark]) => mark === "eats").map(([id]) => id);
-    if (!starterSelectionValid(eats, choices)) return false;
+    // Auto-seeding stays strict: it never adopts onboarding's relaxed minimums (two foods per
+    // group, or every food a group has). Every group must hold two allowed foods and two picks.
+    if (!strictSeedSelection(eats, choices)) return false;
     // A partial write keeps this marker so the same device can resume only missing suggestions.
     if (state !== "pending") deps.storage.setItem(marker, "pending");
-    await deps.persist(marks, choices, undefined, "suggested");
+    await deps.persist(marks, choices, undefined, "suggested", flags);
     assertCurrent(h);
     deps.storage.setItem(marker, "complete");
     return true;

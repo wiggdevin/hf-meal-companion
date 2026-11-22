@@ -1,14 +1,20 @@
 /** Curated, account-filtered starters from the bundled USDA food list. */
-import { starterFacetOutcome } from "./starter-evidence";
+import { starterSuggestionEvidence } from "./starter-evidence";
 import { dbFood } from "@/lib/food-db";
 import type { Profile } from "@/lib/constraints-client";
 import type { Food, FoodRole, FoodStatus, FoodUnit } from "@/lib/foods";
-import { profileFacetOutcome } from "@/lib/policy/profiles/hard-rules";
-import { isActiveHardRule, type ProfileInstance } from "@/lib/policy/profiles/types";
-import { allergenKey } from "@/lib/policy/allergens";
+import type { ProfileInstance } from "@/lib/policy/profiles/types";
+import { activeHardRulesFor } from "@/lib/policy/profiles/account-rules";
+import type { ConstraintProfile } from "@/lib/policy/constraints";
+import { suggestionFoodIdentity, suggestionItemsVerdict } from "@/lib/coach/suggest-verdict";
+import {
+  LEGACY_PREFERENCE_FLAGS, type LegacyPreferenceFlag,
+} from "@/lib/policy/profiles/legacy-flags";
 
 export type DietStyle = "omnivore" | "pescatarian" | "vegetarian" | "vegan";
-export type Starter = { id: string; role: FoodRole; unit: FoodUnit; grams: number; diets: readonly DietStyle[]; allergens?: readonly string[]; categories?: readonly string[]; default?: boolean };
+export type Starter = { id: string; role: FoodRole; unit: FoodUnit; grams: number; diets: readonly DietStyle[]; allergens?: readonly string[];
+  /** Cross-contact or common-recipe allergens (oats and gluten, nuts and peanuts): they count as present for a hard allergy rule. */
+  mayContain?: readonly string[]; categories?: readonly string[]; default?: boolean };
 const ALL = ["omnivore", "pescatarian", "vegetarian", "vegan"] as const;
 const ANIMAL = ["omnivore", "pescatarian", "vegetarian"] as const;
 const SEA = ["omnivore", "pescatarian"] as const;
@@ -24,13 +30,13 @@ export const STARTERS: readonly Starter[] = [
   S("tuna-canned-in-water-light", "protein", "oz", 28.35, SEA, { categories: ["fish"], allergens: ["fish"], default: true }),
   S("cod-cooked", "protein", "oz", 28.35, SEA, { categories: ["fish"], allergens: ["fish"] }),
   S("egg-white", "protein", "cup", 243, ANIMAL, { allergens: ["egg"], default: true }),
-  S("whey-protein-powder", "protein", "cup", 96, ANIMAL, { allergens: ["dairy"], default: true }),
+  S("whey-protein-powder", "protein", "cup", 96, ANIMAL, { allergens: ["dairy"], mayContain: ["soy"], default: true }),
   // Breakfast anchors (Phase 17 O1): without them a new account's 07:30 plate had only egg white,
   // whey or tofu to lead it.
   S("egg-whole-large", "protein", "whole", 50, ANIMAL, { allergens: ["egg"], default: true }),
   S("greek-yogurt-plain-nonfat", "protein", "cup", 245, ANIMAL, { allergens: ["dairy"], default: true }),
   S("tofu-firm", "protein", "oz", 28.35, ALL, { allergens: ["soy"], default: true }),
-  S("tempeh", "protein", "oz", 28.35, ALL, { allergens: ["soy"], default: true }),
+  S("tempeh", "protein", "oz", 28.35, ALL, { allergens: ["soy"], mayContain: ["gluten", "wheat"], default: true }),
   S("edamame-cooked", "protein", "cup", 155, ALL, { allergens: ["soy"], categories: ["beans"], default: true }),
   S("lentils-cooked", "protein", "cup", 198, ALL, { categories: ["beans"], default: true }),
   S("black-beans-cooked", "protein", "cup", 172, ALL, { categories: ["beans"], default: true }),
@@ -39,14 +45,14 @@ export const STARTERS: readonly Starter[] = [
   S("white-rice-cooked", "carb", "cup", 158, ALL, { default: true }),
   S("brown-rice-cooked", "carb", "cup", 195, ALL, { default: true }),
   S("quinoa-cooked", "carb", "cup", 185, ALL, { default: true }),
-  S("oatmeal-cooked", "carb", "cup", 234, ALL, { default: true }),
+  S("oatmeal-cooked", "carb", "cup", 234, ALL, { mayContain: ["gluten", "wheat"], default: true }),
   S("potato-baked-with-skin", "carb", "whole", 173, ALL, { default: true }),
   S("sweet-potato-baked", "carb", "whole", 114, ALL, { default: true }),
   S("banana", "carb", "whole", 118, ALL, { default: true }),
   S("apple-with-skin", "carb", "whole", 182, ALL, { allergens: ["apple"], categories: ["apple"] }),
-  S("white-bread", "carb", "whole", 29, ALL, { allergens: ["wheat", "gluten"], categories: ["gluten"] }),
+  S("white-bread", "carb", "whole", 29, ALL, { allergens: ["wheat", "gluten"], mayContain: ["soy", "dairy"], categories: ["gluten"] }),
   S("corn-tortilla", "carb", "whole", 26, ALL),
-  S("whole-wheat-bread", "carb", "whole", 32, ALL, { allergens: ["wheat", "gluten"], categories: ["gluten"] }),
+  S("whole-wheat-bread", "carb", "whole", 32, ALL, { allergens: ["wheat", "gluten"], mayContain: ["soy", "dairy"], categories: ["gluten"] }),
   S("blueberries", "carb", "cup", 148, ALL, { default: true }),
   // Vegetables (role carb, as the layout counts them): a main plate takes one whenever Eats has it.
   S("broccoli-cooked", "carb", "cup", 156, ALL, { default: true }),
@@ -55,9 +61,9 @@ export const STARTERS: readonly Starter[] = [
   S("olive-oil", "fat", "tbsp", 13.5, ALL, { default: true }),
   S("avocado-oil", "fat", "tbsp", 13.5, ALL, { default: true }),
   S("avocado", "fat", "cup", 150, ALL, { default: true }),
-  S("peanut-butter", "fat", "tbsp", 16, ALL, { allergens: ["peanut"], default: true }),
-  S("almonds", "fat", "oz", 28.35, ALL, { allergens: ["tree-nut"], default: true }),
-  S("pumpkin-seeds", "fat", "oz", 28.35, ALL, { default: true }),
+  S("peanut-butter", "fat", "tbsp", 16, ALL, { allergens: ["peanut"], mayContain: ["tree-nut"], default: true }),
+  S("almonds", "fat", "oz", 28.35, ALL, { allergens: ["tree-nut"], mayContain: ["peanut"], default: true }),
+  S("pumpkin-seeds", "fat", "oz", 28.35, ALL, { mayContain: ["tree-nut", "peanut"], default: true }),
   S("butter", "fat", "tbsp", 14.2, ANIMAL, { allergens: ["dairy"] }),
 ];
 
@@ -78,70 +84,127 @@ export function dietStyle(flags: readonly string[]): DietStyle {
   return "omnivore";
 }
 
-/**
- * One concern per allergen for a starter: wheat and gluten are the same concern here (W014, audit
- * 2026-10-10 A041), so an account that avoids either never sees a starter tagged with the other.
- */
-function allergenConcern(name: string): string {
-  const key = allergenKey(name);
-  return key === "wheat" ? "gluten" : key;
+/** Why one starter is withheld: the rule in the user's words, and whether the starter breaks it or just cannot be checked against it. */
+export type StarterRuleHit = { rule: string; verdict: "violates" | "unverified" };
+
+const NO_FLAGS: readonly string[] = [];
+const FOOD_RULES = "food rules";
+
+/** Flags the evaluator reads as preference flags (the 12 legacy ones; anything else is ignored). */
+function preferenceFlagsFor(flags: readonly string[]): LegacyPreferenceFlag[] {
+  return LEGACY_PREFERENCE_FLAGS.filter((flag) => flags.includes(flag));
 }
 
 /**
- * The allergen/category/hard-rule exclusion check alone — not diet style, which `starterChoices`
- * filters separately. Factored out so the just-before-write recheck in
- * `lib/foods/starter-client.ts` (ONB2-RULE-REREAD-WRITE) can apply the IDENTICAL predicate against
- * a freshly re-read profile+instances, instead of a hand-rolled approximation that could drift.
+ * The inputs `evaluatePolicy` reads for an account, built the way lib/server/policy-profile.ts
+ * builds them: the legacy flags are preference flags, and the stored instances are the profile's
+ * hard rules. A flag's own synthesized instance is never added a second time as a profile rule,
+ * exactly as the server never adds one; a STORED row is always kept, even when a flag maps to
+ * the same profile id. `legacy_no_pork` and
+ * `legacy_no_beef` exist only as a synthesis of those flags, so they fold back into the flags.
  */
-function starterPassesRuleSets(
-  item: Starter, bannedCategories: ReadonlySet<string>, avoidAllergens: ReadonlySet<string>,
-  instances: readonly ProfileInstance[], asOf: Date,
-): boolean {
-  return !(item.categories ?? []).some((key) => bannedCategories.has(key))
-    && !(item.allergens ?? []).some((key) => avoidAllergens.has(allergenConcern(key)))
-    && dbFood(item.id) !== undefined
-    && instances.every((instance) => instance.rules.every((rule) =>
-      !isActiveHardRule(rule, asOf) || (starterFacetOutcome(item, rule.facet) ?? profileFacetOutcome(rule.facet, {
-        // The bundled name may name a facet, but it is not a label and clears nothing here: only
-        // the starter's own curated evidence (starterFacetOutcome) can (Phase 18 W2c).
-        foodName: dbFood(item.id)?.name, wholeFoodName: null,
-        ingredientsText: dbFood(item.id)?.name, ingredientsTextIsLabel: false,
-      })) === "absent"));
+export function starterPolicyInputs(
+  flags: readonly string[], profile: Profile, instances: readonly ProfileInstance[], asOf: Date,
+): { profile: ConstraintProfile; preferenceFlags: LegacyPreferenceFlag[] } {
+  const preferenceFlags = new Set(preferenceFlagsFor(flags));
+  for (const instance of instances) {
+    if (instance.profileId === "legacy_no_pork") preferenceFlags.add("no_pork");
+    else if (instance.profileId === "legacy_no_beef") preferenceFlags.add("no_beef");
+  }
+  // Every stored row is a profile rule, whether or not a legacy flag maps to the same profile id
+  // (`no_shellfish` plus a stored crustacean row keeps the stored row), exactly as the server's
+  // `readPolicyProfile` does. Only an instance synthesized from a flag is skipped: the flag
+  // already reaches the evaluator as a preference flag. An instance with no marker (an older
+  // server) is treated as stored, which can only withhold more.
+  const rules = instances.filter((instance) => instance.derivedFromFlag !== true
+    && instance.profileId !== "legacy_no_pork" && instance.profileId !== "legacy_no_beef");
+  return {
+    preferenceFlags: LEGACY_PREFERENCE_FLAGS.filter((flag) => preferenceFlags.has(flag)),
+    profile: {
+      avoid_allergens: profile.avoid_allergens, avoid_food_ref_ids: profile.avoid_food_ref_ids,
+      banned_categories: profile.banned_categories, conditions: profile.conditions,
+      ...(profile.custom_rules === undefined ? {} : { custom_rules: profile.custom_rules }),
+      profileIds: instances.map((instance) => instance.profileId),
+      profileRules: activeHardRulesFor(rules, asOf),
+    },
+  };
 }
 
-/** Absence of a loaded profile must never mean that allergens are clear. */
+/**
+ * The one eligibility verdict for a starter: the fail-closed verdict Today, Coach and the plan
+ * checks use (`suggestionItemsVerdict` → `evaluatePolicy`), judged on the starter's own bundled
+ * row. Anything that verdict does not call "allowed" (blocked, unverified, unknown) is withheld.
+ * Curated starter data (`starterSuggestionEvidence`) can only add denying evidence here.
+ */
+function starterRuleHit(
+  item: Starter, flags: readonly string[], profile: Profile, instances: readonly ProfileInstance[],
+  asOf: Date,
+): StarterRuleHit | null {
+  const food = dbFood(item.id);
+  if (food === undefined) return { rule: "the bundled food list", verdict: "unverified" };
+  // A starter has no food-ref id to compare with `avoid_food_ref_ids`, so a profile that names any
+  // avoided food cannot be checked here: every starter is withheld (fail closed), never offered.
+  if (profile.avoid_food_ref_ids.length > 0) return { rule: "Avoid list", verdict: "unverified" };
+  const { profile: constraint, preferenceFlags } = starterPolicyInputs(flags, profile, instances, asOf);
+  const refId = `starter:${item.id}`;
+  const facts = starterSuggestionEvidence(item, {
+    allergenTags: [], allergenEvidence: {}, checkedAllergens: [], ingredientsText: null,
+    ingredientsTextIsLabel: false, foodName: food.name, foodBrand: null, packaged: false,
+    policyCategories: null, facets: {}, noCook: null, onEatsList: false, onAvoidList: false,
+    role: item.role,
+  }, { denyOnly: true });
+  const verdict = suggestionItemsVerdict(
+    [{ foodRefId: refId, catalogFoodRevisionId: null, verdict: "allowed" }],
+    { status: "ready", preferenceFlags, byIdentity: { [suggestionFoodIdentity({ foodRefId: refId, catalogFoodRevisionId: null })]: facts } },
+    constraint, false);
+  if (verdict.outcome === "allowed") return null;
+  return { rule: FOOD_RULES, verdict: verdict.outcome === "blocked" ? "violates" : "unverified" };
+}
+
+/**
+ * Every starter with the rule that withholds it (null: it is offered). Diet style is judged
+ * separately (it can only deny), so a starter of another diet carries `{ rule: "diet", verdict:
+ * "violates" }`.
+ */
+export function starterRuleHits(flags: readonly string[], profile: Profile,
+  instances: readonly ProfileInstance[] = [], asOf: Date = new Date(),
+): Map<string, StarterRuleHit | null> {
+  const style = dietStyle(flags);
+  return new Map(STARTERS.map((item) => [item.id, item.diets.includes(style)
+    ? starterRuleHit(item, flags, profile, instances, asOf)
+    : { rule: "diet", verdict: "violates" as const }]));
+}
+
+/**
+ * Absence of a loaded profile must never mean that allergens are clear. A starter whose status
+ * cannot be proved is withheld by itself; the list is never emptied wholesale because one facet
+ * cannot be checked.
+ */
 export function starterChoices(flags: readonly string[], profile: Profile,
   instances: readonly ProfileInstance[] = [], asOf: Date = new Date()): Starter[] {
-  // This local catalog has no food-ref IDs; an unresolved ID rule cannot be waived by a name.
-  if (profile.avoid_food_ref_ids.length) return [];
-  const style = dietStyle(flags);
-  const banned = new Set(profile.banned_categories.map((x) => x.toLowerCase()));
-  const allergens = new Set(profile.avoid_allergens.map(allergenConcern));
-  for (const flag of flags) {
-    const key = ({ no_shellfish: "shellfish", no_eggs: "egg", no_soy: "soy", no_peanuts: "peanut" } as Record<string, string>)[flag];
-    if (key) allergens.add(allergenConcern(key));
-  }
-  if (flags.includes("low_fodmap")) banned.add("beans");
-  if (flags.includes("no_pork") || flags.includes("halal") || flags.includes("kosher")) banned.add("pork");
-  if (flags.includes("no_beef")) banned.add("beef");
-  // No certification data exists for meat; halal/kosher suggestions use plant, eggs and fish only.
-  if (flags.includes("halal") || flags.includes("kosher")) { banned.add("beef"); banned.add("poultry"); }
-  return STARTERS.filter((item) => item.diets.includes(style)
-    && starterPassesRuleSets(item, banned, allergens, instances, asOf));
+  const hits = starterRuleHits(flags, profile, instances, asOf);
+  return STARTERS.filter((item) => hits.get(item.id) === null);
 }
 
 /**
- * The same allergen/category/hard-rule check `starterChoices` applies, but against the account's
- * CURRENT profile directly (no diet-style filter, no flag-derived bans merged in) — for a
- * just-before-write recheck where only the stored profile+instances could have changed, not the
- * draft's own flags. Returns true when the item is now excluded and must not be written as "eats".
+ * The same eligibility verdict `starterChoices` applies, against the account's CURRENT stored
+ * profile only (no draft flags) — for a just-before-write recheck where only the stored
+ * profile+instances could have changed. True when the item is now excluded and must not be
+ * written as "eats".
  */
 export function starterExcludedByCurrentRules(
   item: Starter, profile: Profile, instances: readonly ProfileInstance[], asOf: Date = new Date(),
+  flags: readonly string[] = NO_FLAGS,
 ): boolean {
-  const banned = new Set(profile.banned_categories.map((x) => x.toLowerCase()));
-  const allergens = new Set(profile.avoid_allergens.map(allergenConcern));
-  return !starterPassesRuleSets(item, banned, allergens, instances, asOf);
+  return starterExclusionReason(item, profile, instances, asOf, flags) !== null;
+}
+
+/** The rule that now withholds one starter from the CURRENT profile, or null when it is still allowed. */
+export function starterExclusionReason(
+  item: Starter, profile: Profile, instances: readonly ProfileInstance[], asOf: Date = new Date(),
+  flags: readonly string[] = NO_FLAGS,
+): StarterRuleHit | null {
+  return starterRuleHit(item, flags, profile, instances, asOf);
 }
 
 export function starterDefaultIds(choices: readonly Starter[]): string[] {
@@ -218,10 +281,67 @@ export function starterFillShortRoles(
   return added;
 }
 
+/** How many foods one role needs: two, or every food it has when the account's rules leave fewer. */
+export function starterRoleRequirement(role: FoodRole, choices: readonly Starter[]): number {
+  return Math.min(2, choices.filter((item) => item.role === role).length);
+}
+
+/** The roles whose rules leave fewer than two foods (zero: the role is skipped). */
+export function starterShortRoles(choices: readonly Starter[]): FoodRole[] {
+  return (["protein", "carb", "fat"] as const).filter((role) =>
+    choices.filter((item) => item.role === role).length < 2);
+}
+
+/**
+ * Two foods per role, or every food a role has when the account's rules leave fewer (a role with
+ * none is skipped) — a person with hard food rules must always be able to finish (W062).
+ */
 export function starterSelectionValid(ids: readonly string[], choices: readonly Starter[]): boolean {
   const selected = new Set(ids);
   return (["protein", "carb", "fat"] as const).every((role) =>
-    choices.filter((item) => item.role === role && selected.has(item.id)).length >= 2);
+    choices.filter((item) => item.role === role && selected.has(item.id)).length
+      >= starterRoleRequirement(role, choices));
+}
+
+export type StarterSelectionProblem =
+  | { kind: "rule"; foodName: string; rule: string; verdict: StarterRuleHit["verdict"] }
+  | { kind: "floor"; role: FoodRole; need: number; have: number };
+
+const ROLE_WORDS: Record<FoodRole, string> = { protein: "proteins", carb: "carbs", fat: "fats" };
+
+/**
+ * What stops a picked selection from saving against the account's rules: a picked food a rule now
+ * withholds (named, with the rule), else a role still short of its floor. Null when it saves. Pure.
+ */
+export function starterSelectionProblem(
+  ids: readonly string[], flags: readonly string[], profile: Profile,
+  instances: readonly ProfileInstance[] = [], asOf: Date = new Date(),
+): StarterSelectionProblem | null {
+  const hits = starterRuleHits(flags, profile, instances, asOf);
+  const choices = STARTERS.filter((item) => hits.get(item.id) === null);
+  if (starterSelectionValid(ids, choices)) return null;
+  for (const id of ids) {
+    const hit = hits.get(id);
+    const name = dbFood(id)?.name;
+    if (hit && name && hit.rule !== "diet") return { kind: "rule", foodName: name, rule: hit.rule, verdict: hit.verdict };
+  }
+  const selected = new Set(ids);
+  for (const role of ["protein", "carb", "fat"] as const) {
+    const need = starterRoleRequirement(role, choices);
+    const have = choices.filter((item) => item.role === role && selected.has(item.id)).length;
+    if (have < need) return { kind: "floor", role, need, have };
+  }
+  return null;
+}
+
+/** The line the person reads for a selection problem. */
+export function starterProblemMessage(problem: StarterSelectionProblem): string {
+  if (problem.kind === "floor") {
+    return `Pick ${problem.need} ${ROLE_WORDS[problem.role]} in Foods to finish.`;
+  }
+  return problem.verdict === "violates"
+    ? `${problem.foodName} doesn't fit your ${problem.rule}. Go back to Foods, take it off, and pick again.`
+    : `We can't confirm ${problem.foodName} fits your ${problem.rule}. Go back to Foods, take it off, and pick again.`;
 }
 
 export function starterFood(id: string, status: FoodStatus): Food {

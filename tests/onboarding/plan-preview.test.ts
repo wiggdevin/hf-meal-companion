@@ -4,6 +4,9 @@ import { onboardingPlanPreview } from "@/lib/onboarding/plan-preview";
 import { resolveDay } from "@/lib/resolve";
 import { defaultStore } from "@/lib/store";
 import { starterFood } from "@/lib/foods/starter";
+import { StampedEligibleSet } from "@/lib/foods/eligible-client";
+import { foodRulesKey } from "@/lib/foods/rule-marks";
+import { foodRulesEpoch } from "@/lib/foods/rules-epoch";
 import type { Settings, TargetRevision } from "@/lib/types";
 import { buildCompletedSettings, createOnboardingState, onboardingReducer } from "@/lib/profile/onboarding-state";
 import { defaultSettings } from "@/lib/store";
@@ -103,12 +106,13 @@ describe("onboardingPlanPreview over the real onboarding candidate", () => {
 // card and Today planned from different food sets.
 describe("onboardingPlanPreview for a returning account", () => {
   const DATE = "2026-10-08";
+  const stamped = (ids: string[]) => new StampedEligibleSet(ids, new Map(), foodRulesKey(settings()), foodRulesEpoch());
   const own = { ...starterFood("chicken-breast-roasted", "eats"), id: "own-chicken", name: "Home roasted chicken" };
 
   it("plans from the account's verified Eats plus the picks, exactly as Today does after the save", () => {
     const account = defaultStore();
     account.foods = { [own.id]: own };
-    const preview = onboardingPlanPreview(settings(), PICKED, DATE, { store: account, verified: new Set([own.id]) });
+    const preview = onboardingPlanPreview(settings(), PICKED, DATE, { store: account, verified: stamped([own.id]) });
 
     const store = defaultStore();
     store.settings = { ...settings(), ruleReviewReady: true };
@@ -117,6 +121,26 @@ describe("onboardingPlanPreview for a returning account", () => {
     expect(preview.meals.map((meal) => [meal.time, meal.name]))
       .toEqual(today.slots.filter((slot) => slot.meal && slot.components.length > 0)
         .map((slot) => [slot.time, slot.meal!.name]));
+  });
+
+  // Sol BLOCK (PR 275 audit): a returning account that switches to vegan kept its verified chicken,
+  // because the verified ids were copied into a plain set that skipped the stamp check.
+  it("an existing food verified under other rules (the rules the person just chose) stays out", () => {
+    const account = defaultStore();
+    account.foods = { [own.id]: own };
+    const other = new StampedEligibleSet([own.id], new Map(), foodRulesKey({ dietPrefs: { flags: ["vegan"] } } as never), foodRulesEpoch());
+    const preview = onboardingPlanPreview(settings(), PICKED, DATE, { store: account, verified: other });
+    expect(preview.meals.flatMap((meal) => meal.components.map((part) => part.name))).not.toContain(own.name);
+  });
+
+  it("an existing food from a revoked or plain verified set stays out, even with no picks", () => {
+    const account = defaultStore();
+    account.foods = { [own.id]: own };
+    const revoked = new StampedEligibleSet([own.id], new Map(), foodRulesKey(settings()), foodRulesEpoch() - 1);
+    for (const verified of [revoked, new Set([own.id])]) {
+      const preview = onboardingPlanPreview(settings(), [], DATE, { store: account, verified });
+      expect(preview.meals).toEqual([]);
+    }
   });
 
   it("an existing food the server did not verify stays out, as it does on Today", () => {
@@ -130,7 +154,7 @@ describe("onboardingPlanPreview for a returning account", () => {
     const account = defaultStore();
     const sameName = { ...PICKED[0], id: "own-salmon", status: "avoid" as const };
     account.foods = { [sameName.id]: sameName };
-    const preview = onboardingPlanPreview(settings(), PICKED, DATE, { store: account, verified: new Set() });
+    const preview = onboardingPlanPreview(settings(), PICKED, DATE, { store: account, verified: stamped([]) });
     expect(preview.meals.length).toBeGreaterThan(0);
   });
 });

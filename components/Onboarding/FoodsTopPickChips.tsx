@@ -11,6 +11,7 @@
  */
 import { dbFood } from "@/lib/food-db";
 import type { Starter, StarterMark } from "@/lib/foods/starter";
+import { FoodsPickHint } from "@/components/Onboarding/FoodsPickHint";
 import { starterVarietyOrder } from "@/lib/foods/starter-variety";
 import type { FoodRole } from "@/lib/foods";
 import Button from "@/components/ui/Button";
@@ -33,6 +34,8 @@ export function topPickChoices(choices: readonly Starter[]): Starter[] {
   return picks;
 }
 
+export { FoodsPickHint };
+
 export default function FoodsTopPickChips({ choices, marks, onMark }: {
   choices: readonly Starter[];
   marks: Record<string, StarterMark>;
@@ -41,6 +44,7 @@ export default function FoodsTopPickChips({ choices, marks, onMark }: {
   const picks = topPickChoices(choices);
   return <div className="flex flex-col gap-3" data-testid="foods-top-pick-chips">
     <p className="m-0 text-caption text-graphite">Tap the ones you love most.</p>
+    <FoodsPickHint choices={choices} marks={marks} />
     <div className="flex flex-wrap gap-2">
       {picks.map((item) => {
         const name = dbFood(item.id)?.name ?? item.id;

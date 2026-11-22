@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { starterChoices, initialStarterSelection, starterFood, mentionedFoodChoices, starterSelectionValid } from "./starter";
+import { starterChoices, initialStarterSelection, starterFood, mentionedFoodChoices, starterSelectionValid,
+  starterSelectionProblem, starterProblemMessage, starterRoleRequirement, starterShortRoles,
+  STARTERS } from "./starter";
+import { legacyInstanceFromCatalog } from "@/lib/policy/profiles/legacy-flags";
+import type { ProfileInstance, RuleId } from "@/lib/policy/profiles/types";
 
 import { profileInstancesForLegacyFlags } from "@/lib/policy/profiles/legacy-flags";
 
@@ -24,6 +28,7 @@ describe("account-safe starter foods", () => {
     expect(starterChoices(["no_soy"], emptyRules).some((item) => item.id === "tofu-firm")).toBe(false);
     expect(starterChoices([], { ...emptyRules, avoid_allergens: ["soy"] })
       .some((item) => item.id === "tofu-firm")).toBe(false);
+    // A starter has no food-ref id to compare with, so an Avoid list cannot be checked: fail closed.
     expect(starterChoices([], { ...emptyRules, avoid_food_ref_ids: ["unmapped-ref"] })).toEqual([]);
     expect(starterChoices([], { ...emptyRules, avoid_allergens: ["tree nuts", "milk"] })
       .some((item) => item.id === "almonds" || item.id === "whey-protein-powder")).toBe(false);
@@ -37,11 +42,86 @@ describe("account-safe starter foods", () => {
     }
   });
 
-  it("does not clear confirmed allergy profiles from missing starter tags", () => {
+  it("excludes only the starters that carry a confirmed allergy, never the whole list", () => {
+    const all = starterChoices([], emptyRules).map((item) => item.id);
+    const carriers: Record<string, string[]> = {
+      no_soy: ["tofu-firm", "tempeh"], no_eggs: ["egg-white"],
+      no_peanuts: ["peanut-butter", "almonds", "pumpkin-seeds"], no_shellfish: [],
+    };
     for (const flag of ["no_soy", "no_eggs", "no_peanuts", "no_shellfish"] as const) {
-      expect(starterChoices([flag], emptyRules,
-        profileInstancesForLegacyFlags([flag], "2026-09-01"))).toEqual([]);
+      const ids = starterChoices([flag], emptyRules,
+        profileInstancesForLegacyFlags([flag], "2026-09-01")).map((item) => item.id);
+      expect(ids.length).toBeGreaterThan(0);
+      for (const out of carriers[flag]) expect(ids).not.toContain(out);
+      // The carriers go, and so does every formulated starter the shared evaluator cannot prove
+      // free of the allergen from an unlabeled row (bread, whey, yogurt, tempeh, tortilla,
+      // peanut butter, canned tuna: at most 8); every plain whole food stays.
+      expect(ids.length).toBeGreaterThanOrEqual(all.length - 10);
+      for (const plain of ["white-rice-cooked", "banana", "olive-oil", "lentils-cooked"]) {
+        if (!carriers[flag].includes(plain)) expect(ids).toContain(plain);
+      }
     }
+  });
+
+  it("peanut allergy keeps a non-empty list and offers no peanut-containing starter", () => {
+    const peanut = legacyInstanceFromCatalog("allergy_peanut", "2026-09-01")!;
+    const ids = starterChoices([], emptyRules, [peanut]).map((item) => item.id);
+    expect(ids.length).toBeGreaterThan(20);
+    for (const item of STARTERS.filter((x) => ids.includes(x.id))) {
+      expect([...(item.allergens ?? []), ...(item.mayContain ?? [])].join(" ")).not.toMatch(/peanut/);
+    }
+    expect(ids).not.toContain("peanut-butter");
+    expect(ids).not.toContain("almonds");
+    expect(starterShortRoles(starterChoices([], emptyRules, [peanut]))).toEqual([]);
+  });
+
+  it("stored halal withholds uncertified chicken and beef and leaves a starter-free list that can still save", () => {
+    const halal = legacyInstanceFromCatalog("halal", "2026-09-01")!;
+    const noBeef = profileInstancesForLegacyFlags(["no_beef"], "2026-09-01");
+    // No draft flag: the stored profile alone holds halal, and nothing in the bundled list is certified.
+    const stored = starterChoices([], emptyRules, [halal]).map((item) => item.id);
+    expect(stored).not.toContain("chicken-breast-roasted");
+    expect(stored).not.toContain("ground-beef-90-10-cooked");
+    const choices = starterChoices(["halal", "no_beef"], emptyRules, [halal, ...noBeef]);
+    expect(choices.map((item) => item.id)).not.toContain("pork-tenderloin-roasted");
+    // Withheld means withheld, not "assume fine": the person finishes with no starters at all.
+    expect(starterRoleRequirement("protein", choices)).toBe(0);
+    expect(starterSelectionValid([], choices)).toBe(true);
+    expect(starterSelectionProblem([], ["halal", "no_beef"], emptyRules, [halal, ...noBeef])).toBeNull();
+  });
+
+  it("excludes a starter whose rule facet is uncurated by itself, not the others", () => {
+    const uncurated: ProfileInstance = { profileId: "texture", source: "user_stated",
+      confirmedAt: "2026-09-01", options: {}, rules: [{
+        id: "texture::contains_ingredient:zzz-unknown-term" as RuleId, profileId: "texture",
+        facet: "contains_ingredient:zzz-unknown-term", strength: "never",
+        hardBasis: "user_rule", evidenceStrength: null, confirmation: "confirmed", expiresAt: null }] };
+    // No starter can be proven free of an unknown ingredient, so each is held individually; a
+    // known term still clears the rest, which shows exclusion is per starter, not a blanket.
+    expect(starterChoices([], emptyRules, [uncurated])).toEqual([]);
+    const beef: ProfileInstance = { ...uncurated, profileId: "legacy_no_beef", rules: [{
+      ...uncurated.rules[0], id: "legacy_no_beef::contains_ingredient:beef" as RuleId,
+      profileId: "legacy_no_beef", facet: "contains_ingredient:beef" }] };
+    const ids = starterChoices([], emptyRules, [beef]).map((item) => item.id);
+    expect(ids).not.toContain("ground-beef-90-10-cooked");
+    // A formulated starter has no label here, so a named-ingredient rule withholds it too; every
+    // plain whole food but the beef stays.
+    const formulated = ["tuna-canned-in-water-light", "whey-protein-powder", "greek-yogurt-plain-nonfat",
+      "tempeh", "white-bread", "corn-tortilla", "whole-wheat-bread", "peanut-butter"];
+    expect(ids.length).toBe(STARTERS.length - 1 - formulated.length);
+    for (const id of formulated) expect(ids).not.toContain(id);
+  });
+
+  it("lowers the floor to what a role has, and names the problem when a pick breaks a rule", () => {
+    const poultryFree = starterChoices([], { ...emptyRules, banned_categories: ["poultry"] });
+    expect(starterRoleRequirement("protein", poultryFree)).toBe(2);
+    const one = poultryFree.filter((item) => item.role === "protein").slice(0, 1);
+    expect(starterRoleRequirement("protein", one)).toBe(1);
+    expect(starterRoleRequirement("fat", [])).toBe(0);
+    const problem = starterSelectionProblem(["chicken-breast-roasted"], [],
+      { ...emptyRules, banned_categories: ["poultry"] });
+    expect(problem).toMatchObject({ kind: "rule", foodName: expect.stringMatching(/^Chicken breast/) });
+    expect(starterProblemMessage(problem!)).toMatch(/doesn't fit your .*Go back to Foods/);
   });
 
   it("preserves this account's saved Avoid and neutral marks when setup is reopened", () => {
@@ -81,7 +161,7 @@ describe("account-safe starter foods", () => {
   it("requires two selected foods per role and converts to household portions", () => {
     const choices = starterChoices(["vegan"], emptyRules);
     expect(starterSelectionValid(choices.slice(0, 2).map((item) => item.id), choices)).toBe(false);
-    const selected = ["tofu-firm", "tempeh", "white-rice-cooked", "quinoa-cooked", "olive-oil", "avocado"];
+    const selected = ["tofu-firm", "edamame-cooked", "white-rice-cooked", "quinoa-cooked", "olive-oil", "avocado"];
     expect(starterSelectionValid(selected, choices)).toBe(true);
     const tofu = starterFood("tofu-firm", "eats");
     expect(tofu.unit).toBe("oz");

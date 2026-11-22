@@ -66,6 +66,15 @@ describe("zero-food starter seed", () => {
     expect(persist).not.toHaveBeenCalled();
   });
 
+  it("stays strict: an account whose rules leave no starter is never auto-seeded, and relaxed onboarding minimums do not apply", async () => {
+    const { deps, persist } = setup();
+    // A peanut-avoid with an unmatchable ref leaves no starter; onboarding would let the person
+    // finish with nothing, but auto-seeding must not write anything on that relaxed footing.
+    const holding = { ...profile, avoid_food_ref_ids: ["ref-x"] };
+    expect(await seedZeroFoodAccount(holding, [], deps)).toBe(false);
+    expect(persist).not.toHaveBeenCalled();
+  });
+
   it("never seeds over current local choices", async () => {
     const { deps, store, remoteHasFoods } = setup();
     store.foods.own = { id: "own", name: "My lunch", role: "protein", unit: "g",
