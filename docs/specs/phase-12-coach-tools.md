@@ -31,7 +31,7 @@ Owner confirmation of the minima (protein 1.8 / 2.0 g/kg, `macroMinimumKcal`) is
   sends the settings the target was derived from as `floor_profile` in `p_row`. For height and goal
   the sent value wins over the stored one (the target is judged on the profile it was derived from,
   so a `lose_fat` to `maintain` edit is not refused at the old goal's protein). Sex and birth year
-  are only checked present. The weight is the weigh-in log first, then `floor_profile.weight_kg`.
+  are only checked present. The weight is the weigh-in log first, then `floor_profile.weight_kg`, then the stored profile weight.
   Kidney holds and the adult floor are read server-side and never from the body.
 - **Deviation: pace-cleared copy.** A row with `floor_exempt = 'pace_cleared_copy'` and a pace of 0
   skips the profile and floor checks (it still needs four macros per day, no negatives and kcal
@@ -40,7 +40,8 @@ Owner confirmation of the minima (protein 1.8 / 2.0 g/kg, `macroMinimumKcal`) is
   floor: ending a pace is never refused.
 - **Lock order.** `approve_target_proposal` now takes the settings lock before the target lock, like
   every checked writer, so a concurrent approval and write cannot deadlock (40P01). A replay of a
-  pair write never inserts a predecessor, and a predecessor dated after its revision is refused.
+  pair write never inserts a predecessor, a predecessor dated after its revision is refused, and one
+  request id may not name both halves of a pair.
 - **Pins and the derive engine.** The derive engine does not raise a pin to the protein or calorie
   floor, so a pin under a floor is refused (`below_floor`), not raised. Grams-mode carbohydrate under
   100 g is no longer raised. Typed grams keep their training-day carbohydrate: calories that differ

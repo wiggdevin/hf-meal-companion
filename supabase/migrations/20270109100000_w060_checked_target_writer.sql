@@ -185,6 +185,10 @@ begin
   if p_row->'training_macros' is null or p_row->'rest_macros' is null then
     raise exception 'target_macros_required' using errcode = '22023';
   end if;
+  -- One id cannot name both halves, even on a replay (the pair would read back as one row).
+  if p_predecessor is not null and v_request_id is not null and v_request_id = v_pred_request_id then
+    raise exception 'predecessor_request_id_reused' using errcode = '22023';
+  end if;
   -- Same order as apply_sync_op and the other settings writers: settings lock, then target lock.
   perform pg_advisory_xact_lock(hashtextextended(p_user_id::text || ':user_settings:settings', 0));
   perform pg_advisory_xact_lock(hashtextextended(p_user_id::text, 0));
@@ -221,9 +225,6 @@ begin
   end if;
   -- The predecessor is history: it is never judged, so it must never be the active revision. It
   -- may not be dated after the revision, or the active reader (newest date first) would pick it.
-  if p_predecessor is not null and v_request_id is not null and v_request_id = v_pred_request_id then
-    raise exception 'predecessor_request_id_reused' using errcode = '22023';
-  end if;
   if p_predecessor is not null
      and (p_predecessor->>'effective_from')::date > (p_row->>'effective_from')::date then
     raise exception 'predecessor_after_revision' using errcode = '22023';

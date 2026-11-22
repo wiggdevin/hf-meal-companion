@@ -325,6 +325,10 @@ run("write_target_revision_checked (database)", () => {
           { training: day(100, 60, 30), rest: day(100, 60, 30) }));
       expect(out.error?.code).toBe("22023");
       expect(await rows()).toHaveLength(0);
+      // The same pair after the revision committed (a replay) is refused the same way.
+      expect((await checked(row({ request_id: rr }))).error).toBeNull();
+      const replay = await checked(row({ request_id: rr }), row({ request_id: rr }));
+      expect(replay.error?.code).toBe("22023");
     });
 
     it("a replay never inserts a predecessor, even an unseen or unchecked one", async () => {
