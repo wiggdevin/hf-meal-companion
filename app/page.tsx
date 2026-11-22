@@ -54,7 +54,10 @@ import BarcodeScanSheet from "@/components/BarcodeScanSheet";
 import ScanConfirmSheet from "@/components/ScanConfirmSheet";
 import CaptureSheet from "@/components/CaptureSheet";
 import type { BarcodeResponse } from "@/lib/barcode/client";
-import { captureOverlayProps } from "@/lib/capture-client";
+import { captureActions, captureOverlayProps } from "@/lib/capture-client";
+import { publicFeatureScan } from "@/lib/capture/public-flags";
+import { useLogIntent } from "@/components/today/useLogIntent";
+import LogNowButton from "@/components/today/LogNowButton";
 import type { CaptureMethod } from "@/lib/capture/flags";
 import { addCups, setCups } from "@/lib/water-client";
 import { latestWins } from "@/lib/today/latest-wins";
@@ -212,6 +215,14 @@ export default function Today() {
   /** A meal still saving on another day — Today says so rather than hiding it. */
   const [elsewhere, setElsewhere] = useState<{ date: string; count: number } | null>(null);
   const [captureMode, setCaptureMode] = useState<CaptureMethod | null>(null);
+  /** A photo shared into the app (manifest share_target), handed to the plate capture once. */
+  const [sharedPhoto, setSharedPhoto] = useState<File | null>(null);
+  // A `/log` link (home-screen shortcut, share sheet): open what it asked for, once mounted.
+  useLogIntent(mounted, { methods: captureActions().map((a) => a.method), scan: publicFeatureScan() }, ({ open, slot, file }) => {
+    if (open.kind === "sheet") { setLogSlot(null); setLogOpen("food"); return; }
+    setHandoffSlot(slot);
+    if (open.kind === "scan") setScanOpen(true); else { setSharedPhoto(file); setCaptureMode(open.method); }
+  });
   const [pendingProposal, setPendingProposal] = useState<Fresh<ProposalSummary[]> | null>(null);
   const [starterGate, setStarterGate] = useState<StarterGate | null>(null);
   const [eligibleFoodIds, setEligibleFoodIds] = useState<Set<string> | null>(null);
@@ -981,6 +992,7 @@ export default function Today() {
           back={isToday ? undefined : { href: "/", label: "Back to today",
             onClick: (event) => { event.preventDefault(); selectDate(todayIso); } }}
           trailing={<>
+            <LogNowButton onOpen={() => openCardPanel(() => setLogOpen("food"))} />
             <DayTypeToggle
               key={viewedDate}
               date={viewedDate}
@@ -1239,9 +1251,10 @@ export default function Today() {
               // On a past day the slot and its time come from one choice, so they never disagree.
               slot={handoffSlot ?? (logAtFor(captureSlot) ? captureSlot : undefined)}
               at={logAtFor(captureSlot)}
-              onOpenSearch={() => { setCaptureMode(null); setLogOpen("food"); }}
-              onLogged={() => { setCaptureMode(null); refresh(); confirmLogged(); }}
-              onClose={() => setCaptureMode(null)}
+              initialFile={sharedPhoto}
+              onOpenSearch={() => { setCaptureMode(null); setSharedPhoto(null); setLogOpen("food"); }}
+              onLogged={() => { setCaptureMode(null); setSharedPhoto(null); refresh(); confirmLogged(); }}
+              onClose={() => { setCaptureMode(null); setSharedPhoto(null); }}
             />
           )}
           {openEntry && (() => {

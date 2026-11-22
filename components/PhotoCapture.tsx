@@ -91,16 +91,26 @@ function PhotoActions({
  * and the EXIF strip in one step (architecture §4.2). Only the shot time is read off the original
  * first (W125), on the phone, and only the instant leaves it.
  */
-export default function PhotoCapture({ label, onReady, busy = false, withThumbnail = false }: {
+export default function PhotoCapture({ label, onReady, busy = false, withThumbnail = false, initialFile }: {
   label: string;
   /** `meta`: the shot time read off the original file, and the thumbnail when asked for. */
   onReady: (photo: Blob, meta: PhotoMeta) => void;
   busy?: boolean;
   /** Also make the 512 px copy a plate photo keeps (W125). */
   withThumbnail?: boolean;
+  /** A photo shared into the app (manifest share_target): loaded as if just taken. It still waits
+   *  for "Use this photo", so a share never sends anything on its own. */
+  initialFile?: File | null;
 }) {
   const input = useRef<HTMLInputElement | null>(null);
   const { shot, meta, preview, working, failed, take, clear } = usePhotoShot(withThumbnail);
+  const loaded = useRef<File | null>(null);
+  useEffect(() => {
+    if (!initialFile || loaded.current === initialFile) return;
+    loaded.current = initialFile;
+    void take(initialFile);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `take` is rebuilt each render; the file is the trigger
+  }, [initialFile]);
 
   return (
     <div className="flex flex-col items-center gap-3">
