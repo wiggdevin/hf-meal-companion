@@ -5,7 +5,7 @@ import BarcodeScanSheet from "@/components/BarcodeScanSheet";
 import CatalogSearch from "@/components/CatalogSearch";
 import Sheet from "@/components/Sheet";
 import Button from "@/components/ui/Button";
-import { captureInstant, type CaptureInstant } from "@/components/coach/attachments/context";
+import { captureInstant, type CaptureInstant } from "@/components/coach/attachments/capture-instant";
 import { barcodeAttachment } from "@/components/coach/attachments/photo-barcode";
 import type { AttachmentSendOptions } from "@/components/coach/attachments/useAttachmentTurn";
 import type { CoachAttachment } from "@/lib/coach/attachments";
@@ -33,7 +33,6 @@ export default function ScanAttachmentSheet({
     opts?: AttachmentSendOptions) => void | Promise<boolean>;
   onSearchManually?: (description: string) => void;
   now?: () => Date;
-  /** The photo's frozen instant, when this sheet asks "Which one?" about a code read from it. */
   captured?: CaptureInstant;
 }) {
   const [choice, setChoice] = useState<BarcodeResponse | null>(initialChoice);
@@ -41,9 +40,7 @@ export default function ScanAttachmentSheet({
   const [sending, setSending] = useState(false);
   const [refused, setRefused] = useState(false);
   const claimed = useRef(false);
-  useEffect(() => {
-    if (open) claimed.current = false;
-  }, [open]);
+  useEffect(() => { if (open) claimed.current = false; }, [open]);
   // A reopened sheet starts clean: no refusal line left from an earlier scan.
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {

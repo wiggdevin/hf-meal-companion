@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CaptureStatusSheet, useCaptureUpload, type CaptureMethod } from "@/components/coach/attachments/useCaptureUpload";
-import { captureInstant, type CaptureInstant } from "@/components/coach/attachments/context";
+import { captureInstant, type CaptureInstant } from "@/components/coach/attachments/capture-instant";
 import { barcodeInPhoto, type PhotoBarcode } from "@/components/coach/attachments/photo-barcode";
 import ScanAttachmentSheet from "@/components/coach/attachments/ScanAttachmentSheet";
 import type { CoachAttachment } from "@/lib/coach/attachments";

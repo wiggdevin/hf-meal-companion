@@ -7,7 +7,7 @@
  * which one; anything else (no code, an unknown code, offline, an unreadable one) leaves the photo
  * to the AI as a plate, menu or label, where "This was a nutrition label" can still re-read it.
  */
-import { captureInstant, type CaptureInstant } from "@/components/coach/attachments/context";
+import { captureInstant, type CaptureInstant } from "@/components/coach/attachments/capture-instant";
 import type { BarcodeMatch, BarcodeResponse } from "@/lib/barcode/client";
 import { resolveScan } from "@/lib/barcode/resolve-scan";
 import { readBarcodeFromStill } from "@/lib/barcode/still";

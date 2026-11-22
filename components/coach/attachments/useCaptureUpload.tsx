@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Sheet from "@/components/Sheet";
 import Button from "@/components/ui/Button";
-import { captureInstant, type CaptureInstant } from "@/components/coach/attachments/context";
+import { captureInstant, type CaptureInstant } from "@/components/coach/attachments/capture-instant";
 import { signAndUpload } from "@/lib/capture-client";
 import type { CoachAttachment } from "@/lib/coach/attachments";
 import { resizeImage } from "@/lib/media/resize";
