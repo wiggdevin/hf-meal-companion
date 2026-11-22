@@ -806,4 +806,3 @@ describe("floor refusals on a target write (W060)", () => {
     expect(loadStore().settings).toEqual(during);
   });
 });
-

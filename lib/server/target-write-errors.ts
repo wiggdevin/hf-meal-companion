@@ -87,6 +87,7 @@ export function mapTargetWriteError(error: unknown): unknown {
         `Your calories and macros don't add up: they make ${Math.round(macroKcal)} kcal. `
         + "Change one of them.");
     }
+    if (dayType === undefined) return unreadable("SF004", error);
     return invalidMacrosError(dayType);
   }
   return error;

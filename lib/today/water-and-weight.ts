@@ -320,7 +320,7 @@ export async function saveMorningWeight(
       ? `Weight saved. Your targets were not changed: ${error.message}`
       : TARGETS_PARTIAL_MESSAGE;
     const partial = { ok: true as const, partial: "targets" as const,
-      message, previousTargetRevisionId,
+      message, previousTargetRevisionId: isFinalRefusal(error) ? null : previousTargetRevisionId,
       ...(targetRequestId ? { targetRequestId } : {}) };
     return opts.detailed ? partial : message;
   }

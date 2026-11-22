@@ -99,7 +99,8 @@ export async function applyLogWeight(
       ? { targetRequestId: saved.targetRequestId } : {}),
   };
   if ("partial" in saved) {
-    return { status: "applied", ok: true, partial: "targets", message: saved.message, token };
+    return { status: "applied", ok: true, partial: "targets", message: saved.message, token,
+      notices: [saved.message] };
   }
   return { status: "applied", token };
 }

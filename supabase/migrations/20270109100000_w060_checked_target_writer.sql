@@ -41,7 +41,8 @@
 -- {sex, birth_year, height_cm, weight_kg, goal}. For height and goal the floor_profile value wins
 -- over the stored one (the target is judged against the profile it was derived from, so a
 -- lose_fat to maintain edit is not refused at the old goal's protein); sex and birth year are
--- only checked present; the weight is the weigh-in log first, then floor_profile.weight_kg.
+-- only checked present; the weight is the weigh-in log first, then floor_profile.weight_kg, then
+-- the stored profile weight.
 -- Pace-cleared copy. A row with floor_exempt = 'pace_cleared_copy' and a pace of 0 skips the
 -- profile and floor checks (macros are still checked for NULLs, negatives and the Atwater sum) and
 -- keeps its own minima. The server recompute uses it to end a paced revision's pace when a hold
@@ -89,7 +90,7 @@ begin
       select distinct on (s.local_date) s.id, s.local_date, s.kg6
       from s
       where s.kg6 is not null and s.kg6 > 0
-      order by s.local_date, s.ingest desc, s.start_time desc, s.id
+      order by s.local_date, s.ingest desc, s.start_time desc, s.id desc
     )
     select round(d.kg6, 3), d.id
     from per_day d
@@ -165,6 +166,7 @@ declare
   v_existing jsonb;
   v_existing_pred jsonb;
   v_weight numeric;
+  v_sample_id uuid;
   v_floor record;
   v_floors jsonb;
   v_day text;
@@ -219,14 +221,20 @@ begin
   end if;
   -- The predecessor is history: it is never judged, so it must never be the active revision. It
   -- may not be dated after the revision, or the active reader (newest date first) would pick it.
+  if p_predecessor is not null and v_request_id is not null and v_request_id = v_pred_request_id then
+    raise exception 'predecessor_request_id_reused' using errcode = '22023';
+  end if;
   if p_predecessor is not null
      and (p_predecessor->>'effective_from')::date > (p_row->>'effective_from')::date then
     raise exception 'predecessor_after_revision' using errcode = '22023';
   end if;
   if not v_exempt then
-    select w.kg into v_weight
+    -- A weigh-in beats the sent profile weight, which beats the stored one (it may not have synced).
+    select w.kg, w.sample_id into v_weight, v_sample_id
       from account_body_mass_kg(p_user_id, (p_row->>'effective_from')::date) w;
-    v_weight := coalesce(v_weight, nullif(v_fallback->>'weight_kg', '')::numeric);
+    if v_sample_id is null then
+      v_weight := coalesce(nullif(v_fallback->>'weight_kg', '')::numeric, v_weight);
+    end if;
     select * into v_floor from account_floor(p_user_id, v_weight, v_fallback);
   else
     select null::numeric as protein_g_min, null::numeric as fat_g_min,

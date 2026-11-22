@@ -427,4 +427,3 @@ describe("a floor refusal on a weight action (W060)", () => {
     await expect(undoLogWeight(result.token)).rejects.toThrow(`Couldn't undo this: ${SENTENCE}`);
   });
 });
-

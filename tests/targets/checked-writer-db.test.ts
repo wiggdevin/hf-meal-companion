@@ -224,14 +224,15 @@ run("write_target_revision_checked (database)", () => {
       const out = await checked(row({ floor_profile: floorProfile }));
       expect(out.error).toBeNull();
       expect(out.data).toMatchObject({ protein_g_min: 145, kcal_min: 1430 });
-      // The sent 170.2 cm recomp profile beats the stored 200 cm maintain one: a profile edit is
-      // judged on the profile the target was derived from (the stored one lags the edit).
-      // min(100 kg, 30 x 1.702^2 = 86.9 kg) x 2.0 = 174 g protein, kcal 4 x 174 + 850 = 1,546.
+      // The sent 170.2 cm, 72.575 kg recomp profile beats the stored 200 cm, 100 kg maintain one
+      // (no weigh-in exists): a profile edit is judged on the profile the target was derived
+      // from, the stored one lags the edit. 72.575 x 2.0 = 145 g protein, kcal 4 x 145 + 850 = 1,430.
       await resetUser(userId);
       await seedProfile({ height_cm: 200, weight_kg: 100, goal: "maintain" });
       const sent = await checked(row({ floor_profile: floorProfile }));
-      expect(JSON.parse(sent.error?.details ?? "{}"))
-        .toEqual({ floor: "kcal", dayType: "training", minimum: 1546 });
+      expect(sent.error).toBeNull();
+      await resetUser(userId);
+      await seedProfile({ height_cm: 200, weight_kg: 100, goal: "maintain" });
       // Without a floor_profile the stored profile decides (200 cm, 100 kg, maintain: 1.8 x 100
       // = 180 g protein, kcal 4 x 180 + 850 = 1,570).
       const stored = await checked(row());
@@ -312,6 +313,15 @@ run("write_target_revision_checked (database)", () => {
     it("refuses a predecessor dated after the revision (the active reader would pick it)", async () => {
       const out = await checked(row({ request_id: crypto.randomUUID() }),
         row({ effective_from: "2026-10-04", request_id: crypto.randomUUID() },
+          { training: day(100, 60, 30), rest: day(100, 60, 30) }));
+      expect(out.error?.code).toBe("22023");
+      expect(await rows()).toHaveLength(0);
+    });
+
+    it("refuses a predecessor that reuses the revision's request id", async () => {
+      const rr = crypto.randomUUID();
+      const out = await checked(row({ request_id: rr }),
+        row({ effective_from: "2026-10-02", request_id: rr },
           { training: day(100, 60, 30), rest: day(100, 60, 30) }));
       expect(out.error?.code).toBe("22023");
       expect(await rows()).toHaveLength(0);
