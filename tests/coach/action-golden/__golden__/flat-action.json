@@ -56,6 +56,10 @@
       "minimum": 0,
       "type": "number"
     },
+    "heightUnit": {
+      "description": "Allowed values: \"ft_in\", \"cm\"; \"\" means absent.",
+      "type": "string"
+    },
     "item": {
       "additionalProperties": false,
       "properties": {
@@ -247,6 +251,10 @@
       "maximum": 400,
       "minimum": 0,
       "type": "number"
+    },
+    "weightUnit": {
+      "description": "Allowed values: \"lb\", \"kg\"; \"\" means absent.",
+      "type": "string"
     }
   },
   "required": [

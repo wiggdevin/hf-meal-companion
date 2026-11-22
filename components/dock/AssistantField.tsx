@@ -24,6 +24,7 @@ import {
   BUBBLE, FADE, GROW, INSTANT, MORPH, PRESS, SPLIT, TRAY_OPEN, lensVar, rubber, sheen, sheenOff,
 } from "@/components/dock/dock-motion";
 import { loadStore } from "@/lib/store";
+import { SETTINGS_CHANGED_EVENT } from "@/lib/settings-events";
 import styles from "@/components/TabBar.module.css";
 import { ASK_INPUT_CLASS, AskPop, AskSkin } from "@/components/dock/AskShell";
 import { spring } from "@/lib/design/motion";
@@ -99,6 +100,12 @@ export default function AssistantField({ open, width, onCoach, reduce, onOpen, o
   const live = onCoach || chatOpen;
   const dockState = useDockComposerState(live);
   const [weightUnit, setWeightUnit] = useState<WeightUnit>(preferredWeightUnit);
+  // A unit switched from chat (and its Undo) shows in an open weigh-in field at once (W060).
+  useEffect(() => {
+    const reread = () => setWeightUnit(preferredWeightUnit());
+    window.addEventListener(SETTINGS_CHANGED_EVENT, reread);
+    return () => window.removeEventListener(SETTINGS_CHANGED_EVENT, reread);
+  }, []);
   // The typed weight outlives the weigh-in card, so closing it mid-entry keeps the number.
   const [weightDraft, setWeightDraft] = useState("");
   /** Shared by the field's own Send, the Chat tile and Weigh-in's follow-ups: a dock question goes
