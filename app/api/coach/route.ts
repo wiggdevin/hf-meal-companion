@@ -75,7 +75,7 @@ async function handle(req: Request, arrivedAt: number): Promise<Response> {
     // Scoped AI input: echo the scope so the reply can show where it was asked.
     const answer = async (draft?: (text: string) => void) => {
       const turn = await runTurn(client, adminClient(), userId, body,
-        { startedAt: arrivedAt, ...(draft ? { draft } : {}) });
+        { startedAt: arrivedAt, signal: req.signal, ...(draft ? { draft } : {}) });
       return body.scope ? { ...turn, scope: body.scope } : turn;
     };
     // OD06 / W091: a phone that asks for the stream gets the reply's draft as it is written, then

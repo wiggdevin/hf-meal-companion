@@ -90,7 +90,7 @@ export async function prepareModelTurn(
   ];
   const blockContext: BlockHydrationContext = {
     admin, userId, date: today, tz: clock.tz, context, profile, newId,
-    ...deps.blocks,
+    ...kit.blocks, ...deps.blocks,
   };
   const ask = intentResult
     ? { intent: intentResult.intent, confidence: intentResult.confidence } : null;

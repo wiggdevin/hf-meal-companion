@@ -12,7 +12,8 @@ import { kgToLb, lbToKg, type WeightUnit } from "@/lib/health/units";
 import { entryMacros } from "@/lib/plan/entry-macros";
 import { consumedSnapshot, eatenPlanSnapshot, slotHasOwnLog } from "@/lib/plan/eaten-estimate";
 import { resolveTargets, targetDayType } from "@/lib/targets";
-import type { DayType, FoodComponent, SlotId, Store, StoredDay } from "@/lib/types";
+import { itemKcal } from "@/lib/nutrients/energy";
+import type { DayType, FoodComponent, LoggedItem, SlotId, Store, StoredDay } from "@/lib/types";
 import { formatWater, type WaterUnit } from "@/lib/water-units";
 
 export type TrendMetric = "kcal" | "protein" | "water" | "sleep" | "activity" | "weight";
@@ -97,7 +98,7 @@ export function dayIntake(day: StoredDay | undefined): { kcal: number; protein: 
   }
   for (const slot of eaten) {
     if (slotHasOwnLog(day, slot)) continue;
-    const lines = consumedSnapshot(day, slot)?.components ?? eatenPlanSnapshot(day, slot) ?? editedLines(day, slot);
+    const lines = eatenSlotLines(day, slot);
     if (!lines) { partial = true; continue; }
     const sum = sumLines(lines);
     kcal += sum.kcal;
@@ -106,11 +107,75 @@ export function dayIntake(day: StoredDay | undefined): { kcal: number; protein: 
   return { kcal: Math.round(kcal), protein: Math.round(protein), partial };
 }
 
+/** The lines an eaten slot counts (recipe snapshot, followPlan snapshot, edited lines), or null. */
+function eatenSlotLines(day: StoredDay, slot: SlotId): FoodComponent[] | null {
+  return consumedSnapshot(day, slot)?.components ?? eatenPlanSnapshot(day, slot) ?? editedLines(day, slot);
+}
+
 /** A hand-edited slot's own lines (not a time-only edit, not cleared, not empty). */
 function editedLines(day: StoredDay, slot: SlotId): FoodComponent[] | null {
   const override = day.itemOverrides?.[slot];
   if (!override || override.followPlan || override.cleared || override.components.length === 0) return null;
   return override.components;
+}
+
+export type MacroKey = "kcal" | "protein" | "carbs" | "fat";
+export const MACRO_KEYS: readonly MacroKey[] = ["kcal", "protein", "carbs", "fat"];
+/** One macro of one day: `value` null when nothing eaten that day measured it; `partial` a floor. */
+export type MacroIntake = { value: number | null; partial: boolean };
+export type DayMacroIntake = Record<MacroKey, MacroIntake>;
+
+const SNAPSHOT_CODE: Record<Exclude<MacroKey, "kcal">, string> = {
+  protein: "protein", carbs: "carbohydrate", fat: "fat_total",
+};
+
+/** Whether one logged item measured a macro: its snapshot carries it (energy by the one rule). */
+function itemMeasures(item: LoggedItem, key: MacroKey): boolean {
+  const snapshot = item.snapshot ?? {};
+  if (Object.keys(snapshot).length === 0) return false;
+  if (key === "kcal") return itemKcal(snapshot) !== null;
+  const amount = (snapshot as Record<string, { amount?: unknown } | undefined>)[SNAPSHOT_CODE[key]]?.amount;
+  return (typeof amount === "number" || (typeof amount === "string" && amount.trim() !== ""))
+    && Number.isFinite(Number(amount));
+}
+
+/**
+ * `dayIntake` per macro, for every macro, with what each total is made of. The same records count
+ * (a log, an eaten recipe or followPlan snapshot, a hand-edited slot) by the same rules; nothing is
+ * estimated. A macro no record measured is `null` (never an exact 0), a total that some record did
+ * not measure is a floor, and a partly measured recipe, an unknown mass or an undescribed eaten slot
+ * makes every macro of the day a floor. `null` when the day recorded nothing.
+ */
+export function dayMacroIntake(day: StoredDay | undefined): DayMacroIntake | null {
+  if (!day) return null;
+  const entries = day.extras ?? [];
+  const eaten = Object.entries(day.eaten ?? {}).filter(([, at]) => !!at).map(([slot]) => slot as SlotId);
+  if (entries.length === 0 && eaten.length === 0) return null;
+  const sum: Record<MacroKey, number> = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+  const measured: Record<MacroKey, boolean> = { kcal: false, protein: false, carbs: false, fat: false };
+  const missing: Record<MacroKey, boolean> = { kcal: false, protein: false, carbs: false, fat: false };
+  let floor = false;
+  const add = (key: MacroKey, value: number | undefined, known: boolean) => {
+    if (known && typeof value === "number" && Number.isFinite(value)) { sum[key] += value; measured[key] = true; }
+    else missing[key] = true;
+  };
+  for (const entry of entries) {
+    if (entry.nutritionPartial || entry.massUnknown) floor = true;
+    const items = entry.items ?? [];
+    for (const key of MACRO_KEYS) {
+      if (items.length === 0) add(key, entry.macros?.[key], true);
+      else for (const item of items) add(key, item.macros?.[key], itemMeasures(item, key));
+    }
+  }
+  for (const slot of eaten) {
+    if (slotHasOwnLog(day, slot)) continue;
+    const lines = eatenSlotLines(day, slot);
+    if (!lines) { floor = true; continue; }
+    for (const line of lines) for (const key of MACRO_KEYS) add(key, line.macros?.[key], !!line.macros);
+  }
+  return Object.fromEntries(MACRO_KEYS.map((key) => [key, {
+    value: measured[key] ? sum[key] : null, partial: floor || missing[key],
+  }])) as DayMacroIntake;
 }
 
 const finite = (value: number | null | undefined): number | null =>

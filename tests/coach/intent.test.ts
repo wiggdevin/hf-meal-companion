@@ -13,7 +13,9 @@ vi.mock("@/lib/ai/typesafe", () => ({
     systemOneMock(p.state, p.questions, { ...o, purpose: p.purpose }),
 }));
 
+import { isNutritionTrendCommand } from "@/lib/coach/chart-grammar";
 import {
+  chartSpanDays,
   classifyIntent,
   extractNumbers,
   hintLine,
@@ -247,6 +249,103 @@ describe("intent pre-pass", () => {
     });
     expect(isFastPathEligible(result!, message)).toBe(true);
     expect(hintLine(result!)).toContain("Likely intent: show_chart (0.90)");
+  });
+
+  it.each([
+    ["show my weight trend", { chart: "weight_trend" }],
+    ["how am I doing this week", { chart: "kcal_week" }],
+    ["show my macros", { chart: "macros_today" }],
+    ["show my calories this week", { chart: "kcal_week" }],
+  ] as const)("keeps the existing chart routing for %s", async (message, args) => {
+    systemOneMock.mockResolvedValue(answers("show_chart", 0.93));
+    const result = await classifyIntent(message, context);
+    expect(result?.args).toEqual(args);
+    expect(isFastPathEligible(result!, message)).toBe(true);
+  });
+
+  it.each([
+    ["how has my protein been this month", { chart: "macros_trend", days: 30, focus: "protein" }],
+    ["show my macros over the last 2 weeks", { chart: "macros_trend", days: 14 }],
+    ["chart my carbs for the past fortnight", { chart: "macros_trend", days: 14, focus: "carbs" }],
+    ["how has my protein been", { chart: "macros_trend", days: 14, focus: "protein" }],
+    ["my fat intake over the last ninety days", { chart: "macros_trend", days: 90, focus: "fat" }],
+    ["calories last 7 days", { chart: "kcal_week", days: 7 }],
+    ["show my calories for the past seven days", { chart: "kcal_week", days: 7 }],
+    ["my calories lately", { chart: "kcal_week", days: 14 }],
+    ["protein trend", { chart: "macros_trend", days: 14, focus: "protein" }],
+    ["show my protein over the last one week", { chart: "macros_trend", days: 7, focus: "protein" }],
+    ["calories last 30 days", { chart: "kcal_week", days: 30 }],
+    ["show my calories this month", { chart: "kcal_week", days: 30 }],
+    ["kcal over the past three weeks", { chart: "kcal_week", days: 21 }],
+  ] as const)("routes the nutrition trend request %s", async (message, args) => {
+    systemOneMock.mockResolvedValue(answers("show_chart", 0.93));
+    const result = await classifyIntent(message, context);
+    expect(result).toMatchObject({ intent: "show_chart", args });
+    expect(result?.args).toEqual(args);
+    expect(isFastPathEligible(result!, message)).toBe(true);
+    if ("days" in args) expect(hintLine(result!)).toContain(`days=${args.days}`);
+  });
+
+  it.each([
+    ["calories over the last 200 days", { chart: "kcal_week", days: 90 }],
+    ["protein over the last 2 days", { chart: "macros_trend", days: 7, focus: "protein" }],
+    ["show my macros today", { chart: "macros_today" }],
+  ] as const)("clamps the window to 7..90 before it is an arg: %s", async (message, args) => {
+    systemOneMock.mockResolvedValue(answers("show_chart", 0.93));
+    const result = await classifyIntent(message, context);
+    expect(result?.args).toEqual(args);
+    if ("days" in args) expect(hintLine(result!)).toContain(`days=${args.days}`);
+  });
+
+  it.each([
+    ["show my carbs chart", { chart: "macros_trend", days: 14, focus: "carbs" }],
+    ["protein chart", { chart: "macros_trend", days: 14, focus: "protein" }],
+    ["fat chart", { chart: "macros_trend", days: 14, focus: "fat" }],
+    ["how is my protein been", { chart: "macros_trend", days: 14, focus: "protein" }],
+    ["how are my macros been", { chart: "macros_trend", days: 14 }],
+    ["protein over the past day", { chart: "macros_trend", days: 7, focus: "protein" }],
+    ["calories over the last day", { chart: "kcal_week", days: 7 }],
+  ] as const)("gives chart args to the gate-admitted phrase %s", async (message, args) => {
+    expect(isNutritionTrendCommand(message)).toBe(true);
+    systemOneMock.mockResolvedValue(answers("show_chart", 0.93));
+    const result = await classifyIntent(message, context);
+    expect(result?.args).toEqual(args);
+  });
+
+  it("gives chart args, with a 7..90 day window, to every phrase the trend gate admits", async () => {
+    const subjects = ["my protein", "carbs", "my fat intake", "macros", "my calories", "kcal"];
+    const windows = ["", " lately", " daily", " over the past day", " for the last 2 days",
+      " over the past 3 weeks", " this month", " a day", " over time"];
+    const phrases = subjects.flatMap((subject) => windows.flatMap((window) => [
+      `show me ${subject} chart${window}`, `${subject} trend${window}`, `chart ${subject}${window}`,
+      `how has ${subject} been${window}`, `how is ${subject} been${window}`,
+    ])).filter(isNutritionTrendCommand);
+    expect(phrases.length).toBeGreaterThan(150);
+    systemOneMock.mockResolvedValue(answers("show_chart", 0.93));
+    for (const message of phrases) {
+      const args = (await classifyIntent(message, context))?.args as { chart?: string; days?: number };
+      expect(args?.chart, message).toMatch(/^(?:kcal_week|macros_trend|macros_today)$/);
+      if (args.days !== undefined) {
+        expect(args.days, message).toBeGreaterThanOrEqual(7);
+        expect(args.days, message).toBeLessThanOrEqual(90);
+      }
+    }
+  });
+
+  it.each([
+    "how has my body fat been this month",
+    "show my fat loss over the last 30 days",
+  ])("does not read body composition as the fat macro: %s", async (message) => {
+    systemOneMock.mockResolvedValue(answers("show_chart", 0.93));
+    const result = await classifyIntent(message, context);
+    expect(result?.args).not.toMatchObject({ chart: "macros_trend" });
+  });
+
+  it("reads a window, not a rate, and not body fat", () => {
+    expect(chartSpanDays("protein a day over the last 2 weeks")).toBe(14);
+    expect(chartSpanDays("how much protein a day")).toBeNull();
+    expect(chartSpanDays("this week and the last month")).toBe(30);
+    expect(chartSpanDays("show my macros")).toBeNull();
   });
 
   it("requires 0.95 confidence for a mutating fast path", async () => {

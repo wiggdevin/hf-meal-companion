@@ -178,25 +178,71 @@ export const logDraftBlockV1Schema = z.object({
   provenance: provenanceSchema.optional(),
 });
 
+const isoDate = z.iso.date();
+const TIME_CHARTS = new Set(["weight_trend", "kcal_week", "macros_trend"]);
+const NUTRITION_TRENDS = new Set(["kcal_week", "macros_trend"]);
+/** The longest charted range (lib/coach/intent.ts clamps a request to 7..90 days). */
+const MAX_RANGE_DAYS = 90;
+
 export const chartBlockV1Schema = z.object({
   kind: z.literal("chart"),
   v: z.literal(1),
   id: z.string().min(1),
-  chart: z.enum(["weight_trend", "macros_today", "kcal_week"]),
-  days: z.number().int().positive().optional(),
+  chart: z.enum(["weight_trend", "macros_today", "kcal_week", "macros_trend"]),
+  /**
+   * The window in calendar days. `macros_trend`: 7..90. Older `kcal_week` blocks stored their
+   * logged-day count (1..7), so the general bound stays 1..90.
+   */
+  days: z.number().int().min(1).max(90).optional(),
+  /** `kcal_week` / `macros_trend`: the first and last date the window covers. Server-set. */
+  start: isoDate.optional(),
+  end: isoDate.optional(),
+  /** `macros_trend`: the macro selected first (the one asked about). Never a value. */
+  focus: z.enum(["protein", "carbs", "fat"]).optional(),
   series: z.array(z.object({
     label: z.string().min(1).max(80),
-    points: z.array(z.object({ x: z.string().max(80), y: z.number() })),
-  })),
+    points: z.array(z.object({
+      x: z.string().max(80),
+      /** `kcal_week` / `macros_trend` only: null when nothing eaten that day measured it. */
+      y: z.number().nullable(),
+      /** `kcal_week` / `macros_trend` only: the value is a floor ("at least"). Server-set. */
+      partial: z.literal(true).optional(),
+    })).max(120),
+  })).max(8),
   unit: z.string().max(32),
   caption: z.string().max(240),
   /**
-   * `macros_today` only: the day holds a partly measured recipe serving, or its partial check could
+   * `macros_today`: the day holds a partly measured recipe serving, or its partial check could
    * not run (#21). "Consumed" is then a lower bound and what is left an upper bound ("at most").
-   * Set by the server hydrator (lib/coach/blocks/hydrate-chart.ts), never by the model; absent
-   * when the day is whole.
+   * `kcal_week` / `macros_trend`: at least one point is a floor (each says so with `partial`).
+   * Set by the server hydrator (lib/coach/blocks/hydrate-chart.ts), never by the model.
    */
   partial: z.boolean().optional(),
+}).superRefine((block, ctx) => {
+  if (block.chart === "macros_trend" && block.days !== undefined && (block.days < 7)) {
+    ctx.addIssue({ code: "custom", path: ["days"], message: "macros_trend days must be 7..90" });
+  }
+  if ((block.start === undefined) !== (block.end === undefined)) {
+    ctx.addIssue({ code: "custom", path: ["start"], message: "start and end come together" });
+  }
+  if (block.start && block.end && block.start > block.end) {
+    ctx.addIssue({ code: "custom", path: ["start"], message: "start must not be after end" });
+  }
+  if (block.start && block.end && Date.parse(`${block.end}T00:00:00Z`) - Date.parse(`${block.start}T00:00:00Z`)
+    > (MAX_RANGE_DAYS - 1) * 86_400_000) {
+    ctx.addIssue({ code: "custom", path: ["end"], message: `the range spans at most ${MAX_RANGE_DAYS} days` });
+  }
+  block.series.forEach((series, s) => series.points.forEach((point, p) => {
+    if (TIME_CHARTS.has(block.chart) && !isoDate.safeParse(point.x).success) {
+      ctx.addIssue({ code: "custom", path: ["series", s, "points", p, "x"], message: "x must be an ISO date" });
+    }
+    if (block.start && block.end && (point.x < block.start || point.x > block.end)) {
+      ctx.addIssue({ code: "custom", path: ["series", s, "points", p, "x"], message: "x must lie inside start..end" });
+    }
+    if (!NUTRITION_TRENDS.has(block.chart) && (point.y === null || point.partial)) {
+      ctx.addIssue({ code: "custom", path: ["series", s, "points", p], message: "only nutrition trends hold null or partial points" });
+    }
+  }));
 });
 
 export const quickRepliesBlockV1Schema = z.object({

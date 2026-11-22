@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { hydrateChart, type ChartArgs, type KcalChartRow, type WeightChartRow }
-  from "@/lib/coach/blocks/hydrate-chart";
+import {
+  hydrateChart, KCAL_WEEK_DEFAULT_DAYS, MACROS_TREND_DEFAULT_DAYS, trendDays,
+  type ChartArgs, type NutritionChartRow, type WeightChartRow,
+} from "@/lib/coach/blocks/hydrate-chart";
 import { hydrateFoodIdeas } from "@/lib/coach/blocks/hydrate-food-ideas";
 import { hydrateFoodSearch, type FoodSearchArgs }
   from "@/lib/coach/blocks/hydrate-food-search";
@@ -12,7 +14,8 @@ import type { NormalizedSample } from "@/lib/health/contract";
 import { localDateOf, rollUpDay } from "@/lib/health/daily";
 import type { ConstraintProfile } from "@/lib/policy/constraints";
 import type { CoachContext } from "@/lib/server/coach-context";
-import { buildDayContext } from "@/lib/server/day-context";
+import { readIntakeWindow, recentRecordedDates } from "@/lib/server/intake-window";
+import { TREND_MAX_DAYS } from "@/lib/coach/chart-grammar";
 import { RECIPE_IDEAS_INSTEAD } from "@/lib/recipe-pilot-copy";
 
 export type DirectBlockToolName = "show_chart" | "quick_replies";
@@ -25,6 +28,10 @@ export type BlockHydrationContext = {
   profile: ConstraintProfile;
   newId: () => string;
   weightUnit?: "lb" | "kg";
+  /** The account's real local date. A day at or after it that is not marked complete is a floor. */
+  today?: string;
+  /** Aborts every read a chart makes: the turn ended, or the phone left (app/api/coach/route.ts). */
+  signal?: AbortSignal;
 };
 export type HydratedTool = { data: unknown; block: UiBlock | null };
 
@@ -74,25 +81,32 @@ async function weightRows(ctx: BlockHydrationContext, days: number): Promise<Wei
   });
 }
 
-async function kcalRows(ctx: BlockHydrationContext): Promise<KcalChartRow[]> {
-  // daily_energy has one row per user and logged date, so the database — not this process — owns
-  // both distinctness and the seven-day bound. (The old energy_kcal_calc filter on daily_totals
-  // skipped a day whose items carried only reported energy.)
-  const { data, error } = await ctx.admin.from("daily_energy").select("local_date")
-    .eq("user_id", ctx.userId)
-    .lte("local_date", ctx.date).order("local_date", { ascending: false }).limit(7);
-  if (error) throw error;
-  const dates = (data ?? []).flatMap((row) => {
-    const date = (row as { local_date?: unknown }).local_date;
-    return typeof date === "string" ? [date] : [];
-  }).sort();
-  const days = await Promise.all(dates.map((date) => date === ctx.date && ctx.context
-    ? ctx.context.day
-    : buildDayContext(ctx.admin, ctx.userId, date, ctx.tz)));
-  // A day with no target revision has no target row to chart; omit it rather than invent a number.
-  return days.flatMap((day) => day.targets === null ? [] : [{
-    localDate: day.date, consumedKcal: day.consumed.kcal, targetKcal: day.targets.kcal,
-  }]);
+type NutritionWindow = { rows: NutritionChartRow[]; range: { start: string; end: string } };
+
+/**
+ * The charted days of a `kcal_week` / `macros_trend`, oldest first, from one snapshot of the
+ * window (lib/server/intake-window.ts): every read is batched over the window, never per day.
+ * `days` set: every recorded date within that many calendar days ending on the scope date.
+ * `kcal_week` with no `days` (the original "last seven logged days"): the last seven recorded
+ * dates within the last 90 days, then exactly those dates.
+ */
+async function nutritionWindow(ctx: BlockHydrationContext, args: ChartArgs): Promise<NutritionWindow> {
+  const today = ctx.today ?? ctx.date;
+  if (args.chart === "kcal_week" && args.days === undefined) {
+    const dates = await recentRecordedDates(ctx.admin, ctx.userId, {
+      from: shiftDate(ctx.date, -(TREND_MAX_DAYS - 1)), to: ctx.date, count: KCAL_WEEK_DEFAULT_DAYS,
+      signal: ctx.signal,
+    });
+    if (dates.length === 0) return { rows: [], range: { start: ctx.date, end: ctx.date } };
+    const rows = await readIntakeWindow(ctx.admin, ctx.userId, { dates }, { today, signal: ctx.signal });
+    return { rows, range: { start: rows[0]?.date ?? dates[0], end: rows.at(-1)?.date ?? dates.at(-1)! } };
+  }
+  const days = trendDays(args.days,
+    args.chart === "macros_trend" ? MACROS_TREND_DEFAULT_DAYS : KCAL_WEEK_DEFAULT_DAYS);
+  const range = { start: shiftDate(ctx.date, -(days - 1)), end: ctx.date };
+  const rows = await readIntakeWindow(ctx.admin, ctx.userId, { from: range.start, to: range.end },
+    { today, signal: ctx.signal });
+  return { rows, range };
 }
 
 /** The account's own display unit (`user_settings.weight_unit`), so a chart opened right after a
@@ -106,6 +120,7 @@ async function accountWeightUnit(ctx: BlockHydrationContext): Promise<"lb" | "kg
 }
 
 async function chartBlock(args: ChartArgs, ctx: BlockHydrationContext): Promise<UiBlock | null> {
+  ctx.signal?.throwIfAborted();
   if (args.chart === "weight_trend") {
     return hydrateChart(args, {
       id: ctx.newId(), weightUnit: await accountWeightUnit(ctx),
@@ -127,12 +142,14 @@ async function chartBlock(args: ChartArgs, ctx: BlockHydrationContext): Promise<
       } : undefined,
     });
   }
-  return hydrateChart(args, { id: ctx.newId(), kcalRows: await kcalRows(ctx) });
+  // Never the model's: its acknowledgement below is the chart name and point count only.
+  const { rows, range } = await nutritionWindow(ctx, args);
+  return hydrateChart(args, { id: ctx.newId(), nutritionRows: rows, range });
 }
 
 function emptyChartMessage(chart: ChartArgs["chart"]): string {
   if (chart === "weight_trend") return "No weigh-ins yet.";
-  if (chart === "kcal_week") return "No logged days yet.";
+  if (chart === "kcal_week" || chart === "macros_trend") return "No logged days yet.";
   return "Today's macro data is unavailable.";
 }
 

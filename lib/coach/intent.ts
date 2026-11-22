@@ -10,6 +10,9 @@ import {
   choiceConfidence, FAST_PATH_ARGUMENT_CONFIDENCE, type MissingArgs,
 } from "@/lib/coach/intent-args";
 import { extractNumbers } from "@/lib/coach/intent-numbers";
+import {
+  chartSpanDays, clampTrendDays, focusMacro, isThisWeekOnly, mentionsMacro, OPEN_TREND_DAYS, OVER_TIME,
+} from "@/lib/coach/chart-grammar";
 export { extractNumbers } from "@/lib/coach/intent-numbers";
 
 export type { Intent } from "@/lib/coach/intent-types";
@@ -43,7 +46,11 @@ type IntentArgs = ActionIntentArgs & {
   update_profile: MissingArgs;
   set_targets: MissingArgs;
   use_shopping_list: MissingArgs;
-  show_chart: MissingArgs & { chart?: "weight_trend" | "macros_today" | "kcal_week" };
+  show_chart: MissingArgs & {
+    chart?: "weight_trend" | "macros_today" | "kcal_week" | "macros_trend";
+    days?: number;
+    focus?: "protein" | "carbs" | "fat";
+  };
   question: MissingArgs;
   other: MissingArgs;
 };
@@ -81,10 +88,30 @@ function noulConfidence(answer: { noul?: number } | undefined): number {
   return typeof value === "number" ? Math.max(value, 1 - value) : 0;
 }
 
+export { chartSpanDays } from "@/lib/coach/chart-grammar";
+
 function chartArgs(message: string): IntentArgs["show_chart"] {
   if (/\b(?:weight|weigh[- ]?in|body mass)\b/i.test(message)) return { chart: "weight_trend" };
-  if (/\bmacros?\b/i.test(message)) return { chart: "macros_today" };
-  if (/\b(?:week|weekly|calories|kcal)\b/i.test(message)) return { chart: "kcal_week" };
+  const span = chartSpanDays(message);
+  // Clamped before it becomes an arg or a hint: a chart window is always 7..90 days.
+  const days = span === null ? null : clampTrendDays(span, OPEN_TREND_DAYS);
+  const overTime = OVER_TIME.test(message);
+  if (mentionsMacro(message)) {
+    const focus = focusMacro(message);
+    const withFocus = focus ? { focus } : {};
+    if (days !== null) return { chart: "macros_trend", days, ...withFocus };
+    if (overTime) return { chart: "macros_trend", days: OPEN_TREND_DAYS, ...withFocus };
+    if (/\bmacros?\b/i.test(message)) return { chart: "macros_today" };
+    // One macro with no window ("protein chart", "show my carbs chart"): the open two weeks.
+    if (focus) return { chart: "macros_trend", days: OPEN_TREND_DAYS, focus };
+  }
+  if (/\b(?:week|weekly|calories|calorie|kcal)\b/i.test(message)) {
+    // Only "this week" keeps the original last seven logged days; "last 7 days" is 7 calendar days.
+    if (isThisWeekOnly(message)) return { chart: "kcal_week" };
+    if (days !== null) return { chart: "kcal_week", days };
+    if (overTime) return { chart: "kcal_week", days: OPEN_TREND_DAYS };
+    return { chart: "kcal_week" };
+  }
   return { missing: ["chart"] };
 }
 
@@ -156,7 +183,9 @@ export async function classifyIntent(
     }
     case "show_chart": {
       const args = chartArgs(message);
-      return result(intent, confidence, args, args.chart ? { chart: 1 } : {}, raw);
+      return result(intent, confidence, args,
+        args.chart ? { chart: 1, ...(args.days !== undefined ? { days: 1 } : {}),
+          ...(args.focus !== undefined ? { focus: 1 } : {}) } : {}, raw);
     }
     case "update_profile":
     case "set_targets":

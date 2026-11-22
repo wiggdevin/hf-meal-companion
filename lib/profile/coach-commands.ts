@@ -12,6 +12,7 @@
  *
  * Pure. No I/O.
  */
+import { isNutritionTrendCommand } from "@/lib/coach/chart-grammar";
 import { FOOD_WORDS } from "@/lib/profile/taste-words";
 
 const words = (list: string) => new Set(list.split(" "));
@@ -98,6 +99,8 @@ const FORMS: readonly Form[] = [
   (m) => /^set (?:my )?(?:kcal|calories|calorie target|protein)(?: target)? to \d+(?: ?(?:kcal|g|grams))?$/.test(m),
   (m) => /^i(?:'m| am) \d{2}(?: years old)?$/.test(m),
   (m) => /^show (?:me )?(?:my )?(?:weight|macros|calories|kcal)(?: trend| chart| this week| today)?$/.test(m),
+  // Nutrition over time: "how has my protein been this month", "calories last 30 days".
+  isNutritionTrendCommand,
   // Plan a meal: "set my breakfast to oatmeal with blueberries every weekday for the next two weeks",
   // "change next tuesday's lunch to grilled chicken and rice".
   (m) => {

@@ -19,7 +19,8 @@ const INTENT_CRITERIA = {
   log_weight: "Record the person's body weight.",
   update_profile: "Change body, activity, goal, or dietary profile data.",
   set_targets: "Change calorie or macro targets directly.",
-  show_chart: "Show or graph weight progress, this week's calories, or today's macros.",
+  show_chart: "Show or graph weight progress, today's macros, or calories, protein, carbs, fat or "
+    + "macros over recent days, weeks or a month.",
   question: "Ask for information or an explanation without requesting a change.",
   other: "Anything that does not fit another intent.",
 } as const;

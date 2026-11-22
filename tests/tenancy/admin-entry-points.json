@@ -334,6 +334,10 @@
     "test": "tests/tenancy/admin-routes.test.ts",
     "via": "@/lib/server/health-tokens"
   },
+  "lib/server/intake-window.ts": {
+    "test": "tests/tenancy/admin-libs.test.ts",
+    "via": "@/lib/coach/blocks"
+  },
   "lib/server/job-cursor.ts": {
     "test": "tests/tenancy/admin-jobs.test.ts",
     "via": "@/app/api/jobs/estimate/route"
