@@ -9,15 +9,16 @@
 import { buildCommitRequest } from "@/lib/log-client";
 import { commitLogEntry, type CommitResult } from "@/lib/log-commit-client";
 import { canLogAgain } from "@/lib/log/recent-meals";
-import type { LoggedFood } from "@/lib/types";
+import type { LoggedFood, SlotId } from "@/lib/types";
 
-/** The request and the card for a re-log, or null when the entry cannot be rebuilt as it stands. */
-export function logAgainRequest(entry: LoggedFood, at: Date, tz: string) {
+/** The request and the card for a re-log, or null when the entry cannot be rebuilt as it stands.
+ *  `slot`: the meal it files under ("Same as yesterday" on a card); the old entry's otherwise. */
+export function logAgainRequest(entry: LoggedFood, at: Date, tz: string, slot?: SlotId) {
   if (!canLogAgain(entry)) return null;
   const entryId = crypto.randomUUID();
   const items = (entry.items ?? []).map((item, index) => ({ ...item, id: crypto.randomUUID(), seq: index + 1 }));
   const req = buildCommitRequest({
-    entryId, eatenAt: at, tz, slot: entry.slot ?? "snack", title: entry.name,
+    entryId, eatenAt: at, tz, slot: slot ?? entry.slot ?? "snack", title: entry.name,
     items: items.map((item) => ({ id: item.id, foodRefId: item.food_ref_id,
       revision: { revision_id: null }, grams: item.grams, qty: item.qty, unit: item.unit })),
   });
@@ -33,8 +34,9 @@ export function logAgainRequest(entry: LoggedFood, at: Date, tz: string) {
 /** Commit the re-log. `null`: nothing was sent, because the entry cannot be rebuilt. */
 export async function logAgain(
   entry: LoggedFood, at: Date = new Date(), tz: string = Intl.DateTimeFormat().resolvedOptions().timeZone,
+  slot?: SlotId,
 ): Promise<{ result: CommitResult; date: string; card: LoggedFood } | null> {
-  const built = logAgainRequest(entry, at, tz);
+  const built = logAgainRequest(entry, at, tz, slot);
   if (built === null) return null;
   const date = built.req.local_date;
   const result = await commitLogEntry(built.req,

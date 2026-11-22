@@ -116,7 +116,7 @@ export default function SlotCard({
   onSaveComponents,
   onTimeChange,
   onPlanWithCoach,
-  onLogWhatYouAte,
+  onLogWhatYouAte, onSameAsYesterday,
   onAteSomethingElse,
   onClear,
   onDelete,
@@ -146,7 +146,7 @@ export default function SlotCard({
   onSaveComponents?: (components: FoodComponent[]) => void | Promise<void>;
   onTimeChange?: (time: string) => void | Promise<void>;
   onPlanWithCoach?: () => void;
-  onLogWhatYouAte?: () => void;
+  onLogWhatYouAte?: () => void; /** Yesterday's entries in this slot, logged again (fast logging). */ onSameAsYesterday?: () => void;
   /** A planned meal was not what was eaten: open the Plan panel in log mode. */
   onAteSomethingElse?: () => void;
   onClear?: () => void;
@@ -310,6 +310,7 @@ export default function SlotCard({
             <div className="flex flex-col gap-2">
               <Button ref={planButton} block variant="primary" onClick={planEmpty}>{`Plan with ${ASSISTANT_NAME}`}</Button>
               <Button ref={logButton} block variant="tertiary" onClick={logEmpty}>Log what you ate</Button>
+              {onSameAsYesterday && <Button block variant="tertiary" onClick={onSameAsYesterday}>Same as yesterday</Button>}
             </div>
           </>}
           <EmptyCardFlow open={attached}>{flowFace("")}</EmptyCardFlow>

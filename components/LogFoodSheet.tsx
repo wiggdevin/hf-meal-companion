@@ -42,6 +42,9 @@ import {
 import type { LoggedFood, Macros, SlotId } from "@/lib/types";
 import KcalText from "@/components/ui/KcalText";
 import Notice from "@/components/ui/Notice";
+import RecentMealsRow from "@/components/RecentMealsRow";
+import { favoriteRelog, relogOnce, type Relogged } from "@/lib/log/quick-relog";
+import { loadStore } from "@/lib/store";
 import { NUTRITION_UNCHECKED_COPY, PARTIAL_NOTE, commitNutritionUnchecked } from "@/lib/nutrition-display";
 
 const FLAG_LABEL: Record<string, string> = { gluten: "gluten", dairy: "dairy", apple: "apple" };
@@ -87,6 +90,7 @@ export default function LogFoodSheet({
   onCapture,
   onScan,
   at,
+  onRelogged,
 }: {
   mode: "food" | "meal";
   mine: Record<string, Food>;
@@ -108,6 +112,9 @@ export default function LogFoodSheet({
   onCapture: (method: CaptureMethod) => void;
   /** Present only when NEXT_PUBLIC_FEATURE_SCAN=1 — app/page.tsx decides, as QuickActions does. */
   onScan?: () => void;
+  /** A one-tap re-log (recents, a star, Same as yesterday) that logged something: Today closes the
+   *  sheet and confirms with Undo. A re-log that logged nothing says so here instead. */
+  onRelogged?: (done: Relogged) => void;
 }) {
   const router = useRouter();
   const [view, setView] = useState<View>(mode === "meal" ? "meal" : "search");
@@ -243,6 +250,9 @@ export default function LogFoodSheet({
   /** Favorites-strip tap (lane L): a recipe has no catalog pick to cache, so it only routes to
    *  the recipe screen — quick-logging a serving from the chip is a follow-up ticket. */
   function handleFavoritePick(fav: FavoriteRow) {
+    // Fast logging: a star logged before is logged again at its last portion, in one tap.
+    const before = onRelogged && mode === "food" ? favoriteRelog(fav, loadStore().days) : null;
+    if (before) { void relog([before.entry]); return; }
     if (fav.kind === "recipe") {
       router.push("/foods#recipes");
       return;
@@ -258,6 +268,19 @@ export default function LogFoodSheet({
     void pickCatalogRow({ key: `fav:${fav.id}`, catalogFoodId: fav.catalogFoodId,
       revisionId: fav.revisionId ?? null, description: fav.name, brand: null, sourceTile: "USDA",
       prefStatus: null, qualityFlags: [], offPlan: [], offline: false, score: 1 } as CatalogRow);
+  }
+
+  /** Fast logging: earlier entries logged again now, through the commit path (lib/log/quick-relog.ts). */
+  async function relog(entries: LoggedFood[]) {
+    setSubmitting(true);
+    try {
+      const done = await relogOnce(entries, { at, slot });
+      if (done === "busy") return;
+      if (done?.ids.length && onRelogged) onRelogged(done);
+      else commitFeedback.notify({ tone: "error", message: done?.message ?? "That did not log. Try again." });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function attachFoodRef(catalogFoodId: number, seq: number) {
@@ -667,11 +690,13 @@ export default function LogFoodSheet({
         <div className="flex flex-col gap-2.5">
           {mode === "meal" && <Button variant="tertiary" block onClick={() => setView("meal")}>Back to the meal</Button>}
           <Button variant="tertiary" block onClick={onSomethingElse}>Not here? Type it from the label…</Button>
+          {commitNotice}
         </div>
       }
     >
       <div className="flex flex-col gap-4">
         {captureRow}
+        {onRelogged && mode === "food" && <RecentMealsRow slot={slot} at={at} busy={submitting} onRelog={(e) => void relog(e)} />}
         {blocked && <Notice tone="error" title={blocked} className="mb-2" />}
         {useCatalog ? (
           <>
