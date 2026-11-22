@@ -228,22 +228,20 @@ async function enforceCaps(
 }
 
 /**
- * The two pre-model checks, read together (fast logging 2026-11-21): the duplicate probe and the
- * cap read do not depend on each other. The order of the ANSWERS is unchanged: a duplicate is
- * answered first and writes nothing, then the cap refuses and writes its `blocked` row. Both are
- * settled before this returns, so the model is never called past the cap.
+ * The two pre-model checks, read together: the duplicate probe and the cap read do not depend on
+ * each other. The order of the ANSWERS is unchanged: a duplicate is answered first and writes
+ * nothing, without waiting on the cap read; then the cap refuses and writes its `blocked` row. A cap
+ * read that fails while the probe is still out is marked handled at once, and thrown only once the
+ * probe has cleared. Both are settled before this returns, so the model is never called past the cap.
  */
 async function assertUnderCaps(
   client: SupabaseClient, admin: SupabaseClient, userId: string, purpose: CapturePurpose,
   inputHash: string, since: string,
 ): Promise<{ usedToday: number; soft: number; state: CapState }> {
-  const [duplicate, caps] = await Promise.allSettled([
-    assertNotDuplicate(client, userId, purpose, inputHash, since),
-    readCaps(admin, userId),
-  ]);
-  if (duplicate.status === "rejected") throw duplicate.reason;
-  if (caps.status === "rejected") throw caps.reason;
-  return enforceCaps(admin, userId, purpose, inputHash, caps.value);
+  const capsRead = readCaps(admin, userId);
+  capsRead.catch(() => undefined);
+  await assertNotDuplicate(client, userId, purpose, inputHash, since);
+  return enforceCaps(admin, userId, purpose, inputHash, await capsRead);
 }
 
 async function resolveFoodRef(
@@ -581,12 +579,6 @@ export async function proposeDraft(
   // Phase 13 §9 R3: the attestation is checked before the media is read, and again by the payload
   // builder before anything is serialised. Off, capture refuses with 503 nous_unconfirmed.
   assertGeminiAttested();
-  // The account's food rules are needed only at grounding, after the model answers, but read now
-  // so the round trip hides behind the media, the checks and the model. A failure is held and
-  // thrown where it was always thrown (at grounding); a refusal before then leaves it unawaited,
-  // so it is marked handled here.
-  const profileRead = loadUserProfile(client);
-  profileRead.catch(() => undefined);
   const media = await loadMedia(admin, userId, req, deps.fetchOwnedObject ?? fetchOwnedObjectImpl);
   const text = req.method === "text" ? req.text : undefined;
   const payload = capturePayload(purpose,
@@ -595,6 +587,9 @@ export async function proposeDraft(
 
   const since = new Date(now() - DUPLICATE_WINDOW_MS).toISOString();
   const { usedToday, soft, state } = await assertUnderCaps(client, admin, userId, purpose, inputHash, since);
+  // The account's food rules are read once the media and the caps have passed, and before the paid
+  // model call: a refused request reads nothing more, and a failed read stops before any spend.
+  const profile = await loadUserProfile(client);
 
   // Owner request 2026-10-02: text, photo and label ask OpenRouter first (lib/ai/capture.ts), the
   // Gemini payload above stays the fallback.
@@ -629,7 +624,6 @@ export async function proposeDraft(
   // T0 §4: every item is grounded at the same time, and `Promise.all` preserves the model's
   // order, so what the user reads on the confirm sheet is still the order the model said it in.
   const groundStarted = Date.now();
-  const profile = await profileRead;
   const results = await Promise.all(parsed.items.map(
     (item) => groundItem(client, userId, item, label, profile, searchFoods)
       .catch((error: unknown) => ungroundable(item, error))));

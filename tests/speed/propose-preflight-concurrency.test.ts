@@ -1,19 +1,23 @@
 /**
- * Fast logging (2026-11-21): proposeDraft's pre-model reads run together, not one after another.
+ * Fast logging: proposeDraft's duplicate probe and cap read run together, not one after another.
  *
- * The duplicate probe, the spend-cap read and the food-rules read do not depend on each other, so
- * they overlap. What must NOT change: the cap is decided before the model is called, a duplicate
- * answers 409 before the cap writes its `blocked` row, and a blocked cap never reaches the model.
+ * What must NOT change: a duplicate answers 409 before the cap writes its `blocked` row (and without
+ * waiting on the cap read), the cap is decided before the model is called, a blocked cap never
+ * reaches the model, and the food rules are read only after the caps pass and before the paid call.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DuplicateRequest, proposeDraft } from "@/lib/server/capture";
 
-const REQ = { method: "text" as const, localDate: "2026-09-17", tz: "America/New_York",
+const REQ = { method: "text" as const, localDate: "2026-09-17", tz: "America/Denver",
   slot: "meal-1", text: "an egg" };
 
 const tick = () => new Promise((r) => setTimeout(r, 2));
+const never = () => new Promise<never>(() => {});
 
-type Opts = { duplicate?: boolean; used?: number };
+type Opts = {
+  duplicate?: boolean; used?: number;
+  stallCaps?: boolean; failCaps?: boolean; failProfile?: boolean;
+};
 
 /** A fake client that records when each pre-model read starts and ends. */
 function fakeDb(log: string[], opts: Opts = {}) {
@@ -25,7 +29,14 @@ function fakeDb(log: string[], opts: Opts = {}) {
     return value;
   };
   const rpc = vi.fn(async (name: string) => {
-    if (name === "ai_calls_today") return timed("caps", { data: opts.used ?? 0, error: null });
+    if (name === "ai_calls_today") {
+      if (opts.stallCaps) { log.push("caps:start"); return never(); }
+      if (opts.failCaps) {
+        log.push("caps:start"); await tick();
+        return { data: null, error: { message: "cap read down" } };
+      }
+      return timed("caps", { data: opts.used ?? 0, error: null });
+    }
     if (name === "get_or_create_food_ref") return { data: "ref-70", error: null };
     return { data: null, error: null };
   });
@@ -37,7 +48,10 @@ function fakeDb(log: string[], opts: Opts = {}) {
       if (table === "ai_calls") {
         return timed("duplicate", { data: opts.duplicate ? { id: "call-1" } : null, error: null });
       }
-      if (table === "constraint_profiles") return timed("profile", { data: null, error: null });
+      if (table === "constraint_profiles") {
+        return timed("profile", opts.failProfile
+          ? { data: null, error: { message: "rules down" } } : { data: null, error: null });
+      }
       return { data: null, error: null };
     });
     chain.then = (resolve: (value: unknown) => void) => resolve({ data: [], error: null });
@@ -61,43 +75,52 @@ function deps(log: string[]) {
 }
 
 const at = (log: string[], event: string) => log.indexOf(event);
+const blockedRows = (inserts: unknown[]) => inserts.filter((i) => (i as { table: string }).table === "ai_calls");
 
 beforeEach(() => {
   vi.unstubAllEnvs();
   vi.stubEnv("CAPTURE_METHODS", "text,voice,label,photo");
+  vi.stubEnv("CAPTURE_DAILY_SOFT_CAP", "3");
+  vi.stubEnv("CAPTURE_DAILY_HARD_CAP", "5");
 });
 
-describe("proposeDraft's pre-model reads", () => {
-  it("runs the duplicate probe, the cap read and the food-rules read at the same time", async () => {
+describe("proposeDraft's pre-model checks", () => {
+  it("runs the duplicate probe and the cap read at the same time", async () => {
     const log: string[] = [];
     const db = fakeDb(log);
     await proposeDraft(db.client, db.client, "u1", REQ, deps(log));
-    // Each of the three starts before any of the others has finished.
-    const firstEnd = Math.min(at(log, "duplicate:end"), at(log, "caps:end"), at(log, "profile:end"));
+    const firstEnd = Math.min(at(log, "duplicate:end"), at(log, "caps:end"));
     expect(at(log, "duplicate:start")).toBeLessThan(firstEnd);
     expect(at(log, "caps:start")).toBeLessThan(firstEnd);
-    expect(at(log, "profile:start")).toBeLessThan(firstEnd);
   });
 
-  it("still decides the cap and the duplicate before the model is called", async () => {
+  it("reads the food rules after the caps pass and before the model is called", async () => {
     const log: string[] = [];
     const db = fakeDb(log);
     await proposeDraft(db.client, db.client, "u1", REQ, deps(log));
-    expect(at(log, "caps:end")).toBeLessThan(at(log, "model:start"));
-    expect(at(log, "duplicate:end")).toBeLessThan(at(log, "model:start"));
+    expect(at(log, "duplicate:end")).toBeLessThan(at(log, "profile:start"));
+    expect(at(log, "caps:end")).toBeLessThan(at(log, "profile:start"));
+    expect(at(log, "profile:end")).toBeLessThan(at(log, "model:start"));
   });
 
-  it("never calls the model at the hard cap", async () => {
-    vi.stubEnv("CAPTURE_HARD_CAP", "5");
+  it("stops on a failed food-rules read before the paid model call", async () => {
     const log: string[] = [];
-    const db = fakeDb(log, { used: 999 });
+    const db = fakeDb(log, { failProfile: true });
     const d = deps(log);
-    await expect(proposeDraft(db.client, db.client, "u1", REQ, d)).rejects.toMatchObject({ code: "spend_cap" });
+    await expect(proposeDraft(db.client, db.client, "u1", REQ, d)).rejects.toMatchObject({ code: "policy_failed" });
+    expect(d.runCapture).not.toHaveBeenCalled();
+  });
+
+  it("answers a known duplicate without waiting on a stalled cap read", async () => {
+    const log: string[] = [];
+    const db = fakeDb(log, { duplicate: true, stallCaps: true });
+    const d = deps(log);
+    await expect(proposeDraft(db.client, db.client, "u1", REQ, d)).rejects.toBeInstanceOf(DuplicateRequest);
+    expect(blockedRows(db.inserts)).toEqual([]);
     expect(d.runCapture).not.toHaveBeenCalled();
   });
 
   it("answers a duplicate first, without writing a blocked row, even at the hard cap", async () => {
-    vi.stubEnv("CAPTURE_HARD_CAP", "5");
     const log: string[] = [];
     const db = fakeDb(log, { duplicate: true, used: 999 });
     const d = deps(log);
@@ -106,27 +129,50 @@ describe("proposeDraft's pre-model reads", () => {
     expect(d.runCapture).not.toHaveBeenCalled();
   });
 
-  it("does not leave a failed early rules read unhandled when the cap refuses first", async () => {
-    vi.stubEnv("CAPTURE_HARD_CAP", "5");
+  it("handles a failed cap read at once and throws it only after the probe clears", async () => {
     const unhandled = vi.fn();
     process.on("unhandledRejection", unhandled);
     try {
       const log: string[] = [];
-      const db = fakeDb(log, { used: 999 });
-      const client = db.client as unknown as { from: (t: string) => Record<string, unknown> };
-      const realFrom = client.from;
-      client.from = (table: string) => {
-        const chain = realFrom(table);
-        if (table === "constraint_profiles") {
-          chain.maybeSingle = async () => ({ data: null, error: { message: "boom" } });
-        }
-        return chain;
-      };
-      await expect(proposeDraft(db.client, db.client, "u1", REQ, deps(log))).rejects.toMatchObject({ code: "spend_cap" });
+      const db = fakeDb(log, { failCaps: true });
+      const d = deps(log);
+      await expect(proposeDraft(db.client, db.client, "u1", REQ, d)).rejects.toMatchObject({ status: 503, code: "provider_unavailable" });
       await tick(); await tick();
       expect(unhandled).not.toHaveBeenCalled();
+      expect(at(log, "duplicate:end")).toBeGreaterThan(-1);
+      expect(d.runCapture).not.toHaveBeenCalled();
+      expect(at(log, "profile:start")).toBe(-1);
     } finally {
       process.off("unhandledRejection", unhandled);
     }
+  });
+});
+
+describe("the real daily hard cap (CAPTURE_DAILY_HARD_CAP)", () => {
+  it("lets the last slot under the cap through", async () => {
+    const log: string[] = [];
+    const db = fakeDb(log, { used: 4 });
+    const d = deps(log);
+    await proposeDraft(db.client, db.client, "u1", REQ, d);
+    expect(d.runCapture).toHaveBeenCalledOnce();
+  });
+
+  it("refuses at the cap, writes one blocked row and never calls the model or reads the rules", async () => {
+    const log: string[] = [];
+    const db = fakeDb(log, { used: 5 });
+    const d = deps(log);
+    await expect(proposeDraft(db.client, db.client, "u1", REQ, d)).rejects.toMatchObject({ code: "spend_cap" });
+    expect(blockedRows(db.inserts)).toHaveLength(1);
+    expect(d.runCapture).not.toHaveBeenCalled();
+    expect(at(log, "profile:start")).toBe(-1);
+  });
+
+  it("refuses every capture when the cap is 0 (the kill switch)", async () => {
+    vi.stubEnv("CAPTURE_DAILY_HARD_CAP", "0");
+    const log: string[] = [];
+    const db = fakeDb(log, { used: 0 });
+    const d = deps(log);
+    await expect(proposeDraft(db.client, db.client, "u1", REQ, d)).rejects.toMatchObject({ code: "spend_cap" });
+    expect(d.runCapture).not.toHaveBeenCalled();
   });
 });
