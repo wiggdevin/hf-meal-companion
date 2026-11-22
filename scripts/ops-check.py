@@ -23,7 +23,9 @@ Checks:
   `ai_spend_reserve_split` counts it) is over 60 % of a cap: the all-accounts ceiling, the
   background ceiling, or any one account's cap (the body counts accounts, never names one). The caps
   are the app's defaults ($50, $10, $2) unless AI_GLOBAL_DAILY_SPEND_CAP_USD,
-  AI_BACKGROUND_DAILY_SPEND_CAP_USD or AI_DAILY_SPEND_CAP_USD are set for this job too.
+  AI_BACKGROUND_DAILY_SPEND_CAP_USD or AI_DAILY_SPEND_CAP_USD are set for this job too. As in the app
+  (lib/ai/spend.ts), the background cap is clamped to global x (1 - AI_INTERACTIVE_SHARE, default 0.7).
+  Open holds count whether or not they have expired, until the sweep settles them.
 - grounding: the `lookup` lane's search queries this UTC month are over 5,000 (the free monthly
   grounding allowance; $14 per 1,000 after it). Query counts are not stored, so this reads the
   lookup rows' recorded cost: each query bills $0.014 and tokens add a little, so cost / $0.014 is an
@@ -62,6 +64,7 @@ SPEND_ALERT_SHARE = 0.60
 SPEND_CAPS = {"global": ("AI_GLOBAL_DAILY_SPEND_CAP_USD", 50.0),
               "background": ("AI_BACKGROUND_DAILY_SPEND_CAP_USD", 10.0),
               "account": ("AI_DAILY_SPEND_CAP_USD", 2.0)}
+SPEND_SHARE = ("AI_INTERACTIVE_SHARE", 0.7)  # lib/ai/spend.ts DEFAULT_INTERACTIVE_SHARE
 GROUNDING_MONTHLY_QUERIES = 5000
 ACCOUNT_ROWS = 100  # STATE_QUERY sends at most this many account amounts
 GROUNDING_COST_PER_QUERY_USD = 0.014  # lib/ai/spend.ts GROUNDING_COST_PER_QUERY_USD
@@ -95,7 +98,8 @@ select json_build_object(
                    order by job), '[]'::json)
                  from newest
                  where not done and pass_started_at < now() - interval '12 hours'),
-  -- Committed spend for the UTC day, as ai_spend_reserve_split counts it: settled plus open holds.
+  -- Committed spend for the UTC day, as ai_spend_reserve_split counts it: settled plus EVERY open
+  -- hold, expired or not (a hold stops counting only when the sweep settles it).
   'spend_global', (select coalesce(sum(spent_usd), 0) from public.ai_spend_global_days
                     where day = (now() at time zone 'utc')::date)
                 + (select coalesce(sum(amount_usd), 0) from public.ai_spend_reservations
@@ -185,15 +189,33 @@ def usd(value):
     return f"${float(value):,.2f}"
 
 
+_PLAIN_DECIMAL = re.compile(r"\d{1,9}(\.\d{1,9})?")
+
+
+def _plain_decimal(raw):
+    """A plain non-negative decimal as a float, else None (no sign, hex, exponent, NaN, Infinity)."""
+    text = (raw or "").strip()
+    if not _PLAIN_DECIMAL.fullmatch(text):
+        return None
+    value = float(text)
+    return value if value <= 1_000_000 else None
+
+
+def interactive_share(env):
+    """AI_INTERACTIVE_SHARE as lib/ai/spend.ts reads it: above 0 and at most 1, else 0.7."""
+    value = _plain_decimal(env.get(SPEND_SHARE[0]))
+    value = None if value is None else round(value, 6)
+    return value if value is not None and 0 < value <= 1 else SPEND_SHARE[1]
+
+
 def spend_caps(env):
-    """The three daily caps in USD, from the app's variable names when set, else its defaults."""
+    """The three daily caps in USD, from the app's variable names when set, else its defaults.
+    The background cap is clamped to global x (1 - share), as the app does."""
     caps = {}
     for key, (name, default) in SPEND_CAPS.items():
-        try:
-            value = float(env.get(name) or default)
-        except ValueError:
-            value = default
-        caps[key] = value if value >= 0 else default
+        value = _plain_decimal(env.get(name))
+        caps[key] = default if value is None else value
+    caps["background"] = min(caps["background"], round(caps["global"] * (1 - interactive_share(env)), 6))
     return caps
 
 

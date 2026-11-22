@@ -30,6 +30,17 @@ begin
                   chosen_key, offered_keys, ranking_version)
       on table public.food_signal_events to service_role;
   end if;
+  -- 20270109090100: the AI-spend internal helpers are callable only from inside the
+  -- security-definer spend RPCs. Production revokes them from service_role too.
+  if to_regprocedure('public._ai_spend_lock()') is not null then
+    revoke all on function public._ai_spend_lock() from service_role;
+  end if;
+  if to_regprocedure('public._ai_spend_reconcile(uuid, timestamptz)') is not null then
+    revoke all on function public._ai_spend_reconcile(uuid, timestamptz) from service_role;
+  end if;
+  if to_regprocedure('public._ai_spend_reconcile(uuid)') is not null then
+    revoke all on function public._ai_spend_reconcile(uuid) from service_role;
+  end if;
 end $$;
 
 -- Raw catalog read for tests/rls/security-invoker.test.ts. PostgREST cannot reach pg_class.
