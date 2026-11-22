@@ -9,6 +9,7 @@ import type { EvidenceByName } from "@/lib/coach/policy";
 import { makeExecutors } from "@/lib/coach/executors";
 import { TURN_LIMITS } from "@/lib/coach/turn";
 import { defaultPorts } from "@/lib/server/coach-ports";
+import { localDateIn } from "@/lib/server/jobs";
 import { liveLogEntryExists } from "@/lib/server/coach-unlogged-meal";
 import { pinPlanSlot, planSlotOf } from "@/lib/server/coach-turn/plan-slot";
 import type { ReplyCheckPorts } from "@/lib/server/reply-check";
@@ -55,9 +56,16 @@ export function armTurn(turn: OpenTurn, gate: PolicyProfileRead) {
     },
     ...deps.replyCheck,
   };
+  // Chart reads stop when the turn does, and when the phone leaves (app/api/coach/route.ts): a
+  // 90-day window is the largest read a turn makes. The turn itself still finishes and saves.
+  const blockSignal = deps.signal ? AbortSignal.any([turnAbort.signal, deps.signal]) : turnAbort.signal;
+  // The account's real date, not the viewed scope date: a chart's in-progress day is today's.
+  const realToday = (() => {
+    try { return localDateIn(clock.tz, new Date(clock.now)); } catch { return clock.date; }
+  })();
   const startedAt = now();
   const wallClockBudgetMs = deps.wallClockMs ?? TURN_LIMITS.wallClockMs;
   return { profile, profileInstances, foodEvidence, turnAbort, turnPorts, executors, replyPorts,
     logEntryExists: deps.logEntryExists ?? liveLogEntryExists, startedAt,
-    wallClockBudgetMs };
+    wallClockBudgetMs, blocks: { signal: blockSignal, today: realToday } };
 }

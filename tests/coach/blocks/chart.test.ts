@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { hydrateChart, trendDays } from "@/lib/coach/blocks/hydrate-chart";
+import {
+  hydrateChart, rangeLabel, trendByWeek, trendDays, type NutritionChartRow,
+} from "@/lib/coach/blocks/hydrate-chart";
 import { chartBlockV1Schema } from "@/lib/coach/ui-blocks";
 
 const day = {
@@ -7,6 +9,17 @@ const day = {
   consumed: { protein: 72, carbs: 140, fat: 38, kcal: 1300 },
   targets: { protein: 135, carbs: 240, fat: 70, kcal: 2200 },
 };
+
+type Values = Partial<Record<"kcal" | "protein" | "carbs" | "fat", number | null>>;
+const TARGET = { kcal: 2000, protein: 135, carbs: 240, fat: 70 };
+/** One charted day: measured values (null: not measured), the floors, and that day's target. */
+function nrow(date: string, values: Values, partial: Partial<Record<keyof Values, boolean>> = {},
+  target: NutritionChartRow["target"] = TARGET): NutritionChartRow {
+  const at = (key: keyof Values, fallback: number) => ({
+    value: key in values ? values[key]! : fallback, partial: partial[key] === true });
+  return { date, kcal: at("kcal", 1500), protein: at("protein", 100), carbs: at("carbs", 200),
+    fat: at("fat", 60), target };
+}
 
 describe("chart block hydration", () => {
   it("converts canonical weight rows into the user's pounds", () => {
@@ -43,50 +56,34 @@ describe("chart block hydration", () => {
       });
   });
 
-  it("keeps only the last seven logged calorie days", () => {
-    const rows = Array.from({ length: 9 }, (_, index) => ({
-      localDate: `2026-09-${String(index + 10).padStart(2, "0")}`,
-      consumedKcal: index === 0 ? 0 : 1200 + index,
-      targetKcal: 2100,
-    }));
-    const block = hydrateChart({ chart: "kcal_week" }, { id: "chart-3", kcalRows: rows });
-    expect(block?.series[0].points).toHaveLength(7);
-    expect(block?.series[0].points[0]).toEqual({ x: "2026-09-12", y: 1202 });
+  it("charts every given calorie day over its stored range, with the range in the caption", () => {
+    const rows = [nrow("2026-09-10", { kcal: 0 }), nrow("2026-09-19", { kcal: 1400.456 })];
+    const block = hydrateChart({ chart: "kcal_week" }, { id: "chart-3", nutritionRows: rows,
+      range: { start: "2026-09-10", end: "2026-09-19" } });
     expect(block).toMatchObject({
-      chart: "kcal_week", days: 7, unit: "kcal",
-      caption: "Calories over 7 logged days",
+      chart: "kcal_week", days: 10, start: "2026-09-10", end: "2026-09-19", unit: "kcal",
+      caption: "Calories, Sep 10 – Sep 19, 2026 (2 logged days)",
     });
+    // A logged day whose foods total a measured 0 kcal keeps its 0; precision is kept to 2 places.
+    expect(block?.series[0].points).toEqual([{ x: "2026-09-10", y: 0 }, { x: "2026-09-19", y: 1400.46 }]);
+    expect(chartBlockV1Schema.safeParse(block).success).toBe(true);
   });
 
-  it("states the actual number of logged calorie days", () => {
-    const block = hydrateChart({ chart: "kcal_week" }, { id: "chart-4", kcalRows: [
-      { localDate: "2026-09-10", consumedKcal: 1200, targetKcal: 2100 },
-      { localDate: "2026-09-19", consumedKcal: 1400, targetKcal: 2200 },
-    ] });
-
-    expect(block).toMatchObject({ days: 2, caption: "Calories over 2 logged days" });
+  it("never charts an unmeasured day as an exact 0: it is a blank floor, with no target point", () => {
+    const block = hydrateChart({ chart: "kcal_week", days: 7 }, { id: "c", nutritionRows: [
+      nrow("2026-09-18", { kcal: null }, { kcal: true }), nrow("2026-09-19", { kcal: 1500 }, { kcal: true }),
+    ], range: { start: "2026-09-13", end: "2026-09-19" } });
+    expect(block?.series[0].points).toEqual([
+      { x: "2026-09-18", y: null, partial: true }, { x: "2026-09-19", y: 1500, partial: true },
+    ]);
+    expect(block?.series[1].points).toEqual([{ x: "2026-09-19", y: 2000 }]);
+    expect(block).toMatchObject({ partial: true, days: 7 });
+    expect(chartBlockV1Schema.safeParse(block).success).toBe(true);
   });
 
-  it("keeps a logged day even when its foods total zero calories", () => {
-    const block = hydrateChart({ chart: "kcal_week" }, { id: "chart-5", kcalRows: [
-      { localDate: "2026-09-19", consumedKcal: 0, targetKcal: 2200 },
-    ] });
-
-    expect(block).toMatchObject({
-      days: 1, caption: "Calories over 1 logged day",
-    });
-    expect(block?.series[0].points).toEqual([{ x: "2026-09-19", y: 0 }]);
-  });
-
-  it("honours kcal_week days up to 90 and keeps seven as the default", () => {
-    const rows = Array.from({ length: 95 }, (_, index) => ({
-      localDate: new Date(Date.UTC(2026, 5, 1 + index)).toISOString().slice(0, 10),
-      consumedKcal: 1500, targetKcal: 2000,
-    }));
-    const month = hydrateChart({ chart: "kcal_week", days: 30 }, { id: "c", kcalRows: rows });
-    expect(month).toMatchObject({ days: 30, caption: "Calories over 30 logged days" });
-    expect(hydrateChart({ chart: "kcal_week", days: 365 }, { id: "c", kcalRows: rows })?.days).toBe(90);
-    expect(hydrateChart({ chart: "kcal_week" }, { id: "c", kcalRows: rows })?.days).toBe(7);
+  it("names both years when the range crosses one", () => {
+    expect(rangeLabel("2025-12-20", "2026-01-02")).toBe("Dec 20, 2025 – Jan 2, 2026");
+    expect(rangeLabel("2026-09-19", "2026-09-19")).toBe("Sep 19, 2026");
   });
 
   it.each([
@@ -96,17 +93,17 @@ describe("chart block hydration", () => {
   });
 
   it("charts protein, carbs and fat per logged day against that day's target", () => {
-    const block = hydrateChart({ chart: "macros_trend", days: 14 }, { id: "chart-6", macroRows: [
-      { localDate: "2026-09-19", consumed: { protein: 90.04, carbs: 180, fat: 60 },
-        target: { protein: 135, carbs: 240, fat: 70 }, partial: false },
-      { localDate: "2026-09-10", consumed: { protein: 70, carbs: 150, fat: 50 },
-        target: null, partial: false },
-    ] });
+    const block = hydrateChart({ chart: "macros_trend", days: 14, focus: "carbs" }, { id: "chart-6",
+      nutritionRows: [
+        nrow("2026-09-10", { protein: 70, carbs: 150, fat: 50 }, {}, null),
+        nrow("2026-09-19", { protein: 90.044, carbs: 180, fat: 60 }),
+      ], range: { start: "2026-09-06", end: "2026-09-19" } });
     expect(block).toEqual({
       kind: "chart", v: 1, id: "chart-6", chart: "macros_trend", days: 14, unit: "g",
-      caption: "Protein, carbs and fat over 2 logged days in the last 14 days",
+      start: "2026-09-06", end: "2026-09-19", focus: "carbs",
+      caption: "Protein, carbs and fat, Sep 6 – Sep 19, 2026 (2 logged days)",
       series: [
-        { label: "Protein", points: [{ x: "2026-09-10", y: 70 }, { x: "2026-09-19", y: 90 }] },
+        { label: "Protein", points: [{ x: "2026-09-10", y: 70 }, { x: "2026-09-19", y: 90.04 }] },
         // A day with no target revision keeps its eaten point and gets no target point.
         { label: "Protein target", points: [{ x: "2026-09-19", y: 135 }] },
         { label: "Carbs", points: [{ x: "2026-09-10", y: 150 }, { x: "2026-09-19", y: 180 }] },
@@ -118,23 +115,33 @@ describe("chart block hydration", () => {
     expect(chartBlockV1Schema.safeParse(block).success).toBe(true);
   });
 
-  it("marks the partial days of a macros trend and passes schema validation", () => {
-    const row = (localDate: string, partial: boolean) => ({ localDate,
-      consumed: { protein: 80, carbs: 150, fat: 50 }, target: { protein: 120, carbs: 200, fat: 60 }, partial });
-    const block = hydrateChart({ chart: "macros_trend" }, { id: "c", macroRows: [
-      row("2026-09-18", true), row("2026-09-19", false),
+  it("marks each partial macro point, blanks a wholly unknown macro and passes the schema", () => {
+    const block = hydrateChart({ chart: "macros_trend" }, { id: "c", nutritionRows: [
+      nrow("2026-09-18", { protein: 80, carbs: null, fat: 20 }, { carbs: true, fat: true }),
+      nrow("2026-09-19", { protein: 90, carbs: 150, fat: 50 }),
     ] });
-    expect(block).toMatchObject({ days: 14, partial: true, partialDays: ["2026-09-18"] });
-    expect(chartBlockV1Schema.parse(block).partialDays).toEqual(["2026-09-18"]);
-    const whole = hydrateChart({ chart: "macros_trend" }, { id: "c", macroRows: [row("2026-09-19", false)] });
-    expect(whole && ("partial" in whole || "partialDays" in whole)).toBe(false);
+    expect(block).toMatchObject({ days: 14, start: "2026-09-06", end: "2026-09-19", partial: true });
+    const parsed = chartBlockV1Schema.parse(block);
+    expect(parsed.series.find((row) => row.label === "Carbs")?.points[0]).toEqual({ x: "2026-09-18", y: null, partial: true });
+    expect(parsed.series.find((row) => row.label === "Carbs target")?.points.map((p) => p.x)).toEqual(["2026-09-19"]);
+    expect(parsed.series.find((row) => row.label === "Fat")?.points[0]).toEqual({ x: "2026-09-18", y: 20, partial: true });
+    const whole = hydrateChart({ chart: "macros_trend" }, { id: "c", nutritionRows: [nrow("2026-09-19", {})] });
+    expect(whole && "partial" in whole).toBe(false);
+  });
+
+  it("says by week when more days are charted than one column each", () => {
+    const rows = Array.from({ length: 20 }, (_, i) => nrow(`2026-08-${String(i + 1).padStart(2, "0")}`, {}));
+    const block = hydrateChart({ chart: "macros_trend", days: 30 }, { id: "c", nutritionRows: rows })!;
+    expect(trendByWeek(block)).toBe(true);
+    expect(trendByWeek(hydrateChart({ chart: "macros_trend" }, { id: "c", nutritionRows: rows.slice(0, 14) })!))
+      .toBe(false);
   });
 
   it.each([
     ["weight_trend", { id: "empty", weightRows: [], weightUnit: "kg" }],
-    ["macros_trend", { id: "empty", macroRows: [] }],
+    ["macros_trend", { id: "empty", nutritionRows: [] }],
     ["macros_today", { id: "empty" }],
-    ["kcal_week", { id: "empty", kcalRows: [] }],
+    ["kcal_week", { id: "empty", nutritionRows: [] }],
   ] as const)("returns no %s block when its source is empty", (chart, input) => {
     expect(hydrateChart({ chart }, input)).toBeNull();
   });

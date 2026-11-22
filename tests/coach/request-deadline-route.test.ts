@@ -52,6 +52,13 @@ describe("POST /api/coach deadline", () => {
     expect(vi.mocked(runTurn).mock.calls[0][4]).toMatchObject({ startedAt: arrived });
   });
 
+  it("hands runTurn the request's signal, so chart reads stop when the phone leaves", async () => {
+    vi.mocked(runTurn).mockResolvedValue({} as never);
+    const req = post();
+    await POST(req);
+    expect(vi.mocked(runTurn).mock.calls[0][4]?.signal).toBe(req.signal);
+  });
+
   it("answers a retryable 503 when the turn is still running at the deadline", async () => {
     vi.mocked(runTurn).mockImplementation(never);
     let settled: Response | null = null;

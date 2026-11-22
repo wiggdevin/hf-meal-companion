@@ -170,9 +170,15 @@ export async function runToolBatch(
       state.transcript.push(renderToolResult({ name: name as ToolName, ok: false, error: outcome.message }));
       continue;
     }
-    const { data, resolvedData, persistResult } = outcome;
+    const { resolvedData, persistResult } = outcome;
+    let { data } = outcome;
+    // One block per reply. A chart the person asked for wins the slot over any other block; a
+    // chart that cannot be attached is reported to the model as not shown, never acknowledged.
+    const attached = attachBlock(state, outcome.block);
+    if (name === "show_chart" && outcome.block && !attached) {
+      data = { available: false, message: "Only one chart can be shown in a reply." };
+    }
     state.toolCalls.push(persistResult ? { name, ok: true, result: data } : { name, ok: true });
-    if (state.blocks.length === 0 && outcome.block) state.blocks = validatedBlocks(outcome.block);
     const internalData = resolvedData ?? data;
     if (name === "get_plan") {
       const read = planRead(internalData);
@@ -196,4 +202,15 @@ export async function runToolBatch(
     state.transcript.push(renderToolResult(result));
   }
   return "applied";
+}
+
+/** Attach `block` when the slot is free, or when it is a chart and the slot holds no chart. */
+function attachBlock(state: { blocks: UiBlock[] }, block: UiBlock | null | undefined): boolean {
+  if (!block) return false;
+  const isChart = (candidate: UiBlock) => candidate.kind === "chart";
+  if (state.blocks.length > 0 && !(isChart(block) && !state.blocks.some(isChart))) return false;
+  const validated = validatedBlocks(block);
+  if (validated.length === 0) return false;
+  state.blocks = validated;
+  return true;
 }

@@ -22,7 +22,8 @@ const COMMANDS = ["16 oz water", "drank 500 ml", "add cheese to my avoid list", 
   "move my meals 30 minutes later", "make me 5 suggestions from my eats list", "a chicken wrap that fits my macros",
   "what should I eat for lunch?", "set kcal to 2300", "I am 34", "show my weight trend", "log 2 eggs and toast",
   "set my breakfast to oatmeal with blueberries every weekday for the next two weeks", "how am I doing this week",
-  "how has my protein been this month", "show my macros over the last 2 weeks", "calories last 30 days"];
+  "how has my protein been this month", "show my macros over the last 2 weeks", "calories last 30 days",
+  "protein trend", "calories over the last seven days"];
 
 const ctx = { now: "2026-10-06T10:00:00-06:00", userId: "u1" };
 
@@ -69,6 +70,17 @@ describe("the coach intent pre-pass and the taste safety check", () => {
       "chart my carbs for the past fortnight", "kcal over the past three weeks"]) expect([text, mayReachJev(text)]).toEqual([text, true]);
     for (const text of ["how has my protein been since my kidney diagnosis", "calories last 30 days because i feel sick",
       "how has my protein been this month, i think i'm allergic to eggs", "show my body fat this month"]) {
+      expect([text, mayReachJev(text)]).toEqual([text, false]);
+    }
+  });
+
+  it("admits every window and subject chartArgs reads (one shared grammar)", () => {
+    for (const text of ["protein trend", "show my carbs chart", "calories over the last seven days",
+      "protein over the past one week", "kcal for the last nine days", "my macros for the past fourteen days",
+      "fat over a week", "carbohydrates over the last 120 days", "show my calorie trend"]) {
+      expect([text, mayReachJev(text)]).toEqual([text, true]);
+    }
+    for (const text of ["show my body fat trend", "body fat over the last 30 days"]) {
       expect([text, mayReachJev(text)]).toEqual([text, false]);
     }
   });

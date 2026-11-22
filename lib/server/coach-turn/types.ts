@@ -57,6 +57,8 @@ export type StageDeps = {
    * (lib/server/coach-turn/draft.ts). Absent, nothing streams and the turn is unchanged.
    */
   draft?: DraftSink;
+  /** The request's own signal: the phone left. Stops the chart reads, never the turn's save. */
+  signal?: AbortSignal;
 };
 
 /** The request and its clocks, fixed before the first read. */

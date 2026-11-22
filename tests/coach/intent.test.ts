@@ -263,11 +263,16 @@ describe("intent pre-pass", () => {
   });
 
   it.each([
-    ["how has my protein been this month", { chart: "macros_trend", days: 30 }],
+    ["how has my protein been this month", { chart: "macros_trend", days: 30, focus: "protein" }],
     ["show my macros over the last 2 weeks", { chart: "macros_trend", days: 14 }],
-    ["chart my carbs for the past fortnight", { chart: "macros_trend", days: 14 }],
-    ["how has my protein been", { chart: "macros_trend" }],
-    ["my fat intake over the last ninety days", { chart: "macros_trend", days: 90 }],
+    ["chart my carbs for the past fortnight", { chart: "macros_trend", days: 14, focus: "carbs" }],
+    ["how has my protein been", { chart: "macros_trend", days: 14, focus: "protein" }],
+    ["my fat intake over the last ninety days", { chart: "macros_trend", days: 90, focus: "fat" }],
+    ["calories last 7 days", { chart: "kcal_week", days: 7 }],
+    ["show my calories for the past seven days", { chart: "kcal_week", days: 7 }],
+    ["my calories lately", { chart: "kcal_week", days: 14 }],
+    ["protein trend", { chart: "macros_trend", days: 14, focus: "protein" }],
+    ["show my protein over the last one week", { chart: "macros_trend", days: 7, focus: "protein" }],
     ["calories last 30 days", { chart: "kcal_week", days: 30 }],
     ["show my calories this month", { chart: "kcal_week", days: 30 }],
     ["kcal over the past three weeks", { chart: "kcal_week", days: 21 }],
@@ -278,6 +283,26 @@ describe("intent pre-pass", () => {
     expect(result?.args).toEqual(args);
     expect(isFastPathEligible(result!, message)).toBe(true);
     if ("days" in args) expect(hintLine(result!)).toContain(`days=${args.days}`);
+  });
+
+  it.each([
+    ["calories over the last 200 days", { chart: "kcal_week", days: 90 }],
+    ["protein over the last 2 days", { chart: "macros_trend", days: 7, focus: "protein" }],
+    ["show my macros today", { chart: "macros_today" }],
+  ] as const)("clamps the window to 7..90 before it is an arg: %s", async (message, args) => {
+    systemOneMock.mockResolvedValue(answers("show_chart", 0.93));
+    const result = await classifyIntent(message, context);
+    expect(result?.args).toEqual(args);
+    if ("days" in args) expect(hintLine(result!)).toContain(`days=${args.days}`);
+  });
+
+  it.each([
+    "how has my body fat been this month",
+    "show my fat loss over the last 30 days",
+  ])("does not read body composition as the fat macro: %s", async (message) => {
+    systemOneMock.mockResolvedValue(answers("show_chart", 0.93));
+    const result = await classifyIntent(message, context);
+    expect(result?.args).not.toMatchObject({ chart: "macros_trend" });
   });
 
   it("reads a window, not a rate, and not body fat", () => {

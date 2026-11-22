@@ -241,10 +241,12 @@ export const BLOCK_REGISTRY: readonly CoachTool[] = Object.freeze([
     description:
       "Show a server-hydrated chart only when the user asks to see their weight trend, today's macros, "
       + "calories over recent days (kcal_week; days up to 90), or protein, carbs and fat over recent "
-      + "days (macros_trend; days defaults to 14). Never supply points, series, values or units.",
+      + "days (macros_trend; days defaults to 14; focus names the macro asked about). Never supply "
+      + "points, series, values or units.",
     input: z.object({
       chart: z.enum(["weight_trend", "macros_today", "kcal_week", "macros_trend"]),
       days: z.number().int().min(7).max(90).optional(),
+      focus: z.enum(["protein", "carbs", "fat"]).optional(),
     }),
     effect: "read",
     maxCallsPerTurn: 1,

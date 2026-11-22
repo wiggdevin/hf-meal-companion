@@ -18,22 +18,47 @@ type Query = {
   limit: number | null;
   orders: { column: string; ascending: boolean }[];
   gte?: Record<string, unknown>;
+  lte?: Record<string, unknown>;
+  in?: Record<string, readonly unknown[]>;
 };
 
+/** Whether `row` passes the query's eq/gte/lte/in filters, on the columns the row carries. */
+function matches(query: Query, row: unknown): boolean {
+  if (!row || typeof row !== "object") return true;
+  const record = row as Record<string, unknown>;
+  const has = (column: string) => Object.prototype.hasOwnProperty.call(record, column);
+  const value = (column: string) => String(record[column]);
+  return Object.entries(query.equals).every(([c, v]) => !has(c) || record[c] === v)
+    && Object.entries(query.gte ?? {}).every(([c, v]) => !has(c) || value(c) >= String(v))
+    && Object.entries(query.lte ?? {}).every(([c, v]) => !has(c) || value(c) <= String(v))
+    && Object.entries(query.in ?? {}).every(([c, v]) => !has(c) || v.map(String).includes(value(c)));
+}
+
+/** A postgrest double that honours eq, gte, lte, in and limit on the rows `answer` supplies. */
 function database(
   writes: { table: string; row: Record<string, unknown> }[],
   answer: (query: Query) => { data: unknown[]; error: unknown } = () => ({ data: [], error: null }),
   queries: Query[] = [],
 ) {
+  const filtered = (query: Query) => {
+    const result = answer(query);
+    if (result.error || !Array.isArray(result.data)) return result;
+    const rows = result.data.filter((row) => matches(query, row));
+    return { ...result, data: query.limit === null ? rows : rows.slice(0, query.limit) };
+  };
   const from = (table: string) => {
     const query: Query = { table, columns: "", equals: {}, limit: null, orders: [] };
     const chain: Record<string, unknown> = {};
     Object.assign(chain, {
       select: (columns: string) => { query.columns = columns; return chain; },
       eq: (column: string, value: unknown) => { query.equals[column] = value; return chain; },
-      neq: () => chain, lte: () => chain, lt: () => chain,
-      in: () => chain, is: () => chain,
+      neq: () => chain, lt: () => chain, is: () => chain,
       gte: (column: string, value: unknown) => { query.gte = { ...query.gte, [column]: value }; return chain; },
+      lte: (column: string, value: unknown) => { query.lte = { ...query.lte, [column]: value }; return chain; },
+      in: (column: string, values: readonly unknown[]) => {
+        query.in = { ...query.in, [column]: [...values] };
+        return chain;
+      },
       order: (column: string, options?: { ascending?: boolean }) => {
         query.orders.push({ column, ascending: options?.ascending ?? true });
         return chain;
@@ -42,12 +67,15 @@ function database(
       range: () => chain,
       // Consult `answer` so a fixture can supply a single row (a target revision,
       // say) and not only list reads.
-      maybeSingle: async () => ({ data: answer(query).data[0] ?? null, error: null }),
-      single: async () => ({ data: answer(query).data[0] ?? null, error: null }),
-      then: (resolve: (value: { data: unknown[]; error: null }) => unknown) => {
+      maybeSingle: async () => ({ data: filtered(query).data[0] ?? null, error: null }),
+      single: async () => ({ data: filtered(query).data[0] ?? null, error: null }),
+      then: (resolve: (value: { data: unknown[]; error: null }) => unknown,
+        reject?: (reason: unknown) => unknown) => {
         queries.push({ ...query, equals: { ...query.equals }, orders: [...query.orders],
-          ...(query.gte ? { gte: { ...query.gte } } : {}) });
-        return Promise.resolve(answer(query) as { data: unknown[]; error: null }).then(resolve);
+          ...(query.gte ? { gte: { ...query.gte } } : {}),
+          ...(query.lte ? { lte: { ...query.lte } } : {}),
+          ...(query.in ? { in: { ...query.in } } : {}) });
+        return Promise.resolve(filtered(query) as { data: unknown[]; error: null }).then(resolve, reject);
       },
       insert: (row: Record<string, unknown>) => { writes.push({ table, row }); return chain; },
       update: () => chain,
@@ -78,16 +106,37 @@ const sample = (value: number, date = "2026-09-19") => ({
   health_sources: { kind: "device" },
 });
 
-function loggedEntry(date: string) {
+type EntryValues = { kcal?: number; protein?: number; carbs?: number; fat?: number | null;
+  partial?: boolean };
+
+/** One logged meal on `date` (its `local_date`), 100 g of one food with these per-meal totals. */
+function loggedEntry(date: string, values: EntryValues = {}) {
+  const snapshot: Record<string, { amount: number }> = {
+    energy_kcal_calc: { amount: values.kcal ?? (date === "2026-09-19" ? 1400 : 1250) },
+    protein: { amount: values.protein ?? 80 }, carbohydrate: { amount: values.carbs ?? 150 },
+  };
+  if (values.fat !== null) snapshot.fat_total = { amount: values.fat ?? 45 };
   return {
-    id: `entry-${date}`, eaten_at: `${date}T18:00:00.000Z`, slot: "meal-1", note: null,
+    id: `entry-${date}`, local_date: date, eaten_at: `${date}T18:00:00.000Z`, slot: "meal-1", note: null,
     log_items: [{
-      seq: 0, grams: 100, food_ref_id: `food-${date}`,
-      snapshot: {
-        energy_kcal_calc: { amount: date === "2026-09-19" ? 1400 : 1250 },
-        protein: { amount: 80 }, carbohydrate: { amount: 150 }, fat_total: { amount: 45 },
-      },
+      seq: 0, grams: 100, food_ref_id: `food-${date}`, nutrition_partial: values.partial ?? false,
+      snapshot,
     }],
+  };
+}
+
+/** Rows for the nutrition chart reads: entries, the logged-date index and the target revisions. */
+function nutritionRows(entries: ReturnType<typeof loggedEntry>[], profiles: unknown[] = [TARGET_PROFILE_ROW],
+  plans: Record<string, unknown>[] = []) {
+  return (query: Query) => {
+    if (query.table === "target_profiles") return { data: profiles, error: null };
+    if (query.table === "log_entries") return { data: entries, error: null };
+    if (query.table === "plan_days") return { data: plans, error: null };
+    if (query.table === "daily_energy" && query.columns === "local_date") {
+      return { data: [...entries].sort((a, b) => b.local_date.localeCompare(a.local_date))
+        .map(({ local_date }) => ({ local_date })), error: null };
+    }
+    return { data: [], error: null };
   };
 }
 
@@ -329,19 +378,9 @@ describe("server block persistence", () => {
     ["how am I doing this week", "kcal_week"],
   ] as const)("fast-paths %s to a hydrated block without calling Gemini", async (text, chart) => {
     const writes: { table: string; row: Record<string, unknown> }[] = [];
-    const loggedDates = new Set(["2026-09-10", "2026-09-19"]);
-    const client = database(writes, ({ table, columns, equals }) => {
-      if (table === "target_profiles") return { data: [TARGET_PROFILE_ROW], error: null };
-      if (table === "health_samples") return { data: [sample(58)], error: null };
-      if (table === "daily_energy" && columns === "local_date") {
-        return { data: [...loggedDates].map((local_date) => ({ local_date })), error: null };
-      }
-      if (table === "log_entries" && typeof equals.local_date === "string"
-          && loggedDates.has(equals.local_date)) {
-        return { data: [loggedEntry(equals.local_date)], error: null };
-      }
-      return { data: [], error: null };
-    });
+    const rows = nutritionRows([loggedEntry("2026-09-10"), loggedEntry("2026-09-19")]);
+    const client = database(writes, (query) => query.table === "health_samples"
+      ? { data: [sample(58)], error: null } : rows(query));
     const generate = vi.fn();
     const classified = {
       intent: "show_chart", confidence: 0.98, args: { chart }, argConfidence: { chart: 1 }, raw: {},
@@ -358,12 +397,15 @@ describe("server block persistence", () => {
     expect(result).toMatchObject({ fastPath: true, toolsUsed: ["show_chart"] });
     expect(result.messages.at(-1)?.blocks?.[0]).toMatchObject({ kind: "chart", chart });
     if (chart === "kcal_week") {
-      expect(result.messages.at(-1)?.blocks?.[0]).toMatchObject({
-        days: 2, caption: "Calories over 2 logged days",
-      });
       const block = result.messages.at(-1)?.blocks?.[0];
-      expect(block?.kind === "chart" ? block.series[0].points.map((point) => point.x) : [])
-        .toEqual(["2026-09-10", "2026-09-19"]);
+      // The span runs from the first to the last of the two logged days; today is still being eaten.
+      expect(block).toMatchObject({
+        days: 10, start: "2026-09-10", end: "2026-09-19", partial: true,
+        caption: "Calories, Sep 10 – Sep 19, 2026 (2 logged days)",
+      });
+      expect(block?.kind === "chart" ? block.series[0].points : []).toEqual([
+        { x: "2026-09-10", y: 1250 }, { x: "2026-09-19", y: 1400, partial: true },
+      ]);
     }
   });
 
@@ -373,20 +415,7 @@ describe("server block persistence", () => {
     const loggedDates = Array.from({ length: 40 }, (_, index) =>
       new Date(Date.parse("2026-09-19T12:00:00.000Z") - index * 86_400_000)
         .toISOString().slice(0, 10));
-    const client = database(writes, (query) => {
-      if (query.table === "target_profiles") return { data: [TARGET_PROFILE_ROW], error: null };
-      if (query.columns === "local_date") {
-        return {
-          data: loggedDates.slice(0, query.limit ?? loggedDates.length)
-            .map((local_date) => ({ local_date })),
-          error: null,
-        };
-      }
-      if (query.table === "log_entries" && typeof query.equals.local_date === "string") {
-        return { data: [loggedEntry(query.equals.local_date)], error: null };
-      }
-      return { data: [], error: null };
-    }, queries);
+    const client = database(writes, nutritionRows(loggedDates.map((date) => loggedEntry(date))), queries);
     const classified = {
       intent: "show_chart", confidence: 0.98, args: { chart: "kcal_week" },
       argConfidence: { chart: 1 }, raw: {},
@@ -401,32 +430,28 @@ describe("server block persistence", () => {
       newId: (() => { let n = 0; return () => `generated-${++n}`; })(),
     });
 
-    const dateQueries = queries.filter((query) => query.columns === "local_date");
-    expect(dateQueries).toEqual([expect.objectContaining({
+    expect(queries.filter((query) => query.columns === "local_date")).toEqual([expect.objectContaining({
       table: "daily_energy",
       equals: { user_id: expect.any(String) },
+      gte: { local_date: "2026-06-22" },
+      lte: { local_date: "2026-09-19" },
       limit: 7,
       orders: [{ column: "local_date", ascending: false }],
     })]);
+    // The entries are read once, for exactly the seven dates, not once per day.
+    const entryReads = queries.filter((query) => query.table === "log_entries");
+    expect(entryReads).toHaveLength(1);
+    expect(entryReads[0].in?.local_date).toEqual(loggedDates.slice(0, 7).reverse());
     const block = result.messages.at(-1)?.blocks?.[0];
-    expect(block).toMatchObject({ kind: "chart", chart: "kcal_week", days: 7 });
+    expect(block).toMatchObject({ kind: "chart", chart: "kcal_week", days: 7, start: "2026-09-13" });
     expect(block?.kind === "chart" ? block.series[0].points : []).toHaveLength(7);
   });
-  it("fast-paths a two-week macros trend from the account's logged days, bounded to that window", async () => {
+
+  it("fast-paths a two-week macros trend in one bounded read per table", async () => {
     const writes: { table: string; row: Record<string, unknown> }[] = [];
     const queries: Query[] = [];
-    const loggedDates = new Set(["2026-09-10", "2026-09-19"]);
-    const client = database(writes, (query) => {
-      if (query.table === "target_profiles") return { data: [TARGET_PROFILE_ROW], error: null };
-      if (query.table === "daily_energy" && query.columns === "local_date") {
-        return { data: [...loggedDates].map((local_date) => ({ local_date })), error: null };
-      }
-      if (query.table === "log_entries" && typeof query.equals.local_date === "string"
-          && loggedDates.has(query.equals.local_date)) {
-        return { data: [loggedEntry(query.equals.local_date)], error: null };
-      }
-      return { data: [], error: null };
-    }, queries);
+    const client = database(writes, nutritionRows([loggedEntry("2026-09-10"), loggedEntry("2026-09-19")]),
+      queries);
     const classified = {
       intent: "show_chart", confidence: 0.98, args: { chart: "macros_trend", days: 14 },
       argConfidence: { chart: 1, days: 1 }, raw: {},
@@ -441,36 +466,121 @@ describe("server block persistence", () => {
       newId: (() => { let n = 0; return () => `generated-${++n}`; })(),
     });
 
-    expect(queries.filter((query) => query.columns === "local_date")).toEqual([expect.objectContaining({
-      table: "daily_energy", limit: 14, gte: { local_date: "2026-09-06" },
-    })]);
+    for (const table of ["log_entries", "plan_days"]) {
+      const reads = queries.filter((query) => query.table === table && query.gte?.local_date !== undefined);
+      expect(reads).toEqual([expect.objectContaining({
+        gte: { local_date: "2026-09-06" }, lte: { local_date: "2026-09-19" },
+      })]);
+    }
+    expect(queries.filter((query) => query.table === "daily_energy" && query.columns === "local_date"))
+      .toEqual([]);
     expect(result).toMatchObject({ fastPath: true, toolsUsed: ["show_chart"] });
     const block = result.messages.at(-1)?.blocks?.[0];
-    expect(block).toMatchObject({ kind: "chart", chart: "macros_trend", days: 14, unit: "g" });
+    expect(block).toMatchObject({
+      kind: "chart", chart: "macros_trend", days: 14, unit: "g", start: "2026-09-06", end: "2026-09-19",
+    });
     const series = block?.kind === "chart" ? block.series : [];
     expect(series.find((row) => row.label === "Protein")?.points).toEqual([
-      { x: "2026-09-10", y: 80 }, { x: "2026-09-19", y: 80 },
+      { x: "2026-09-10", y: 80 }, { x: "2026-09-19", y: 80, partial: true },
     ]);
     expect(series.find((row) => row.label === "Protein target")?.points.map((point) => point.x))
       .toEqual(["2026-09-10", "2026-09-19"]);
   });
 
-  it("hands the model only the macros_trend chart name and point count, never its values", async () => {
+  it("charts both window bounds around local midnight, follows a target revision and replays the saved block", async () => {
     const writes: { table: string; row: Record<string, unknown> }[] = [];
-    const loggedDates = new Set(["2026-09-10", "2026-09-19"]);
-    const client = database(writes, (query) => {
-      if (query.table === "target_profiles") return { data: [TARGET_PROFILE_ROW], error: null };
-      if (query.table === "daily_energy" && query.columns === "local_date") {
-        return { data: [...loggedDates].map((local_date) => ({ local_date })), error: null };
-      }
-      if (query.table === "log_entries" && typeof query.equals.local_date === "string"
-          && loggedDates.has(query.equals.local_date)) {
-        return { data: [loggedEntry(query.equals.local_date)], error: null };
-      }
-      return { data: [], error: null };
+    const queries: Query[] = [];
+    // 23:30 in Denver is already 05:30 UTC on Sep 20: the window still ends on the local Sep 19.
+    const lateNight = { ...request, now: "2026-09-19T23:30:00-06:00" };
+    const revised = {
+      ...TARGET_PROFILE_ROW, id: "target-2", effective_from: "2026-09-12", rev: 2, protein_g: 140,
+      training_macros: { kcal: 2200, protein: 140, carbs: 250, fat: 80 },
+      rest_macros: { kcal: 1800, protein: 140, carbs: 150, fat: 80 },
+    };
+    const future = { ...revised, id: "target-3", effective_from: "2026-09-25", rev: 3,
+      training_macros: { kcal: 2200, protein: 999, carbs: 250, fat: 80 },
+      rest_macros: { kcal: 1800, protein: 999, carbs: 150, fat: 80 } };
+    const entries = ["2026-09-05", "2026-09-06", "2026-09-11", "2026-09-12", "2026-09-19", "2026-09-20"]
+      .map((date) => loggedEntry(date));
+    const client = database(writes, nutritionRows(entries, [TARGET_PROFILE_ROW, revised, future]), queries);
+    const classified = {
+      intent: "show_chart", confidence: 0.98, args: { chart: "macros_trend", days: 14 },
+      argConfidence: { chart: 1, days: 1 }, raw: {},
+    };
+
+    const result = await runTurn(client, client, "user-1", { ...lateNight, text: "protein over 2 weeks" }, {
+      generate: vi.fn() as never,
+      classifyIntent: vi.fn().mockResolvedValue(classified) as never,
+      verifyReply: vi.fn().mockResolvedValue({ flagged: false, p: null }) as never,
+      newId: (() => { let n = 0; return () => `generated-${++n}`; })(),
     });
+
+    const block = result.messages.at(-1)?.blocks?.[0];
+    expect(block).toMatchObject({ chart: "macros_trend", start: "2026-09-06", end: "2026-09-19" });
+    const series = block?.kind === "chart" ? block.series : [];
+    expect(series.find((row) => row.label === "Protein")?.points.map((point) => point.x))
+      .toEqual(["2026-09-06", "2026-09-11", "2026-09-12", "2026-09-19"]);
+    expect(series.find((row) => row.label === "Protein target")?.points.map((point) => point.y))
+      .toEqual([120, 120, 140, 140]);
+    expect(queries.find((query) => query.table === "target_profiles")?.lte)
+      .toEqual({ effective_from: "2026-09-19" });
+    // The block persisted on the message is the block shown, and it still validates on replay.
+    const assistant = writes.filter((write) => write.table === "coach_messages").at(-1)!.row;
+    const saved = (assistant.tool_calls as { blocks: unknown[] }).blocks[0];
+    expect(uiBlockSchema.parse(saved)).toEqual(block);
+  });
+
+  it("charts unmeasured fat as blank, a recorded-partial day and today in progress as floors", async () => {
+    const writes: { table: string; row: Record<string, unknown> }[] = [];
+    const client = database(writes, nutritionRows([
+      loggedEntry("2026-09-15", { fat: null }),
+      loggedEntry("2026-09-16", { protein: 90, partial: true }),
+      loggedEntry("2026-09-17", { protein: 0, fat: 0 }),
+      loggedEntry("2026-09-19", { protein: 30 }),
+    ], [TARGET_PROFILE_ROW], [
+      // A finished day today would chart as measured; this one is still open.
+      { local_date: "2026-09-18", eaten_slots: [], day_complete_at: null },
+    ]));
+    const classified = {
+      intent: "show_chart", confidence: 0.98, args: { chart: "macros_trend", days: 7 },
+      argConfidence: { chart: 1, days: 1 }, raw: {},
+    };
+
+    const result = await runTurn(client, client, "user-1", { ...request, text: "macros this week" }, {
+      generate: vi.fn() as never,
+      classifyIntent: vi.fn().mockResolvedValue(classified) as never,
+      verifyReply: vi.fn().mockResolvedValue({ flagged: false, p: null }) as never,
+      newId: (() => { let n = 0; return () => `generated-${++n}`; })(),
+    });
+
+    const block = result.messages.at(-1)?.blocks?.[0];
+    expect(block).toMatchObject({ chart: "macros_trend", partial: true });
+    const series = block?.kind === "chart" ? block.series : [];
+    // Blank, never 0: no record measured that day's fat (and so its total is not a known one).
+    expect(series.find((row) => row.label === "Fat")?.points).toEqual([
+      { x: "2026-09-15", y: null, partial: true }, { x: "2026-09-16", y: 45, partial: true },
+      { x: "2026-09-17", y: 0 }, { x: "2026-09-19", y: 45, partial: true },
+    ]);
+    expect(series.find((row) => row.label === "Protein")?.points).toEqual([
+      { x: "2026-09-15", y: 80 }, { x: "2026-09-16", y: 90, partial: true },
+      { x: "2026-09-17", y: 0 }, { x: "2026-09-19", y: 30, partial: true },
+    ]);
+    // No target point on a day whose fat nothing measured.
+    expect(series.find((row) => row.label === "Fat target")?.points.map((point) => point.x))
+      .toEqual(["2026-09-16", "2026-09-17", "2026-09-19"]);
+  });
+
+  it("hands the model only the macros_trend chart name and point count, never its values or dates", async () => {
+    const writes: { table: string; row: Record<string, unknown> }[] = [];
+    const dates = ["2026-09-08", "2026-09-10", "2026-09-12", "2026-09-14", "2026-09-16"];
+    const values = dates.map((_, index) => ({
+      kcal: 1611.37 + index * 101.13, protein: 61.37 + index * 7.11, carbs: 141.29 + index * 9.17,
+      fat: 37.43 + index * 3.19, partial: index === 2,
+    }));
+    const client = database(writes, nutritionRows(dates.map((date, index) => loggedEntry(date, values[index]))));
     const generate = vi.fn()
       .mockResolvedValueOnce({ kind: "tool", calls: [{ name: "show_chart", args: { chart: "macros_trend", days: 30 } }] })
+      .mockResolvedValueOnce({ kind: "tool", calls: [{ name: "show_chart", args: { chart: "macros_trend", days: 14 } }] })
       .mockResolvedValueOnce({ kind: "final", text: "Here is your month." });
 
     const result = await runTurn(client, client, "user-1", { ...request, text: "how did my month go" }, {
@@ -480,12 +590,94 @@ describe("server block persistence", () => {
       newId: (() => { let n = 0; return () => `generated-${++n}`; })(),
     });
 
-    expect(result.messages.at(-1)?.blocks?.[0]).toMatchObject({ kind: "chart", chart: "macros_trend", days: 30 });
-    const seen = JSON.stringify(generate.mock.calls[1]);
-    expect(seen).toContain('\\"chart\\":\\"macros_trend\\"');
-    expect(seen).toContain('\\"points\\":12');
-    for (const leak of ["Protein target", "Carbs target", "partialDays", "2026-09-10"]) {
-      expect(seen).not.toContain(leak);
+    const block = result.messages.at(-1)?.blocks?.[0];
+    expect(block).toMatchObject({ kind: "chart", chart: "macros_trend", days: 30, partial: true });
+    expect(generate.mock.calls.length).toBeGreaterThanOrEqual(2);
+    const afterChart = JSON.stringify(generate.mock.calls.slice(1));
+    expect(afterChart).toContain('\\"chart\\":\\"macros_trend\\"');
+    expect(afterChart).toContain('\\"points\\":30');
+    const assistant = writes.filter((write) => write.table === "coach_messages").at(-1)!.row;
+    // The second ask is refused (one chart per turn) and adds no values of its own.
+    expect((assistant.tool_calls as { blocks: unknown[] }).blocks).toHaveLength(1);
+    const toolResults = JSON.stringify((assistant.tool_calls as { calls: { result?: unknown }[] }).calls
+      .map((call) => call.result));
+    const leaks = [
+      ...dates, "Sep 8", "Sep 16", "Protein target", "Carbs target", "partial",
+      ...values.flatMap((day) => [day.kcal, day.protein, day.carbs, day.fat])
+        .map((value) => String(Math.round(value * 100) / 100)),
+    ];
+    for (const leak of leaks) {
+      expect(afterChart, leak).not.toContain(leak);
+      expect(toolResults, leak).not.toContain(leak);
     }
+  });
+
+  it("gives the reply's one block slot to a chart over an earlier non-chart block", async () => {
+    const writes: { table: string; row: Record<string, unknown> }[] = [];
+    const client = database(writes, nutritionRows([loggedEntry("2026-09-10"), loggedEntry("2026-09-18")]));
+    const generate = vi.fn()
+      .mockResolvedValueOnce({ kind: "tool", calls: [
+        { name: "quick_replies", args: { options: ["Calories", "Protein"] } },
+        { name: "show_chart", args: { chart: "kcal_week", days: 14 } },
+      ] })
+      .mockResolvedValueOnce({ kind: "final", text: "Here you go." });
+
+    const result = await runTurn(client, client, "user-1", { ...request, text: "how am I eating" }, {
+      generate: generate as never,
+      classifyIntent: vi.fn().mockResolvedValue(null) as never,
+      verifyReply: vi.fn().mockResolvedValue({ flagged: false, p: null }) as never,
+      newId: (() => { let n = 0; return () => `generated-${++n}`; })(),
+    });
+
+    expect(result.messages.at(-1)?.blocks).toEqual([
+      expect.objectContaining({ kind: "chart", chart: "kcal_week", days: 14 }),
+    ]);
+  });
+
+  it.each([
+    [14, "kcal_week", "Here are your calories by logged day."],
+    [30, "kcal_week", "Here are your calories by week (daily averages)."],
+    [30, "macros_trend", "Here are your protein, carbs and fat by week (daily averages)."],
+  ] as const)("fast-path copy for a %i-day %s names how it is grouped", async (days, chart, copy) => {
+    const writes: { table: string; row: Record<string, unknown> }[] = [];
+    const dates = Array.from({ length: 20 }, (_, index) =>
+      new Date(Date.parse("2026-09-18T12:00:00.000Z") - index * 86_400_000).toISOString().slice(0, 10));
+    const client = database(writes, nutritionRows(dates.map((date) => loggedEntry(date))));
+    const classified = {
+      intent: "show_chart", confidence: 0.98, args: { chart, days }, argConfidence: { chart: 1, days: 1 }, raw: {},
+    };
+
+    const result = await runTurn(client, client, "user-1", { ...request, text: "calories trend" }, {
+      generate: vi.fn() as never,
+      classifyIntent: vi.fn().mockResolvedValue(classified) as never,
+      verifyReply: vi.fn().mockResolvedValue({ flagged: false, p: null }) as never,
+      newId: (() => { let n = 0; return () => `generated-${++n}`; })(),
+    });
+
+    expect(result).toMatchObject({ fastPath: true });
+    expect(result.messages.at(-1)?.content).toBe(copy);
+  });
+
+  it("stops the chart reads when the caller's signal aborts, and still finishes the turn", async () => {
+    const writes: { table: string; row: Record<string, unknown> }[] = [];
+    const queries: Query[] = [];
+    const client = database(writes, nutritionRows([loggedEntry("2026-09-18")]), queries);
+    const classified = {
+      intent: "show_chart", confidence: 0.98, args: { chart: "macros_trend", days: 14 },
+      argConfidence: { chart: 1, days: 1 }, raw: {},
+    };
+    const gone = new AbortController();
+    gone.abort(new Error("phone left"));
+
+    const result = await runTurn(client, client, "user-1", { ...request, text: "macros trend" }, {
+      signal: gone.signal,
+      generate: vi.fn() as never,
+      classifyIntent: vi.fn().mockResolvedValue(classified) as never,
+      verifyReply: vi.fn().mockResolvedValue({ flagged: false, p: null }) as never,
+      newId: (() => { let n = 0; return () => `generated-${++n}`; })(),
+    });
+
+    expect(result.messages.at(-1)?.blocks ?? []).toEqual([]);
+    expect(queries.filter((query) => query.table === "log_entries" && query.gte)).toEqual([]);
   });
 });

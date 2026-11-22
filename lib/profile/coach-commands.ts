@@ -12,6 +12,7 @@
  *
  * Pure. No I/O.
  */
+import { isNutritionTrendCommand } from "@/lib/coach/chart-grammar";
 import { FOOD_WORDS } from "@/lib/profile/taste-words";
 
 const words = (list: string) => new Set(list.split(" "));
@@ -53,17 +54,6 @@ const only = (rest: string, ok: (token: string) => boolean) => {
   const tokens = rest.split(" ").filter(Boolean);
   return tokens.length > 0 && tokens.every(ok);
 };
-
-const SPAN_COUNT = "(?:\\d{1,2}|two|three|four|five|six|eight|ten|twelve|thirty|sixty|ninety)";
-const SPAN = `(?:(?:over|for|in|during) )?(?:the )?(?:(?:this|last|past) (?:${SPAN_COUNT} )?|${SPAN_COUNT} )`
-  + "(?:days?|weeks?|fortnight|months?)";
-const TREND_WINDOW = `(?:${SPAN}|lately|recently|over time)`;
-const TREND_SUBJECT = "(?:my )?(?:macros|protein|carbs|fat|calories|kcal)(?: intake)?";
-const NUTRITION_TREND: readonly RegExp[] = [
-  new RegExp(`^(?:show|chart|graph) (?:me )?${TREND_SUBJECT}(?: trend| chart)? ${TREND_WINDOW}$`),
-  new RegExp(`^${TREND_SUBJECT}(?: trend| chart)? ${TREND_WINDOW}$`),
-  new RegExp(`^how (?:has|have|is|are) ${TREND_SUBJECT} been(?: doing)?(?: ${TREND_WINDOW})?$`),
-];
 
 type Form = (message: string) => boolean;
 
@@ -110,7 +100,7 @@ const FORMS: readonly Form[] = [
   (m) => /^i(?:'m| am) \d{2}(?: years old)?$/.test(m),
   (m) => /^show (?:me )?(?:my )?(?:weight|macros|calories|kcal)(?: trend| chart| this week| today)?$/.test(m),
   // Nutrition over time: "how has my protein been this month", "calories last 30 days".
-  (m) => NUTRITION_TREND.some((form) => form.test(m)),
+  isNutritionTrendCommand,
   // Plan a meal: "set my breakfast to oatmeal with blueberries every weekday for the next two weeks",
   // "change next tuesday's lunch to grilled chicken and rice".
   (m) => {

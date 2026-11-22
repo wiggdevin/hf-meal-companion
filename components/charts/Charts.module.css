@@ -15,6 +15,11 @@
 .bar { fill: currentColor; transform-box: fill-box; transform-origin: 50% 100%; }
 .partial { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-dasharray: 3 2; }
 .dimmed { opacity: 0.4; }
+/* The coach's bars: the gauge hues sit under 3:1 on ivory, so a dark edge carries the shape (WCAG
+   1.4.11). A dimmed edged bar fades its fill only, keeping the edge. */
+.edged { stroke: var(--color-text-secondary); stroke-width: 1; }
+.edged.partial { stroke-width: 1.5; stroke-dasharray: 3 2; }
+.edged.dimmed { opacity: 1; fill-opacity: 0.35; }
 
 .line { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .dot { fill: currentColor; stroke: var(--color-surface); stroke-width: 2; }

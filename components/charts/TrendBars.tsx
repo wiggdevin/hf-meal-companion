@@ -11,6 +11,8 @@ import styles from "@/components/charts/Charts.module.css";
 export type TrendColumn = {
   /** The short axis label ("T", "Oct 6"). */
   label: string;
+  /** The table's row header when the axis label is too short to name the period ("Tue, Sep 16, 2026"). */
+  rowLabel?: string;
   /** The column's accessible name and readout ("Tue · 1,840 of 2,000 kcal"). */
   describe: string;
   value: number | null;
@@ -36,7 +38,8 @@ export const MACRO_CLASS = { protein: styles.protein, carbs: styles.carbs, fat: 
  * The frame every trend chart shares: the SVG is one image with a summary name, the columns are
  * real buttons over it (each at least 44 px), and a visually hidden table carries every value.
  */
-export function ChartFrame({ cols, metric, tone, selected, onSelect, summary, caption, valueHeading, children }: {
+export function ChartFrame({ cols, metric, tone, selected, onSelect, summary, caption, valueHeading,
+  periodHeading = "Day", children }: {
   cols: TrendColumn[];
   metric: TrendMetric;
   /** A hue class from `MACRO_CLASS` in place of the metric's own (the coach's carbs and fat). */
@@ -46,6 +49,8 @@ export function ChartFrame({ cols, metric, tone, selected, onSelect, summary, ca
   summary: string;
   caption: string;
   valueHeading: string;
+  /** The table's first column ("Day", or "Week" for weekly means). */
+  periodHeading?: string;
   children: ReactNode;
 }) {
   const box = plotBox(CHART_WIDTH, CHART_HEIGHT, { top: 8, bottom: FOOT });
@@ -65,17 +70,21 @@ export function ChartFrame({ cols, metric, tone, selected, onSelect, summary, ca
     </div>
     <table className="sr-only">
       <caption>{caption}</caption>
-      <thead><tr><th scope="col">Day</th><th scope="col">{valueHeading}</th></tr></thead>
-      <tbody>{cols.map((col, i) => <tr key={i}><th scope="row">{col.label}</th><td>{col.describe}</td></tr>)}</tbody>
+      <thead><tr><th scope="col">{periodHeading}</th><th scope="col">{valueHeading}</th></tr></thead>
+      <tbody>{cols.map((col, i) => <tr key={i}><th scope="row">{col.rowLabel ?? col.label}</th><td>{col.describe}</td></tr>)}</tbody>
     </table>
   </div>;
 }
 
 /** Daily or weekly bars, with each column's own target as a dashed rule across it. */
-export default function TrendBars({ cols, metric, tone, selected, onSelect, summary, caption, valueHeading }: {
+export default function TrendBars({ cols, metric, tone, edged = false, selected, onSelect, summary, caption,
+  valueHeading, periodHeading }: {
   cols: TrendColumn[];
   metric: TrendMetric;
   tone?: string;
+  /** Outline every bar in the secondary text colour, for hues under 3:1 on the card (the coach's). */
+  edged?: boolean;
+  periodHeading?: string;
   selected: number | null;
   onSelect: (index: number) => void;
   summary: string;
@@ -88,12 +97,12 @@ export default function TrendBars({ cols, metric, tone, selected, onSelect, summ
   const slots = columns(cols.length, box);
   const drawn = bars(cols.map((col) => col.value), box, max, { fill: 0.56, maxWidth: 28 });
   return <ChartFrame cols={cols} metric={metric} tone={tone} selected={selected} onSelect={onSelect} summary={summary}
-    caption={caption} valueHeading={valueHeading}>
+    caption={caption} valueHeading={valueHeading} periodHeading={periodHeading}>
     {drawn.map((bar) => {
       const col = cols[bar.index];
       const dim = selected !== null && selected !== bar.index;
       return <motion.path key={`${bar.index}-${metric}`} data-bar={bar.index} data-partial={col.partial || undefined}
-        className={`${styles.bar} ${col.partial ? styles.partial : ""} ${dim ? styles.dimmed : ""}`}
+        className={`${styles.bar} ${col.partial ? styles.partial : ""} ${edged ? styles.edged : ""} ${dim ? styles.dimmed : ""}`}
         d={barPath(bar)} initial={reduce ? false : { scaleY: 0 }} animate={{ scaleY: 1 }}
         transition={reduce ? { duration: 0 } : SPRINGS.smooth} />;
     })}

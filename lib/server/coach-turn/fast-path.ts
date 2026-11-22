@@ -7,6 +7,7 @@
 import { actionsInScope } from "@/lib/coach/scope";
 import { groundActions } from "@/lib/coach/actions";
 import { hydrateRecipeResults, runDirectBlockTool } from "@/lib/coach/blocks";
+import { trendByWeek } from "@/lib/coach/blocks/hydrate-chart";
 import { hydrateFoodIdeas } from "@/lib/coach/blocks/hydrate-food-ideas";
 import { validateToolCall } from "@/lib/coach/dispatch";
 import type { RecipeSuggestionResult } from "@/lib/coach/executors";
@@ -163,15 +164,17 @@ async function chartFastPath(
         : null;
       return runDirectBlockTool("show_chart", chart, {
         admin, userId, date: today, tz: clock.tz, context: chartContext,
-        profile, newId, ...deps.blocks,
+        profile, newId, ...kit.blocks, ...deps.blocks,
       });
     });
     block = hydrated.block;
     ok = true;
     content = block?.kind === "chart"
       ? block.chart === "weight_trend" ? "Here is your weight trend."
-        : block.chart === "kcal_week" ? "Here are your recent logged days."
-          : block.chart === "macros_trend" ? "Here are your protein, carbs and fat by logged day."
+        : block.chart === "kcal_week"
+          ? `Here are your calories by ${trendByWeek(block) ? "week (daily averages)" : "logged day"}.`
+          : block.chart === "macros_trend"
+            ? `Here are your protein, carbs and fat by ${trendByWeek(block) ? "week (daily averages)" : "logged day"}.`
             : "Here are today's macros."
       : ((hydrated.data as { message?: string }).message ?? content);
   } catch (error) {
