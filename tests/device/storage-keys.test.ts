@@ -21,7 +21,7 @@ const ALLOWED = [
   "meal-companion:onboarding-disposition:", "smc:coach:current:", "meal-companion:food-pref-refs",
   // window event names, not storage
   "meal-companion:synced", "meal-companion:outbox-queued", "meal-companion:targets-changed",
-  "meal-companion:log-queued", "meal-companion:body-profile-changed", "smc:session-check",
+  "meal-companion:log-queued", "meal-companion:body-profile-changed", "meal-companion:settings-changed", "smc:session-check",
   "meal-companion:android-install-ready", "meal-companion:android-installed",
   "meal-companion:install-prompt-opens-changed",
   // a BroadcastChannel name and a Web Lock name (reload boundary), not storage

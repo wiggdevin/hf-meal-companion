@@ -12,8 +12,10 @@ import { SYNCED_EVENT, lastError } from "@/lib/sync/client";
 import { announceQueued } from "@/lib/sync/outbox";
 import type { TargetRevision } from "@/lib/types";
 import { settingsWithTargetRevision, targetDayFor } from "@/lib/targets/revision";
+import { TargetFloorError, targetRefusal } from "@/lib/targets/refusal";
 
 export { settingsWithTargetRevision } from "@/lib/targets/revision";
+export { TargetFloorError, TargetSaveRefusedError } from "@/lib/targets/refusal";
 
 export type TargetPredecessor = {
   operation: "derive";
@@ -110,28 +112,6 @@ function authorityBody(
   };
 }
 
-/**
- * A refusal the server explained with a code (onboarding v2: `422 adult_only` under 18,
- * `409 rate_not_eligible` for a held pace). The message keeps the old "save targets failed: N"
- * shape so every existing reader is unchanged.
- */
-export class TargetSaveRefusedError extends Error {
-  constructor(readonly status: number, readonly code: string | null) {
-    super(`save targets failed: ${status}`);
-    this.name = "TargetSaveRefusedError";
-  }
-}
-
-async function refusalCode(h: AccountHandle, response: Response): Promise<string | null> {
-  try {
-    const body = await accountJson<{ error?: unknown }>(h, response);
-    return typeof body?.error === "string" ? body.error : null;
-  } catch (e) {
-    rethrowAccountChanged(e);
-    return null;
-  }
-}
-
 async function postRevisionSet(
   h: AccountHandle, body: object, fetchImpl: typeof fetch,
 ): Promise<TargetRevisionSet> {
@@ -142,7 +122,7 @@ async function postRevisionSet(
   }, { fetchImpl });
   if (!response.ok) {
     if (response.status >= 400 && response.status < 500) {
-      throw new TargetSaveRefusedError(response.status, await refusalCode(h, response));
+      throw await targetRefusal(h, response);
     }
     throw new Error(`save targets failed: ${response.status}`);
   }
@@ -236,6 +216,12 @@ async function sendRevision(
     return result;
   } catch (error) {
     if (error instanceof AccountChanged || !isCurrent(h)) throw error;
+    if (error instanceof TargetFloorError) {
+      // A floor refusal is final: the same body is refused again, so it is never queued. A
+      // queued caller drops it too, and the caller shows the server's sentence.
+      if (written) await restorePendingForOwner(h, h.userId, opts.requestId, previous);
+      throw error;
+    }
     if (opts.queue) {
       if (!written) await replacePendingForOwner(h, entry);
       announceQueued();
@@ -292,6 +278,9 @@ export async function drainPendingTargetRevisions(h: AccountHandle, options: {
       result = await postRevisionSet(h, entry.body, options.fetchImpl ?? fetch);
     } catch (e) {
       rethrowAccountChanged(e);
+      // A queued save the server now refuses as below its floor never succeeds on a retry: drop
+      // it, so the queue does not retry it forever. The owner's older record is not put back.
+      if (e instanceof TargetFloorError) await cancelPendingTargetRevision(entry.requestId, h);
       continue;
     }
     await cancelPendingTargetRevision(entry.requestId, h);

@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { useActionFeedback } from "@/components/ui/ActionFeedback";
 import { currentAccountOrNull, isCurrent } from "@/lib/device/account";
+import { refusalMessage } from "@/lib/targets/refusal";
 
 export const SETTINGS_WRITE_FAILED = "Couldn't save that change — try again when you have a connection.";
 
@@ -30,7 +31,7 @@ export function useSettingsWrite<P>(send: (patch: P) => void | Promise<unknown>)
     void sent.finally(() => { inFlight.current -= 1; }).catch(() => {});
     // Observed at once: a write that fails while it waits its turn is not an unhandled rejection.
     sent.catch(() => {});
-    void feedback.run(() => sent, { kind: "commit", queue: true, failureMessage: SETTINGS_WRITE_FAILED,
+    void feedback.run(() => sent, { kind: "commit", queue: true, failureMessage: (error) => refusalMessage(error, SETTINGS_WRITE_FAILED),
       // Another account now: this edit's outcome belongs to the account that made it; say nothing.
       stale: () => account !== null && !isCurrent(account) });
   }

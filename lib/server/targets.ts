@@ -18,6 +18,7 @@ import type { TargetProfile, TargetsRequest, TargetsResponse } from "@/lib/api-t
 import { targetRevisionFromProfile, targetSeedFromProfile } from "@/lib/targets/revision";
 import { ACCOUNT_DAY_LAST_RESORT_ZONE, accountDay, isoDateIn } from "@/lib/server/account-day";
 import { readTargetEligibility } from "@/lib/server/target-eligibility";
+import { floorProfileOf } from "@/lib/server/target-floor-profile";
 import {
   AdultOnlyError, paceAllowed, type TargetEligibility,
 } from "@/lib/profile/rate-eligibility";
@@ -75,16 +76,6 @@ function seedColumns(seed: TargetSeed | null) {
     activity_model_version: seed?.activityModelVersion ?? null,
     derivation_version: seed?.derivationVersion ?? null,
   };
-}
-
-/**
- * The profile a first write can floor itself on while the settings op that stores it is still
- * queued behind it (onboarding posts the target first). The writer reads the stored value first
- * and uses this only for a field the account has no stored value for.
- */
-function floorProfileOf(settings: DeriveTargetRevisionInput["settings"]) {
-  return { sex: settings.sex, birth_year: settings.birthYear, height_cm: settings.heightCm,
-    weight_kg: settings.weightKg, goal: settings.goal };
 }
 
 /**

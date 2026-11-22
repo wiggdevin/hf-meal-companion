@@ -410,3 +410,21 @@ describe("coach body logging", () => {
     }
   });
 });
+
+describe("a floor refusal on a weight action (W060)", () => {
+  const SENTENCE = "That is below your minimum of 1900 kcal a day. Choose 1900 or more.";
+
+  it("undo shows the refusal's sentence when the restored target is below the floor", async () => {
+    const { TargetFloorError } = await import("@/lib/targets/refusal");
+    const result = await applyLogWeight({
+      kind: "log_weight", actionId: "weight-floor-undo", flagged: [], date: DATE, kg: 58.1,
+    }, { tz: "UTC" });
+    if (result.status !== "applied" || result.token.kind !== "log_weight") {
+      throw new Error("expected weight token");
+    }
+    mocks.restoreTargetRevisionOnline.mockRejectedValueOnce(
+      new TargetFloorError("kcal", "rest", 1900, SENTENCE));
+    await expect(undoLogWeight(result.token)).rejects.toThrow(`Couldn't undo this: ${SENTENCE}`);
+  });
+});
+

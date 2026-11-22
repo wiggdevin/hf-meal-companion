@@ -758,3 +758,52 @@ describe("goal rate on the profile path (step D)", () => {
     expect(loadStore().settings.activeTargetProfile?.inputs?.goalRateBpWeek).toBe(0);
   });
 });
+
+describe("floor refusals on a target write (W060)", () => {
+  const SENTENCE = "That is less than your minimum of 140 g of protein a day. Choose 140 g or more.";
+  const floorError = async () => {
+    const { TargetFloorError } = await import("@/lib/targets/refusal");
+    return new TargetFloorError("protein", "training", 140, SENTENCE);
+  };
+  const seedComplete = () => {
+    const initial = loadStore();
+    saveStore({ ...initial, settings: { ...initial.settings, ...completeProfile() } },
+      { silent: true });
+  };
+
+  it("lets a refused pin reach the caller with the server's sentence and changes nothing", async () => {
+    seedComplete();
+    const before = loadStore().settings;
+    mocks.persistTargetSet.mockRejectedValueOnce(await floorError());
+    await expect(applySetTargets({ kind: "set_targets", actionId: "pin", flagged: [],
+      dayType: "both", proteinG: 60 })).rejects.toThrow(SENTENCE);
+    expect(loadStore().settings).toEqual(before);
+    expect(mocks.mutateUserSettings).not.toHaveBeenCalled();
+  });
+
+  it("lets a refused profile change reach the caller and keeps the old profile", async () => {
+    seedComplete();
+    const before = loadStore().settings;
+    mocks.persistTargetSet.mockRejectedValueOnce(await floorError());
+    await expect(applyUpdateProfile(profileAction({ weightKg: 120 }))).rejects.toThrow(SENTENCE);
+    expect(loadStore().settings).toEqual(before);
+  });
+
+  it("undo that the server refuses names the sentence and restores nothing", async () => {
+    seedComplete();
+    const applied = await applySetTargets({ kind: "set_targets", actionId: "pin", flagged: [],
+      dayType: "both", kcal: 2300 });
+    if (applied.status !== "applied" || applied.token.kind !== "set_targets") {
+      throw new Error("expected a set_targets token");
+    }
+    const withRevision = { ...applied.token, previous: { ...applied.token.previous,
+      activeTargetProfile: { ...deriveTargetRevision({ settings: loadStore().settings,
+        latestWeighInKg: null, today: "2026-09-18", trainingWeekdays: [1, 3, 4, 5] }),
+      id: "00000000-0000-4000-8000-000000000008", revision: 8 } } };
+    const during = loadStore().settings;
+    mocks.restoreTarget.mockRejectedValueOnce(await floorError());
+    await expect(undoSettingsAction(withRevision)).rejects.toThrow(`Couldn't undo this: ${SENTENCE}`);
+    expect(loadStore().settings).toEqual(during);
+  });
+});
+

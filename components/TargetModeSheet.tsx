@@ -16,6 +16,7 @@ import {
 } from "@/lib/targets/percent";
 import type { TargetsRequest } from "@/lib/api-types";
 import { targetDayFor } from "@/lib/targets/revision";
+import { macroKcal } from "@/lib/scaling";
 
 export type Preview =
   | { ok: true; training: GramTargets; rest: GramTargets;
@@ -35,16 +36,38 @@ export function previewGrams(
         minFatPct: check.minFatPct, training, rest };
 }
 
+type GramsStart = { kcalTrain: number; kcalRest: number; grams: GramTargets };
+
+/**
+ * Grams mode: the calories each day follows the grams (docs/specs/phase-12-coach-tools.md 1.5). The
+ * checked writer refuses calories that do not match the macros, so each step of a stepper moves the
+ * calories with it: the training day is the Atwater kcal of the grams shown, and the rest day keeps
+ * its own carbs (from the calories the sheet opened with) under the same protein and fat. +5 g
+ * protein is +20 kcal on both days.
+ */
+export function gramsModeKcal(
+  initial: GramsStart, grams: GramTargets,
+): { kcalTrain: number; kcalRest: number } {
+  const restCarbG = Math.max(0, Math.round(
+    (initial.kcalRest - macroKcal({ protein: initial.grams.proteinG, carbs: 0, fat: initial.grams.fatG })) / 4));
+  return {
+    kcalTrain: macroKcal({ protein: grams.proteinG, carbs: grams.carbG, fat: grams.fatG }),
+    kcalRest: macroKcal({ protein: grams.proteinG, carbs: restCarbG, fat: grams.fatG }),
+  };
+}
+
 /** The request a save sends, dated by the phone's own day at the tap like every other target
  *  writer: the UTC date is tomorrow every US evening, which would leave today on the old numbers
  *  (audit A054). */
 export function targetModeRequest(
-  mode: "grams" | "percent", initial: { kcalTrain: number; kcalRest: number },
+  mode: "grams" | "percent", initial: GramsStart,
   percent: MacroPercents, grams: GramTargets, now: Date = new Date(),
 ): TargetsRequest {
-  const base = { effectiveFrom: targetDayFor(now), kcalTrain: initial.kcalTrain,
-    kcalRest: initial.kcalRest };
-  return mode === "percent" ? { mode, ...base, percent } : { mode, ...base, grams };
+  const effectiveFrom = targetDayFor(now);
+  if (mode === "percent") {
+    return { mode, effectiveFrom, kcalTrain: initial.kcalTrain, kcalRest: initial.kcalRest, percent };
+  }
+  return { mode, effectiveFrom, ...gramsModeKcal(initial, grams), grams };
 }
 
 const line = (label: string, g: GramTargets) =>
@@ -65,6 +88,7 @@ export default function TargetModeSheet({ initial, floors, saveError, saving = f
   const [grams, setGrams] = useState<GramTargets>(initial.grams);
 
   const preview = previewGrams(initial.kcalTrain, initial.kcalRest, pct, floors);
+  const gramsKcal = gramsModeKcal(initial, grams);
   const panelId = useId();
 
   function save() {
@@ -113,6 +137,17 @@ export default function TargetModeSheet({ initial, floors, saveError, saving = f
               <Stepper label="Carbs" value={grams.carbG} step={5} unit="g"
                 onChange={(v) => setGrams({ ...grams, carbG: v })} />
             </>
+          )}
+
+          {mode === "grams" && (
+            <div className="well flex flex-col gap-1 px-4 py-3">
+              <span className="text-tiny font-normal text-muted">
+                {`Training day: ${gramsKcal.kcalTrain} kcal`}
+              </span>
+              <span className="text-tiny font-normal text-muted">
+                {`Rest day: ${gramsKcal.kcalRest} kcal`}
+              </span>
+            </div>
           )}
 
           {mode === "percent" && (

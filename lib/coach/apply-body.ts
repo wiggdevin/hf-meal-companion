@@ -16,6 +16,7 @@ import { deleteMorningWeight, saveMorningWeight } from "@/lib/today/water-and-we
 import {
   cancelPendingTargetRevision, restoreTargetRevisionOnline, settingsWithTargetRevision,
 } from "@/lib/targets/client";
+import { undoRestore } from "@/lib/targets/refusal";
 import { wholeCups } from "@/lib/water";
 import { addCupsWithRev, undoAddedCups } from "@/lib/water-client";
 
@@ -136,14 +137,15 @@ export async function undoLogWeight(token: WeightToken, ctx: { now?: Date } = {}
     updateDay(token.date, { weightLb: undefined });
   }
 
-  if (token.previousTargetRevisionId) {
+  const previousRevisionId = token.previousTargetRevisionId;
+  if (previousRevisionId) {
     const restoreDate = targetDayFor(ctx.now ?? new Date());
-    const restored = await restoreTargetRevisionOnline(
-      token.previousTargetRevisionId,
+    const restored = await undoRestore(() => restoreTargetRevisionOnline(
+      previousRevisionId,
       restoreDate,
       token.fetchImpl,
       h,
-    );
+    ));
     assertCurrent(h);
     const store = loadStore();
     const settings = settingsWithTargetRevision(store.settings, restored);

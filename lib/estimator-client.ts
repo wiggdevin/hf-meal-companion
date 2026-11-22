@@ -14,6 +14,7 @@ import {
 import { readAccountItem, removeAccountItem, writeAccountItem } from "@/lib/device/account-storage";
 import { enqueue } from "@/lib/sync/outbox";
 import { targetDayFor } from "@/lib/targets/revision";
+import { targetRefusal } from "@/lib/targets/refusal";
 import type { Entity, SyncOp } from "@/lib/sync/types";
 import type {
   DecideResponse, ExpenditureResponse, ProposalSummary, TargetsRequest, TargetsResponse,
@@ -142,7 +143,11 @@ export async function postTargets(
   const res = await accountFetch(h, "/api/targets", {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(req),
   }, { fetchImpl: fetchFn });
-  if (!res.ok) throw new Error(`save targets failed: ${res.status}`);
+  if (!res.ok) {
+    // A 4xx says why (below_floor carries the server's own sentence); anything else stays generic.
+    if (res.status >= 400 && res.status < 500) throw await targetRefusal(h, res);
+    throw new Error(`save targets failed: ${res.status}`);
+  }
   return accountJson<TargetsResponse>(h, res);
 }
 

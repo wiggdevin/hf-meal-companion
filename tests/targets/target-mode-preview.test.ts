@@ -1,6 +1,6 @@
 // tests/targets/target-mode-preview.test.ts
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { previewGrams, targetModeRequest } from "@/components/TargetModeSheet";
+import { gramsModeKcal, previewGrams, targetModeRequest } from "@/components/TargetModeSheet";
 import { toPounds, WEIGHT_LB_PER_KG } from "@/components/WeightTrend";
 import { CARB_G_MIN, FAT_G_MIN, type MacroFloors } from "@/lib/targets/percent";
 
@@ -48,9 +48,41 @@ describe("targetModeRequest", () => {
 
   it("dates a save at 6 pm Pacific by that evening's date, not the next UTC day", () => {
     const evening = new Date("2026-10-11T01:00:00.000Z"); // 18:00 Oct 10 in Los Angeles
-    const grams = { proteinG: 140, fatG: 70, carbG: 200 };
-    expect(targetModeRequest("grams", { kcalTrain: 2200, kcalRest: 1800 },
+    const grams = { proteinG: 140, fatG: 70, carbG: 252 };
+    expect(targetModeRequest("grams", { kcalTrain: 2198, kcalRest: 1802, grams },
       { proteinPct: 30, fatPct: 30, carbPct: 40 }, grams, evening))
-      .toEqual({ mode: "grams", effectiveFrom: "2026-10-10", kcalTrain: 2200, kcalRest: 1800, grams });
+      .toEqual({ mode: "grams", effectiveFrom: "2026-10-10", kcalTrain: 2198, kcalRest: 1802, grams });
+  });
+});
+
+describe("grams mode calories follow the grams (spec 1.5, Grams editor)", () => {
+  const grams = { proteinG: 140, fatG: 70, carbG: 252 };
+  const initial = { kcalTrain: 2198, kcalRest: 1802, grams };
+
+  it("keeps the opening calories when nothing changed", () => {
+    expect(gramsModeKcal(initial, grams)).toEqual({ kcalTrain: 2198, kcalRest: 1802 });
+  });
+
+  it("moves both days by 20 kcal for +5 g protein, and the save carries them", () => {
+    const stepped = { ...grams, proteinG: 145 };
+    expect(gramsModeKcal(initial, stepped)).toEqual({ kcalTrain: 2218, kcalRest: 1822 });
+    const req = targetModeRequest("grams", initial, { proteinPct: 30, fatPct: 30, carbPct: 40 },
+      stepped, new Date("2026-10-10T20:00:00.000Z"));
+    expect(req).toMatchObject({ mode: "grams", kcalTrain: 2218, kcalRest: 1822, grams: stepped });
+  });
+
+  it("moves only the training day for a carb step: the rest day keeps its own carbs", () => {
+    expect(gramsModeKcal(initial, { ...grams, carbG: 257 })).toEqual({ kcalTrain: 2218, kcalRest: 1802 });
+  });
+
+  it("never gives the rest day negative carbs", () => {
+    const low = { kcalTrain: 2198, kcalRest: 900, grams };
+    expect(gramsModeKcal(low, grams).kcalRest).toBe(4 * 140 + 9 * 70);
+  });
+
+  it("leaves a percent save's calories as the user's", () => {
+    const req = targetModeRequest("percent", initial, { proteinPct: 30, fatPct: 30, carbPct: 40 },
+      grams, new Date("2026-10-10T20:00:00.000Z"));
+    expect(req).toMatchObject({ mode: "percent", kcalTrain: 2198, kcalRest: 1802 });
   });
 });

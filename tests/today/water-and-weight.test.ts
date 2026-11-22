@@ -18,7 +18,7 @@ import {
 import { HEALTH_DAILY_CACHE_NAME } from "@/lib/health-client";
 import { defaultSettings, getDay, loadStore, saveStore } from "@/lib/store";
 import { putRow } from "@/lib/sync/idb";
-import { TargetRevisionQueuedError } from "@/lib/targets/client";
+import { TargetFloorError, TargetRevisionQueuedError } from "@/lib/targets/client";
 import { resetTestAccount } from "@/tests/helpers/account";
 import { bindAccount, type AccountHandle } from "@/lib/device/account";
 
@@ -427,6 +427,36 @@ describe("the morning weight", () => {
       targetRequestId: requestId,
     });
     expect(getDay("2026-09-19")?.weightLb).toBe(170);
+  });
+
+  it("says the targets were not changed, in the server's words, when the new weight puts them under a floor", async () => {
+    saveStore({
+      ...loadStore(),
+      settings: { ...loadStore().settings, sex: "female", birthYear: 1996, heightCm: 165,
+        weightKg: 60, activityLevel: "moderate", goal: "recomp", trainingWeekdays: [1, 3, 4, 5] },
+    });
+    const sentence = "That is less than your minimum of 150 g of protein a day. Choose 150 g or more.";
+    const refusal = new TargetFloorError("protein", "training", 150, sentence);
+    const message = `Weight saved. Your targets were not changed: ${sentence}`;
+
+    const detailed = await saveMorningWeight("2026-09-19", 170, () => {}, {
+      detailed: true,
+      fetchImpl: async () => Response.json({ kg: 77.1107029, sampleId: "s" }),
+      writeTargets: vi.fn(async () => { throw refusal; }),
+      targetDate: "2026-09-19",
+    });
+    // The refusal is final, so nothing is queued and no request id is kept for an Undo to cancel.
+    expect(detailed).toEqual({
+      ok: true, partial: "targets", message, previousTargetRevisionId: null,
+    });
+    expect(getDay("2026-09-19")?.weightLb).toBe(170);
+
+    const plain = await saveMorningWeight("2026-09-19", 171, () => {}, {
+      fetchImpl: async () => Response.json({ kg: 77.5, sampleId: "s" }),
+      writeTargets: vi.fn(async () => { throw refusal; }),
+      targetDate: "2026-09-19",
+    });
+    expect(plain).toBe(message);
   });
 
   it("finds the newest effective weigh-in across local and synchronized health data", () => {

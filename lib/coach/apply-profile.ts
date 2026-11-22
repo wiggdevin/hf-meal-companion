@@ -16,6 +16,7 @@ import {
   persistDerivedTargetRevisionSet, restoreTargetRevisionOnline, settingsWithTargetRevision,
   type TargetPredecessor,
 } from "@/lib/targets/client";
+import { undoRestore } from "@/lib/targets/refusal";
 import { targetDayFor } from "@/lib/targets/revision";
 import { latestWeighInKg } from "@/lib/today/water-and-weight";
 import type { Settings } from "@/lib/types";
@@ -229,8 +230,8 @@ export async function undoSettingsAction(
   const revisionId = token.fields.includes("activeTargetProfile")
     ? token.previous.activeTargetProfile?.id : undefined;
   if (revisionId) {
-    const restored = await restoreTargetRevisionOnline(
-      revisionId, effectiveDate(ctx), ctx.fetchImpl, h);
+    const restored = await undoRestore(() => restoreTargetRevisionOnline(
+      revisionId, effectiveDate(ctx), ctx.fetchImpl, h));
     next = settingsWithTargetRevision(next, restored);
   }
   await syncProfileSettings(next, h, [...token.fields,
