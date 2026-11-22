@@ -96,7 +96,7 @@ export default function DayTypeToggle({
   }
 
   return (
-    <div ref={wrapper} className="relative">
+    <div ref={wrapper} className="relative min-w-0">
       <DayTypeChip dayType={dayType} override={override} open={open} onOpen={toggleMenu} menuId={menuId} />
       <AnimatePresence>
         {open && (

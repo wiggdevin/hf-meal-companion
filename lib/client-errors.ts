@@ -38,7 +38,7 @@ export type ClientErrorCode = (typeof CLIENT_ERROR_CODES)[number];
 
 /** Every page the app serves (a test walks `app/` and holds this list to it). */
 export const CLIENT_ERROR_ROUTES = [
-  "/", "/body", "/coach", "/foods", "/onboarding", "/recipes", "/privacy", "/scan", "/settings", "/sign-in",
+  "/", "/body", "/coach", "/foods", "/log", "/onboarding", "/recipes", "/privacy", "/scan", "/settings", "/sign-in",
   "/week", "/design", "/design/:page", "other",
 ] as const;
 export type ClientErrorRoute = (typeof CLIENT_ERROR_ROUTES)[number];

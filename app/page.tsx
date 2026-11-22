@@ -53,8 +53,13 @@ import type { TimingRun } from "@/lib/timing";
 import BarcodeScanSheet from "@/components/BarcodeScanSheet";
 import ScanConfirmSheet from "@/components/ScanConfirmSheet";
 import CaptureSheet from "@/components/CaptureSheet";
+import ScanReadySheet from "@/components/today/ScanReadySheet";
 import type { BarcodeResponse } from "@/lib/barcode/client";
-import { captureOverlayProps } from "@/lib/capture-client";
+import { captureActions, captureOverlayProps } from "@/lib/capture-client";
+import { publicFeatureScan } from "@/lib/capture/public-flags";
+import { useLogIntent } from "@/components/today/useLogIntent";
+import { slotOnDay } from "@/lib/log/log-intent";
+import LogNowButton from "@/components/today/LogNowButton";
 import type { CaptureMethod } from "@/lib/capture/flags";
 import { addCups, setCups } from "@/lib/water-client";
 import { latestWins } from "@/lib/today/latest-wins";
@@ -212,6 +217,16 @@ export default function Today() {
   /** A meal still saving on another day — Today says so rather than hiding it. */
   const [elsewhere, setElsewhere] = useState<{ date: string; count: number } | null>(null);
   const [captureMode, setCaptureMode] = useState<CaptureMethod | null>(null);
+  /** A barcode link's ready screen: the camera starts only when its Scan is tapped. */
+  const [scanReady, setScanReady] = useState(false);
+  // A `/log` link (home-screen shortcut): open what it asked for, once mounted. A slot counts only
+  // when the viewed day's layout has it; the sheet fallback keeps it too.
+  useLogIntent(mounted, { methods: captureActions().map((a) => a.method), scan: publicFeatureScan() }, ({ open, slot }) => {
+    const daySlot = slotOnDay(slot, resolved.slots);
+    if (open.kind === "sheet") { openCardPanel(() => { setLogSlot(daySlot); setLogOpen("food"); }); return; }
+    setHandoffSlot(daySlot);
+    if (open.kind === "scan") setScanReady(true); else setCaptureMode(open.method);
+  });
   const [pendingProposal, setPendingProposal] = useState<Fresh<ProposalSummary[]> | null>(null);
   const [starterGate, setStarterGate] = useState<StarterGate | null>(null);
   const [eligibleFoodIds, setEligibleFoodIds] = useState<Set<string> | null>(null);
@@ -981,6 +996,7 @@ export default function Today() {
           back={isToday ? undefined : { href: "/", label: "Back to today",
             onClick: (event) => { event.preventDefault(); selectDate(todayIso); } }}
           trailing={<>
+            <LogNowButton onOpen={() => openCardPanel(() => { setLogSlot(focusSlotId); setLogOpen("food"); })} />
             <DayTypeToggle
               key={viewedDate}
               date={viewedDate}
@@ -991,7 +1007,7 @@ export default function Today() {
             />
             {/* Interim way into the Week screen until the week's charts (W4) link to it. */}
             <Link href="/week" aria-label="Open the Week screen"
-              className="tap flex h-11 items-center rounded-full border-hairline border px-4 text-caption font-semibold text-charcoal">
+              className="tap flex h-11 shrink-0 items-center whitespace-nowrap rounded-full border-hairline border px-4 text-caption font-semibold text-charcoal">
               Week
             </Link>
             <HeaderAvatar />
@@ -1215,7 +1231,15 @@ export default function Today() {
             <BarcodeScanSheet
               key="scan"
               onResolved={(r, run) => { setScanOpen(false); setScanResult(r); setScanRun(run ?? null); }}
-              onClose={() => setScanOpen(false)}
+              onClose={() => { setScanOpen(false); setHandoffSlot(null); }}
+            />
+          )}
+          {scanReady && (
+            <ScanReadySheet
+              key="scan-ready"
+              onScan={() => { setScanReady(false); setScanOpen(true); }}
+              onSearch={() => { setScanReady(false); openCardPanel(() => { setLogSlot(handoffSlot); setLogOpen("food"); }); setHandoffSlot(null); }}
+              onClose={() => { setScanReady(false); setHandoffSlot(null); }}
             />
           )}
           {scanResult && (
@@ -1226,8 +1250,8 @@ export default function Today() {
               slot={handoffSlot ?? currentSlotId ?? resolved.slots[0]?.slot ?? "meal-1"}
               eatenAt={logAtFor(handoffSlot ?? currentSlotId ?? resolved.slots[0]?.slot ?? "meal-1")}
               projection={logProjection}
-              onLogged={(_entryId, saved) => { setScanResult(null); setScanRun(null); refresh(); confirmLogged(saved); }}
-              onClose={() => { setScanResult(null); setScanRun(null); }}
+              onLogged={(_entryId, saved) => { setScanResult(null); setScanRun(null); setHandoffSlot(null); refresh(); confirmLogged(saved); }}
+              onClose={() => { setScanResult(null); setScanRun(null); setHandoffSlot(null); }}
             />
           )}
           {captureMode && (
@@ -1239,9 +1263,9 @@ export default function Today() {
               // On a past day the slot and its time come from one choice, so they never disagree.
               slot={handoffSlot ?? (logAtFor(captureSlot) ? captureSlot : undefined)}
               at={logAtFor(captureSlot)}
-              onOpenSearch={() => { setCaptureMode(null); setLogOpen("food"); }}
-              onLogged={() => { setCaptureMode(null); refresh(); confirmLogged(); }}
-              onClose={() => setCaptureMode(null)}
+              onOpenSearch={() => { setCaptureMode(null); setHandoffSlot(null); setLogOpen("food"); }}
+              onLogged={() => { setCaptureMode(null); setHandoffSlot(null); refresh(); confirmLogged(); }}
+              onClose={() => { setCaptureMode(null); setHandoffSlot(null); }}
             />
           )}
           {openEntry && (() => {
