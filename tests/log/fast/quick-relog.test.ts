@@ -1,44 +1,30 @@
 /**
- * Fast logging (2026-11-21): one-tap re-log from recents, a favorite, or "Same as yesterday".
- * A re-log skips the portion step: it logs the earlier entry's own foods and grams, as a new entry,
- * through the one commit path (lib/log/log-again.ts), with Undo after.
+ * Fast logging (2026-11-21): what a one-tap re-log picks and says. A star re-logs by stable
+ * identity (a food ref, a saved meal's foods), never by name; "Same as yesterday" names what it
+ * copies and what it leaves out; a recent chip names its portion and its day.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { LoggedFood, LoggedItem, StoredDay } from "@/lib/types";
+import { describe, expect, it, vi } from "vitest";
+import type { StoredDay } from "@/lib/types";
+import { EGG, RICE, entry, item } from "./relog-fixtures";
 
-const commitLogEntry = vi.fn();
-vi.mock("@/lib/log-commit-client", () => ({ commitLogEntry: (...args: unknown[]) => commitLogEntry(...args) }));
-const forgetLoggedEntry = vi.fn(async () => undefined);
-vi.mock("@/lib/log/delete-entry", () => ({ forgetLoggedEntry: (...args: unknown[]) => forgetLoggedEntry(...(args as [])) }));
+const getRow = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/sync/idb", () => ({ getRow: (...args: unknown[]) => getRow(...args) }));
 
 import { logAgainRequest } from "@/lib/log/log-again";
 import {
-  favoriteRelog, relogEntries, relogNotice, relogOnce, undoRelog, yesterdayInSlot,
+  favoriteRelog, relogDetail, sameAsYesterdayCopy, sameAsYesterdayKey, savedMealRefs, shiftDay, yesterdayInSlot,
 } from "@/lib/log/quick-relog";
-
-const EGG = "aaaaaaaa-0000-4000-8000-000000000001";
-const RICE = "aaaaaaaa-0000-4000-8000-000000000002";
-
-function item(ref: string, grams: number): LoggedItem {
-  return { id: crypto.randomUUID(), seq: 1, food_ref_id: ref, grams, qty: grams, unit: "g", snapshot: {},
-    foodId: ref, name: ref, portionLabel: "g", macros: { kcal: 0, protein: 0, carbs: 0, fat: 0 } };
-}
-
-function entry(id: string, at: string, items: LoggedItem[], extra: Partial<LoggedFood> = {}): LoggedFood {
-  return { id, foodId: "x", name: "Eggs", slot: "meal-1", portionLabel: "1", qty: 1, grams: 100,
-    macros: { kcal: 100, protein: 10, carbs: 0, fat: 5 }, items, rev: 1, at, ...extra };
-}
 
 const eggsOld = entry("e-old", "2026-11-18T08:00:00Z", [item(EGG, 100)]);
 const eggsNew = entry("e-new", "2026-11-20T08:00:00Z", [item(EGG, 150)]);
-const bowl = entry("bowl", "2026-11-20T13:00:00Z", [item(EGG, 50), item(RICE, 200)], { name: "Rice bowl", slot: "meal-2" });
-const local = entry("local", "2026-11-20T09:00:00Z", [item(EGG, 80)], { rev: undefined });
+const bowl = entry("bowl", "2026-11-20T13:00:00Z", [item(EGG, 50), item(RICE, 200, 2)],
+  { name: "Rice bowl", slot: "meal-2", grams: 250 });
+const local = entry("local", "2026-11-20T09:00:00Z", [item(EGG, 80)], { rev: undefined, name: "Toast" });
 const days: Record<string, StoredDay> = {
   "2026-11-18": { extras: [eggsOld] } as StoredDay,
   "2026-11-20": { extras: [eggsNew, bowl, local] } as StoredDay,
 };
-
-beforeEach(() => { commitLogEntry.mockReset(); forgetLoggedEntry.mockClear(); });
+const H = { userId: "u1", epoch: 1 };
 
 describe("favoriteRelog", () => {
   it("finds the newest single-food entry for a favorite food", () => {
@@ -46,8 +32,16 @@ describe("favoriteRelog", () => {
       .toBe("e-new");
   });
 
-  it("finds a favorite meal by its logged name", () => {
-    expect(favoriteRelog({ kind: "meal", id: "m", name: "rice BOWL", sort: 0 }, days)?.entry.id).toBe("bowl");
+  it("finds a saved meal by its foods, whatever either is called", () => {
+    const fav = { kind: "meal" as const, id: "m", name: "Lunch I like", sort: 0 };
+    expect(favoriteRelog(fav, days, [RICE, EGG.toUpperCase()])?.entry.id).toBe("bowl");
+  });
+
+  it("never matches a saved meal by name alone", () => {
+    const fav = { kind: "meal" as const, id: "m", name: "Rice bowl", sort: 0 };
+    expect(favoriteRelog(fav, days)).toBeNull();
+    expect(favoriteRelog(fav, days, null)).toBeNull();
+    expect(favoriteRelog(fav, days, [RICE])).toBeNull();
   });
 
   it("is null when nothing logged can be rebuilt, or for a recipe", () => {
@@ -57,77 +51,66 @@ describe("favoriteRelog", () => {
   });
 });
 
-describe("yesterdayInSlot", () => {
-  it("lists yesterday's re-loggable entries in the same slot", () => {
-    expect(yesterdayInSlot(days, "2026-11-21", "meal-1").map((e) => e.id)).toEqual(["e-new"]);
-    expect(yesterdayInSlot(days, "2026-11-21", "meal-2").map((e) => e.id)).toEqual(["bowl"]);
-    expect(yesterdayInSlot(days, "2026-11-21", "meal-3")).toEqual([]);
-    expect(yesterdayInSlot(days, "2026-11-20", "meal-1")).toEqual([]);
+describe("savedMealRefs", () => {
+  it("reads the saved meal's foods from this account's row", async () => {
+    getRow.mockResolvedValueOnce({ id: "m", deleted_at: null, items: [{ food_ref_id: EGG }, { food_ref_id: RICE }] });
+    expect(await savedMealRefs("m", H)).toEqual([EGG, RICE]);
+    expect(getRow).toHaveBeenCalledWith(H, "favorites_meals", "m");
+  });
+
+  it("is null for a deleted, missing or unreadable row, or with no account", async () => {
+    getRow.mockResolvedValueOnce({ id: "m", deleted_at: "2026-11-01", items: [{ food_ref_id: EGG }] });
+    expect(await savedMealRefs("m", H)).toBeNull();
+    getRow.mockResolvedValueOnce(undefined);
+    expect(await savedMealRefs("m", H)).toBeNull();
+    getRow.mockRejectedValueOnce(new Error("idb"));
+    expect(await savedMealRefs("m", H)).toBeNull();
+    expect(await savedMealRefs("m", null)).toBeNull();
   });
 });
 
-describe("logAgainRequest's slot", () => {
+describe("yesterdayInSlot", () => {
+  it("splits yesterday's entries in the slot into what it copies and what it leaves out", () => {
+    const meal1 = yesterdayInSlot(days, "2026-11-21", "meal-1");
+    expect(meal1.copy.map((e) => e.id)).toEqual(["e-new"]);
+    expect(meal1.omitted.map((e) => e.id)).toEqual(["local"]);
+    expect(yesterdayInSlot(days, "2026-11-21", "meal-2").copy.map((e) => e.id)).toEqual(["bowl"]);
+    expect(yesterdayInSlot(days, "2026-11-21", "meal-3")).toEqual({ copy: [], omitted: [] });
+    expect(yesterdayInSlot(days, "2026-11-20", "meal-1")).toEqual({ copy: [], omitted: [] });
+  });
+
+  it("says what it copies and what it leaves out", () => {
+    expect(sameAsYesterdayCopy(yesterdayInSlot(days, "2026-11-21", "meal-1")))
+      .toBe("Copies Eggs. Leaves out Toast, not saved yet or not rebuildable.");
+    expect(sameAsYesterdayCopy(yesterdayInSlot(days, "2026-11-21", "meal-2"))).toBe("Copies Rice bowl.");
+  });
+
+  it("has one durable key per day and slot", () => {
+    expect(sameAsYesterdayKey("2026-11-21", "meal-1")).toBe("same-as-yesterday:2026-11-21:meal-1");
+    expect(shiftDay("2026-03-01", -1)).toBe("2026-02-28");
+  });
+});
+
+describe("relogDetail", () => {
+  it("names the portion and the day of a recent chip", () => {
+    expect(relogDetail({ entry: eggsNew, date: "2026-11-20" }, "2026-11-21")).toBe("2 eggs · yesterday");
+    expect(relogDetail({ entry: eggsNew, date: "2026-11-21" }, "2026-11-21")).toBe("2 eggs · today");
+    expect(relogDetail({ entry: bowl, date: "2026-11-18" }, "2026-11-21")).toBe("2 foods, 250 g · Wed, Nov 18");
+  });
+});
+
+describe("logAgainRequest", () => {
   it("files the re-log in the slot asked for, else the old entry's", () => {
     const at = new Date("2026-11-21T08:00:00Z");
     expect(logAgainRequest(eggsNew, at, "UTC", "meal-3")?.req.slot).toBe("meal-3");
     expect(logAgainRequest(eggsNew, at, "UTC")?.req.slot).toBe("meal-1");
   });
-});
 
-describe("relogEntries", () => {
-  it("logs each entry as a new one at the given time and slot, and returns their ids for Undo", async () => {
-    commitLogEntry.mockResolvedValue({ status: "ok" });
-    const at = new Date("2026-11-21T12:00:00Z");
-    const done = await relogEntries([eggsNew, bowl], { at, tz: "UTC", slot: "meal-4" });
-    expect(commitLogEntry).toHaveBeenCalledTimes(2);
-    const [req] = commitLogEntry.mock.calls[0] as [{ slot: string; eaten_at: string; items: { grams: number }[] }];
-    expect(req.slot).toBe("meal-4");
-    expect(req.eaten_at).toBe(at.toISOString());
-    expect(req.items.map((i) => i.grams)).toEqual([150]);
-    expect(done).toMatchObject({ ok: true, date: "2026-11-21", message: null });
-    if (done?.ok) expect(done.ids).toHaveLength(2);
-  });
-
-  it("says what a refusal said and keeps the ids already logged", async () => {
-    commitLogEntry.mockResolvedValueOnce({ status: "ok" })
-      .mockResolvedValueOnce({ status: "refused", reason: "x", message: "Nope." });
-    const done = await relogEntries([eggsNew, bowl], { at: new Date("2026-11-21T12:00:00Z"), tz: "UTC" });
-    expect(done?.ok).toBe(false);
-    if (done && !done.ok) {
-      expect(done.ids).toHaveLength(1);
-      expect(done.message).toBeTruthy();
-    }
-  });
-
-  it("sends nothing for an entry it cannot rebuild", async () => {
-    expect(await relogEntries([local], { at: new Date(), tz: "UTC" })).toBeNull();
-    expect(commitLogEntry).not.toHaveBeenCalled();
-  });
-});
-
-describe("one run at a time, Undo, and the toast", () => {
-  it("logs nothing on a second tap while the first is saving", async () => {
-    let release: (v: unknown) => void = () => {};
-    commitLogEntry.mockImplementation(() => new Promise((r) => { release = r; }));
-    const first = relogOnce([eggsNew], { at: new Date("2026-11-21T12:00:00Z"), tz: "UTC" });
-    expect(await relogOnce([eggsNew], { tz: "UTC" })).toBe("busy");
-    release({ status: "ok" });
-    expect(await first).toMatchObject({ ok: true });
-    expect(commitLogEntry).toHaveBeenCalledTimes(1);
-  });
-
-  it("Undo removes exactly the entries the re-log added", async () => {
-    await undoRelog({ ok: true, date: "2026-11-21", ids: ["a", "b"], message: null });
-    expect(forgetLoggedEntry.mock.calls).toEqual([["2026-11-21", "a"], ["2026-11-21", "b"]]);
-  });
-
-  it("says Logged with Undo, the server's mark as a change, and a refusal as an error", () => {
-    const undo = vi.fn();
-    expect(relogNotice({ ok: true, date: "d", ids: ["a"], message: null }, undo))
-      .toEqual({ tone: "success", message: "Logged.", action: { label: "Undo", action: undo } });
-    expect(relogNotice({ ok: true, date: "d", ids: ["a"], message: "Logged, and marked." }, undo).tone).toBe("changed");
-    expect(relogNotice({ ok: false, date: null, ids: [], message: "No." }, undo))
-      .toEqual({ tone: "error", message: "No.", action: undefined });
-    expect(relogNotice(null, undo).tone).toBe("error");
+  it("uses the ids a batch fixed, so a retry posts the same entry", () => {
+    const built = logAgainRequest(bowl, new Date("2026-11-21T08:00:00Z"), "UTC", undefined,
+      { entryId: "entry-1", itemIds: ["item-1", "item-2"] });
+    expect(built?.req.entry_id).toBe("entry-1");
+    expect(built?.req.items.map((i) => i.id)).toEqual(["item-1", "item-2"]);
+    expect(built?.card.id).toBe("entry-1");
   });
 });

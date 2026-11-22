@@ -11,12 +11,17 @@ import { commitLogEntry, type CommitResult } from "@/lib/log-commit-client";
 import { canLogAgain } from "@/lib/log/recent-meals";
 import type { LoggedFood, SlotId } from "@/lib/types";
 
+/** Ids a re-log batch fixed in advance, so a retry posts the same entry, never a second one. */
+export type RelogIds = { entryId: string; itemIds: readonly string[] };
+
 /** The request and the card for a re-log, or null when the entry cannot be rebuilt as it stands.
- *  `slot`: the meal it files under ("Same as yesterday" on a card); the old entry's otherwise. */
-export function logAgainRequest(entry: LoggedFood, at: Date, tz: string, slot?: SlotId) {
+ *  `slot`: the meal it files under ("Same as yesterday" on a card); the old entry's otherwise.
+ *  `ids`: fixed ids (lib/log/relog-batch.ts); fresh random ones otherwise. */
+export function logAgainRequest(entry: LoggedFood, at: Date, tz: string, slot?: SlotId, ids?: RelogIds) {
   if (!canLogAgain(entry)) return null;
-  const entryId = crypto.randomUUID();
-  const items = (entry.items ?? []).map((item, index) => ({ ...item, id: crypto.randomUUID(), seq: index + 1 }));
+  const entryId = ids?.entryId ?? crypto.randomUUID();
+  const items = (entry.items ?? []).map((item, index) => ({
+    ...item, id: ids?.itemIds[index] ?? crypto.randomUUID(), seq: index + 1 }));
   const req = buildCommitRequest({
     entryId, eatenAt: at, tz, slot: slot ?? entry.slot ?? "snack", title: entry.name,
     items: items.map((item) => ({ id: item.id, foodRefId: item.food_ref_id,

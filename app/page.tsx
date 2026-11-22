@@ -85,7 +85,10 @@ import DayCompleteControl from "@/components/today/DayCompleteControl";
 import { outcomeFor } from "@/lib/log/outcome";
 import { logAgain } from "@/lib/log/log-again";
 import { canLogAgain } from "@/lib/log/recent-meals";
-import { relogNotice, relogOnce, undoRelog, yesterdayInSlot, type Relogged } from "@/lib/log/quick-relog";
+import { sameAsYesterdayKey, yesterdayInSlot } from "@/lib/log/quick-relog";
+import { useRelogBatches } from "@/components/today/useRelogBatches";
+import RelogReceipts from "@/components/today/RelogReceipts";
+import SameAsYesterday from "@/components/today/SameAsYesterday";
 import { COUNT_LOG_FAILURE } from "@/lib/today/count-log-once";
 import { countLogged as countLoggedOnce } from "@/components/today/count-logged";
 import { addedMealTime, clearMeal, nextMealSlot, removeMeal, restoreAddedMeal } from "@/lib/today/meal-actions";
@@ -489,6 +492,9 @@ export default function Today() {
     planInputs.current = (date) => resolveDay(...todayResolveInputs(loadStore(), date, live).args);
   });
 
+  /** Fast logging: every one-tap re-log is its own batch, with its own Undo and Retry. */
+  const relogs = useRelogBatches(() => setTick((t) => t + 1));
+
   if (!mounted) {
     return <ShellSkeleton />;
   }
@@ -638,18 +644,6 @@ export default function Today() {
     void forgetLoggedEntry(viewedDate, id);
     setOpenEntry(null);
     refresh();
-  }
-
-  /** A one-tap re-log (recents, a star, Same as yesterday): the sheet closes; Logged, with Undo. */
-  function relogged(done: Relogged | null) {
-    setLogOpen(null); setLogSlot(null); refresh();
-    todayFeedback.notify(relogNotice(done, () => { if (done) void undoRelog(done).then(refresh); }));
-  }
-
-  /** "Same as yesterday" on a meal card: yesterday's entries in this slot, logged again now. */
-  async function sameAsYesterday(slot: SlotId, entries: LoggedFood[]) {
-    const done = await relogOnce(entries, { at: logAtFor(slot), slot });
-    if (done !== "busy") relogged(done);
   }
 
   /** "Log again" on an entry (W123): a new entry now, on today, through the commit path. */
@@ -971,7 +965,7 @@ export default function Today() {
     if (logOpen && logSlot === id) return <LogFoodSheet key={`log-${logOpen}-${id}`} mode={logOpen}
       mine={store.foods} slot={id} projection={logProjection} onAdd={logFood} at={logAtFor(id)}
       onSomethingElse={() => { setHandoffSlot(id); setLogOpen(null); setLogSlot(null); setLabelOpen(true); }}
-      onClose={() => { setLogOpen(null); setLogSlot(null); }} onRelogged={relogged}
+      onClose={() => { setLogOpen(null); setLogSlot(null); }} days={store.days} onRelog={relogs.start}
       {...captureOverlayProps((mode) => { setHandoffSlot(id); setCaptureMode(mode); },
         () => { setHandoffSlot(id); setScanOpen(true); })} />;
     return null;
@@ -1141,7 +1135,8 @@ export default function Today() {
             // Quick meals no longer replaces the plan (A061), so it never locks Swap.
             const canSwap = isMealSlot(slot.slot) || getMealOptions(resolved.dayType, slot.slot).length > 1;
             const note = slotNote(slot, planStore.days[viewedDate], generatedNotes);
-            const yesterday = yesterdayInSlot(store.days, viewedDate, slot.slot);
+            // Never on a day still ahead: "yesterday" there is not a day that has happened.
+            const yesterday = viewedDate <= todayIso ? yesterdayInSlot(store.days, viewedDate, slot.slot) : null;
             const variant: SlotVariant =
               slot.slot === focusSlotId
                 ? "focus"
@@ -1165,7 +1160,9 @@ export default function Today() {
                   onPlanWithCoach={() => openCardPanel(() => { setPlanOpening((id) => id + 1); setPlanMode("plan"); setPlanSlot(slot.slot); })}
                   onAteSomethingElse={() => openCardPanel(() => { setPlanOpening((id) => id + 1); setPlanMode("log"); setPlanSlot(slot.slot); })}
                   onLogWhatYouAte={() => openCardPanel(() => { setLogSlot(slot.slot); setLogOpen("food"); })}
-                  onSameAsYesterday={yesterday.length > 0 ? () => void sameAsYesterday(slot.slot, yesterday) : undefined}
+                  sameAsYesterday={yesterday && yesterday.copy.length > 0 ? <SameAsYesterday {...yesterday} busy={relogs.pending}
+                    onLog={() => void relogs.start(yesterday.copy, { at: logAtFor(slot.slot), slot: slot.slot,
+                      durableKey: sameAsYesterdayKey(viewedDate, slot.slot) })} /> : undefined}
                   attachment={cardAttachment(slot.slot)}
                   dayTotals={{ consumed: resolved.consumed, targets: resolved.targets }}
                   eatenFeedback={todayFeedback.phaseFor(`eaten:${slot.slot}`)}
@@ -1194,6 +1191,8 @@ export default function Today() {
         )}
         <DayCompleteControl date={viewedDate} today={todayIso} />
         <ActionFeedbackToast notice={todayFeedback.notice} onDismiss={todayFeedback.dismiss} />
+        <RelogReceipts batches={relogs.batches} isRunning={relogs.isRunning}
+          onUndo={(id) => void relogs.undo(id)} onRetry={(id) => void relogs.retry(id)} onDismiss={relogs.dismiss} />
 
         {isToday && <ShoppingTodayCard enabled={recipeAccess.enabled} today={todayIso} />}
 
@@ -1222,7 +1221,7 @@ export default function Today() {
               at={logAtFor(logSlot ?? currentSlotId ?? resolved.slots[0]?.slot ?? "meal-1")}
               onSomethingElse={() => { setHandoffSlot(null); setLogOpen(null); setLabelOpen(true); }}
               onClose={() => { setLogOpen(null); setLogSlot(null); }}
-              onRelogged={relogged}
+              days={store.days} onRelog={relogs.start}
               {...captureOverlayProps((mode) => { setHandoffSlot(null); setCaptureMode(mode); },
                 () => { setHandoffSlot(null); setScanOpen(true); })}
             />
