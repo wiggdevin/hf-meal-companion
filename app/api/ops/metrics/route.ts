@@ -24,7 +24,8 @@ function bearerOk(req: Request, expected: string): boolean {
  *
  * `Authorization: Bearer <OPS_METRICS_TOKEN>`, compared in constant time. 404 when the variable is
  * unset or shorter than 32 characters (the route does not exist until it is configured), 401 on a
- * mismatch. 60 per minute per IP (shared Postgres limiter, fail closed). The JSON comes from
+ * mismatch. Bad tokens: 10 per minute per `x-real-ip`; valid ones: 60 per minute per `x-real-ip` (shared
+ * Postgres limiter, fail closed; `x-forwarded-for` is never read). The JSON comes from
  * `public.ops_metrics_snapshot` (service_role only): counts under 5 are null, percentiles under 10
  * samples are null, no row-level data. Always `Cache-Control: no-store`.
  */
@@ -34,8 +35,14 @@ export async function GET(req: Request): Promise<Response> {
     return Response.json({ error: "not_found" }, { status: 404, headers: NO_STORE });
   }
   try {
-    await enforceRateLimit(`ops-metrics:ip:${requestIp(req)}`, 60, 60);
-    if (!bearerOk(req, expected)) throw new HttpError(401, "unauthorized", "Unauthorized");
+    // Authenticate first. A bad token is charged to its own, stricter bucket; only a valid
+    // caller is charged to the normal one, so guessing can't lock the real dashboard out.
+    const ip = requestIp(req);
+    if (!bearerOk(req, expected)) {
+      await enforceRateLimit(`ops-metrics-bad:ip:${ip}`, 10, 60);
+      throw new HttpError(401, "unauthorized", "Unauthorized");
+    }
+    await enforceRateLimit(`ops-metrics:ip:${ip}`, 60, 60);
     const days = parseDays(new URL(req.url).searchParams.get("days"));
     let body: unknown;
     try {

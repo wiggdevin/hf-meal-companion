@@ -50,6 +50,7 @@ const NOT_COOKIE: Record<string, string> = {
   "app/api/health/route.ts": "uptime probe: no session, no user data",
   "app/api/health/ingest/route.ts": "per-source bearer token (health-tokens), not the cookie",
   "app/api/health/oura/callback/route.ts": "OAuth redirect: identity from the bound oauth_states row",
+  "app/api/ops/metrics/route.ts": "internal ops metrics: OPS_METRICS_TOKEN bearer, not the cookie",
   "app/api/mcp/route.ts": "per-user personal access token (bearer), not the cookie",
   "app/api/warm/route.ts": "foreground warm ping: no session, no database read",
   "app/api/jobs/backup/route.ts": "cron: CRON_SECRET bearer",

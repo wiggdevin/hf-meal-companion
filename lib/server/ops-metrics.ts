@@ -16,11 +16,11 @@ export class OpsMetricsError extends Error {
 
 export const OPS_DAYS_DEFAULT = 30;
 
-/** `?days=` clamped to 1..90 like the function; anything unreadable is the default. */
+/** `?days=` clamped to 1..90 like the function; empty or non-integer input is the default (30). */
 export function parseDays(raw: string | null): number {
-  const n = raw === null ? NaN : Number(raw);
-  if (!Number.isInteger(n)) return OPS_DAYS_DEFAULT;
-  return Math.min(90, Math.max(1, n));
+  const text = raw?.trim() ?? "";
+  if (!/^[+-]?\d+$/.test(text)) return OPS_DAYS_DEFAULT; // empty, decimal, junk
+  return Math.min(90, Math.max(1, Number(text)));
 }
 
 export async function opsMetricsSnapshot(days: number): Promise<unknown> {
