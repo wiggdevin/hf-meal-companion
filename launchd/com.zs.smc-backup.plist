@@ -5,13 +5,13 @@
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
-    <string>/Users/zero-suminc./projects/clients/Sasha/meal-companion/scripts/run-backup-job.sh</string>
+    <string>__REPO__/scripts/run-backup-job.sh</string>
   </array>
   <key>RunAtLoad</key><false/>
   <key>StartCalendarInterval</key><array>
     <dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>15</integer></dict>
     <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>15</integer></dict>
   </array>
-  <key>StandardOutPath</key><string>/Users/zero-suminc./Library/Logs/smc-backup.log</string>
-  <key>StandardErrorPath</key><string>/Users/zero-suminc./Library/Logs/smc-backup.log</string>
+  <key>StandardOutPath</key><string>__HOME__/Library/Logs/smc-backup.log</string>
+  <key>StandardErrorPath</key><string>__HOME__/Library/Logs/smc-backup.log</string>
 </dict></plist>
