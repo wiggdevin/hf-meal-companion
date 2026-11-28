@@ -191,23 +191,59 @@ class TestAlertTest(unittest.TestCase):
 
 class FailureDetailTest(unittest.TestCase):
     URL = "https://api.supabase.com/v1/projects/secretref123/database/query"
+    ENDPOINT = "POST api.supabase.com/v1/projects/<ref>/database/query"
 
-    def test_names_the_status_reason_and_endpoint_without_the_ref(self):
-        error = ops.urllib.error.HTTPError(self.URL, 429, "Too Many Requests", {}, None)
-        detail = ops.failure_detail(error)
-        self.assertEqual(detail, "HTTP 429 Too Many Requests from "
-                                 "POST api.supabase.com/v1/projects/<ref>/database/query")
+    def http_error(self, code, reason, body=b"body tok-secret secretref123"):
+        return ops.urllib.error.HTTPError(self.URL, code, reason, {"X-Token": "tok-secret"}, io.BytesIO(body))
+
+    def test_names_the_status_and_endpoint_without_the_ref(self):
+        detail = ops.failure_detail(self.http_error(429, "Too Many Requests"))
+        self.assertEqual(detail, f"HTTP 429 Too Many Requests from {self.ENDPOINT}")
         self.assertNotIn("secretref123", detail)
+
+    def test_the_label_comes_from_the_status_code_not_the_server_reason(self):
+        detail = ops.failure_detail(self.http_error(502, "secretref123 tok-secret"))
+        self.assertEqual(detail, f"HTTP 502 Bad Gateway from {self.ENDPOINT}")
+        self.assertEqual(ops.failure_detail(self.http_error(599, "tok-secret")), f"HTTP 599 from {self.ENDPOINT}")
+
+    def test_endpoint_constant_matches_the_url_read_state_calls(self):
+        seen = []
+        original = ops.request_json
+        ops.request_json = lambda url, *args: seen.append(url) or (200, [{"state": {}}])
+        try:
+            ops.read_state("abc", "tok")
+        finally:
+            ops.request_json = original
+        self.assertEqual(seen, ["https://api.supabase.com/v1/projects/abc/database/query"])
+        self.assertEqual(ops.STATE_ENDPOINT, "POST api.supabase.com/v1/projects/<ref>/database/query")
 
     def test_other_errors_name_only_their_class_and_the_endpoint(self):
         reset = ops.urllib.error.URLError(ConnectionResetError("secret body text"))
-        self.assertEqual(ops.failure_detail(reset), f"ConnectionResetError reaching {ops.STATE_ENDPOINT}")
-        self.assertEqual(ops.failure_detail(ValueError("secret body text")), f"ValueError from {ops.STATE_ENDPOINT}")
-        self.assertNotIn("secret", ops.failure_detail(ValueError("secret body text")))
+        self.assertEqual(ops.failure_detail(reset), f"ConnectionResetError reaching {self.ENDPOINT}")
+        self.assertEqual(ops.failure_detail(ops.urllib.error.URLError("no host given")),
+                         f"URLError reaching {self.ENDPOINT}")
+        self.assertEqual(ops.failure_detail(ValueError("secret body text")), f"ValueError from {self.ENDPOINT}")
 
-    def test_main_logs_the_status_and_endpoint_and_no_secret(self):
+    def test_only_the_answer_error_prints_its_message(self):
+        self.assertEqual(ops.failure_detail(ops.StateAnswerError("Management API returned an unexpected answer (HTTP 204)")),
+                         f"Management API returned an unexpected answer (HTTP 204) from {self.ENDPOINT}")
+        for error in (RuntimeError("tok-secret"), NotImplementedError("secretref123")):
+            detail = ops.failure_detail(error)
+            self.assertEqual(detail, f"{type(error).__name__} from {self.ENDPOINT}")
+
+    def test_read_state_names_the_status_of_an_unexpected_answer(self):
+        original = ops.request_json
+        ops.request_json = lambda *args: (204, None)
+        try:
+            with self.assertRaises(ops.StateAnswerError) as caught:
+                ops.read_state("abc", "tok")
+        finally:
+            ops.request_json = original
+        self.assertIn("HTTP 204", str(caught.exception))
+
+    def run_main_with(self, error):
         def refuse(ref, token):
-            raise ops.urllib.error.HTTPError(self.URL, 502, "Bad Gateway", {}, None)
+            raise error
 
         original, saved = (ops.read_state, ops.probe_health), dict(ops.os.environ)
         ops.read_state = refuse
@@ -215,19 +251,29 @@ class FailureDetailTest(unittest.TestCase):
         ops.os.environ.update(SUPABASE_ACCESS_TOKEN="tok-secret", SUPABASE_PROJECT_REF="secretref123")
         for name in ("GITHUB_TOKEN", "GITHUB_REPOSITORY"):
             ops.os.environ.pop(name, None)
-        out = io.StringIO()
+        out, err = io.StringIO(), io.StringIO()
         try:
-            with contextlib.redirect_stdout(out):
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
                 code = ops.main([])
         finally:
             ops.read_state, ops.probe_health = original
             ops.os.environ.clear()
             ops.os.environ.update(saved)
+        return code, out.getvalue() + err.getvalue()
+
+    def test_main_logs_the_status_and_endpoint_and_no_secret(self):
+        code, output = self.run_main_with(self.http_error(502, "tok-secret reason"))
         self.assertEqual(code, 1)
-        self.assertIn("database state unreadable (HTTP 502 Bad Gateway from "
-                      "POST api.supabase.com/v1/projects/<ref>/database/query)", out.getvalue())
-        self.assertNotIn("secretref123", out.getvalue())
-        self.assertNotIn("tok-secret", out.getvalue())
+        self.assertIn(f"database state unreadable (HTTP 502 Bad Gateway from {self.ENDPOINT})", output)
+        for secret in ("secretref123", "tok-secret"):
+            self.assertNotIn(secret, output)
+
+    def test_main_logs_no_secret_from_an_unexpected_exception(self):
+        code, output = self.run_main_with(RuntimeError("Bearer tok-secret at secretref123"))
+        self.assertEqual(code, 1)
+        self.assertIn(f"database state unreadable (RuntimeError from {self.ENDPOINT})", output)
+        for secret in ("secretref123", "tok-secret"):
+            self.assertNotIn(secret, output)
 
 
 class SyncTest(unittest.TestCase):
