@@ -1,3 +1,8 @@
+# No `registries` block on purpose. A Dependabot run logs "Failed to parse GITHUB_REGISTRIES_PROXY
+# environment variable" whenever no private registry is configured: that line is harmless and is
+# not why a run fails. The failed security-update runs (qs, hono, @hono/node-server, minimatch)
+# said security_update_not_possible: a parent pins the transitive dependency, so the fix is an
+# entry under `overrides` in pnpm-workspace.yaml.
 version: 2
 updates:
   - package-ecosystem: npm

@@ -15,9 +15,22 @@ allowBuilds:
 #   @modelcontextprotocol/sdk >=1.12.0 <1.31.0 (via @google/genai peer dep) — GHSA-6qxp-vccf-f47h
 #   sharp <0.35.5 (via next's optional image-optimization dep) — GHSA-wq5f-xc86-pv6w
 #   source-map-js >=1.0.0 <1.2.2 (via @tailwindcss/node, css-tree, postcss) — GHSA-68fv-2mgg-jv7q
+#
+# Transitive runtime deps pinned exactly by their parent (express 5 <- @modelcontextprotocol/sdk,
+# @hono/node-server <- sdk). Dependabot's security update for each failed with
+# security_update_not_possible (runs 45041123795 qs, hono and @hono/node-server on 2026-11-18),
+# because the parent's pin blocks the bump. Each is lifted to the first patched release, same major:
+#   qs <=6.16.0 (via body-parser) — alert 44
+#   body-parser >=2.0.0 <2.4.0 (via express) — alert 17
+#   hono <4.13.16 (via @hono/node-server and the sdk) — alerts 36-40
+#   @hono/node-server >=2.0.0 <2.1.6 (via the sdk) — alerts 33-35
 overrides:
   'brace-expansion@1': '1.1.21'
   'brace-expansion@5': '5.0.12'
   '@modelcontextprotocol/sdk': '>=1.31.0 <2'
   'sharp': '0.35.5'
   'source-map-js': '1.2.2'
+  'qs': '>=6.16.1 <7'
+  'body-parser': '>=2.4.0 <3'
+  'hono': '>=4.13.16 <5'
+  '@hono/node-server': '>=2.1.6 <3'
