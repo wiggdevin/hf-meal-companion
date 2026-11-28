@@ -289,6 +289,24 @@ def probe_health(base_url, attempts=HEALTH_ATTEMPTS, pause=HEALTH_PAUSE_SECONDS,
     return probes
 
 
+# What the log shows for the database read: method, host and path, with the project ref masked.
+STATE_ENDPOINT = "POST api.supabase.com/v1/projects/<ref>/database/query"
+
+
+def failure_detail(error, endpoint=STATE_ENDPOINT):
+    """One log line naming what failed: the endpoint, the HTTP status and reason, or the error class.
+    Never a response body, a header, a URL with the real project ref or an exception message (a
+    library message can carry a URL or a body snippet); only RuntimeError's own constant text."""
+    if isinstance(error, urllib.error.HTTPError):
+        reason = re.sub(r"[^A-Za-z0-9 -]", "", str(error.reason or ""))[:40].strip()
+        return f"HTTP {error.code}{f' {reason}' if reason else ''} from {endpoint}"
+    if isinstance(error, urllib.error.URLError):
+        return f"{type(error.reason).__name__} reaching {endpoint}"
+    if isinstance(error, RuntimeError):
+        return f"{error} from {endpoint}"
+    return f"{type(error).__name__} from {endpoint}"
+
+
 def read_state(ref, token):
     status, rows = request_json(f"https://api.supabase.com/v1/projects/{ref}/database/query",
                                 {"Authorization": f"Bearer {token}"}, {"query": STATE_QUERY}, "POST")
@@ -407,7 +425,7 @@ def main(argv=None):
         try:
             findings.update(state_findings(read_state(ref, token), spend_caps(env)))
         except Exception as error:  # noqa: BLE001 — never print a response body or a header.
-            print(f"ops check: database state unreadable ({type(error).__name__}); its issues are unchanged")
+            print(f"ops check: database state unreadable ({failure_detail(error)}); its issues are unchanged")
             failed = True
     else:
         print("ops check: database checks skipped (SUPABASE_ACCESS_TOKEN / SUPABASE_PROJECT_REF not set)")

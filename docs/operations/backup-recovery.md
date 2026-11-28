@@ -98,7 +98,7 @@ python3 scripts/backup-storage.py --verify <private-drill-directory>/<stamp>-med
 
 To test a rule, run the workflow by hand with a **test alert** rule (or `python3 scripts/ops-check.py --test-alert <rule>`): it files one issue titled "Test alert: <rule>" with that rule's sample text and closes it in the same run, without reading production or touching the real alert's issue.
 
-The database checks are one read-only select through the Management API with `SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_REF` (the pair `migration-drift.yml` reads); without them only the health check runs. GitHub emails issue activity to repository watchers. GitHub disables scheduled workflows after 60 days with no repository activity; re-enable both from the Actions tab if that happens. Crash reports (W053, `[client-error]` in Vercel runtime logs) and Vercel's own runtime logs stay the error trail; there is no third-party tracker.
+The database checks are one read-only select through the Management API with `SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_REF` (the pair `migration-drift.yml` reads); without them only the health check runs. When the read fails, the run fails and its log says `database state unreadable (HTTP <status> <reason> from POST api.supabase.com/v1/projects/<ref>/database/query)`, or the error class for a network failure: no body, token or project ref. GitHub emails issue activity to repository watchers. GitHub disables scheduled workflows after 60 days with no repository activity; re-enable both from the Actions tab if that happens. Crash reports (W053, `[client-error]` in Vercel runtime logs) and Vercel's own runtime logs stay the error trail; there is no third-party tracker.
 
 ## Evidence and limits
 

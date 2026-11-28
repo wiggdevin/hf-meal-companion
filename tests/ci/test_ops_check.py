@@ -1,6 +1,8 @@
 """scripts/ops-check.py (OD02): alert rules and the one-issue-per-outage sync, with no network."""
+import contextlib
 import datetime as dt
 import importlib.util
+import io
 from pathlib import Path
 import unittest
 
@@ -185,6 +187,47 @@ class TestAlertTest(unittest.TestCase):
             ops.read_state, ops.probe_health = original
             ops.os.environ.clear()
             ops.os.environ.update(env)
+
+
+class FailureDetailTest(unittest.TestCase):
+    URL = "https://api.supabase.com/v1/projects/secretref123/database/query"
+
+    def test_names_the_status_reason_and_endpoint_without_the_ref(self):
+        error = ops.urllib.error.HTTPError(self.URL, 429, "Too Many Requests", {}, None)
+        detail = ops.failure_detail(error)
+        self.assertEqual(detail, "HTTP 429 Too Many Requests from "
+                                 "POST api.supabase.com/v1/projects/<ref>/database/query")
+        self.assertNotIn("secretref123", detail)
+
+    def test_other_errors_name_only_their_class_and_the_endpoint(self):
+        reset = ops.urllib.error.URLError(ConnectionResetError("secret body text"))
+        self.assertEqual(ops.failure_detail(reset), f"ConnectionResetError reaching {ops.STATE_ENDPOINT}")
+        self.assertEqual(ops.failure_detail(ValueError("secret body text")), f"ValueError from {ops.STATE_ENDPOINT}")
+        self.assertNotIn("secret", ops.failure_detail(ValueError("secret body text")))
+
+    def test_main_logs_the_status_and_endpoint_and_no_secret(self):
+        def refuse(ref, token):
+            raise ops.urllib.error.HTTPError(self.URL, 502, "Bad Gateway", {}, None)
+
+        original, saved = (ops.read_state, ops.probe_health), dict(ops.os.environ)
+        ops.read_state = refuse
+        ops.probe_health = lambda url: [(200, {"ok": True})]
+        ops.os.environ.update(SUPABASE_ACCESS_TOKEN="tok-secret", SUPABASE_PROJECT_REF="secretref123")
+        for name in ("GITHUB_TOKEN", "GITHUB_REPOSITORY"):
+            ops.os.environ.pop(name, None)
+        out = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out):
+                code = ops.main([])
+        finally:
+            ops.read_state, ops.probe_health = original
+            ops.os.environ.clear()
+            ops.os.environ.update(saved)
+        self.assertEqual(code, 1)
+        self.assertIn("database state unreadable (HTTP 502 Bad Gateway from "
+                      "POST api.supabase.com/v1/projects/<ref>/database/query)", out.getvalue())
+        self.assertNotIn("secretref123", out.getvalue())
+        self.assertNotIn("tok-secret", out.getvalue())
 
 
 class SyncTest(unittest.TestCase):
