@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import http
 import json
 import os
 import re
@@ -289,11 +290,42 @@ def probe_health(base_url, attempts=HEALTH_ATTEMPTS, pause=HEALTH_PAUSE_SECONDS,
     return probes
 
 
+# The database read: one path, shown in the log with the project ref masked.
+STATE_PATH = "api.supabase.com/v1/projects/{ref}/database/query"
+STATE_ENDPOINT = "POST " + STATE_PATH.format(ref="<ref>")
+
+
+class StateAnswerError(Exception):
+    """The Management API answered, but not with one row of state. The message is a constant:
+    the only exception text failure_detail() prints."""
+
+
+def failure_detail(error, endpoint=STATE_ENDPOINT):
+    """One log line naming what failed: the endpoint, the HTTP status, or the error class.
+    Never a response body, a header, a URL with the real project ref or an exception message (a
+    library message can carry a URL or a body snippet); only StateAnswerError's constant text.
+    The HTTP label comes from http.HTTPStatus, not from the server's reason phrase, which an
+    intermediary can set to anything."""
+    if isinstance(error, urllib.error.HTTPError):
+        try:
+            label = f" {http.HTTPStatus(error.code).phrase}"
+        except ValueError:
+            label = ""
+        return f"HTTP {error.code}{label} from {endpoint}"
+    if isinstance(error, urllib.error.URLError):
+        # A string reason ("no host given") has no class worth naming: name URLError instead.
+        named = error.reason if isinstance(error.reason, BaseException) else error
+        return f"{type(named).__name__} reaching {endpoint}"
+    if isinstance(error, StateAnswerError):
+        return f"{error} from {endpoint}"
+    return f"{type(error).__name__} from {endpoint}"
+
+
 def read_state(ref, token):
-    status, rows = request_json(f"https://api.supabase.com/v1/projects/{ref}/database/query",
+    status, rows = request_json(f"https://{STATE_PATH.format(ref=ref)}",
                                 {"Authorization": f"Bearer {token}"}, {"query": STATE_QUERY}, "POST")
     if status not in (200, 201) or not isinstance(rows, list) or len(rows) != 1:
-        raise RuntimeError("Management API returned an unexpected answer")
+        raise StateAnswerError(f"Management API returned an unexpected answer (HTTP {status})")
     state = rows[0]["state"]
     return json.loads(state) if isinstance(state, str) else state
 
@@ -407,7 +439,7 @@ def main(argv=None):
         try:
             findings.update(state_findings(read_state(ref, token), spend_caps(env)))
         except Exception as error:  # noqa: BLE001 — never print a response body or a header.
-            print(f"ops check: database state unreadable ({type(error).__name__}); its issues are unchanged")
+            print(f"ops check: database state unreadable ({failure_detail(error)}); its issues are unchanged")
             failed = True
     else:
         print("ops check: database checks skipped (SUPABASE_ACCESS_TOKEN / SUPABASE_PROJECT_REF not set)")
